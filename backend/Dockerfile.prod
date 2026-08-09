@@ -1,0 +1,14 @@
+FROM node:24-slim
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY backend/package.json backend/
+COPY types/package.json types/
+RUN npm ci --workspace=backend --omit=dev
+
+COPY tsconfig.base.json ./
+COPY types/src/ types/src/
+COPY backend/ backend/
+WORKDIR /app/backend
+ENV NODE_ENV=production
+CMD ["node", "src/index.ts"]

@@ -1,0 +1,20 @@
+{
+  "name": "german-collocations",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "workspaces": [
+    "database",
+    "backend",
+    "frontend",
+    "types"
+  ],
+  "scripts": {
+    "migrate": "npm run migrate -w database",
+    "load-data": "npm run load-data -w database",
+    "typecheck": "npm run typecheck --worksspaces --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

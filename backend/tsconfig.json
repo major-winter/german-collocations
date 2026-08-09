@@ -1,0 +1,10 @@
+{
+    "extends": "../tsconfig.base.json",
+    "compilerOptions": {
+        "noEmit": true,
+        "erasableSyntaxOnly": true,
+        "module": "nodenext",
+        "moduleResolution": "nodenext"
+    },
+    "include": ["src"]
+}

@@ -1,0 +1,21 @@
+FROM node:24-slim AS build
+WORKDIR /app
+
+COPY package.json package-lock.json ./
+COPY frontend/package.json frontend/
+COPY types/package.json types/
+RUN npm ci --workspace=frontend
+
+COPY tsconfig.base.json ./
+COPY types/src/ types/src/
+COPY frontend/ frontend/
+
+WORKDIR /app/frontend
+ARG VITE_API_URL
+ENV VITE_API_URL=$VITE_API_URL
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY --from=build /app/frontend/dist /usr/share/caddy
+COPY frontend/Caddyfile /etc/caddy/Caddyfile
+
