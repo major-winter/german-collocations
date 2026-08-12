@@ -1,4 +1,3 @@
-import { Link } from 'react-router';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import type { CollocationEntry } from '@collocations/types';

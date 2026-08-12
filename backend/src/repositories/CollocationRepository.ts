@@ -58,12 +58,13 @@ export class PgCollocationRepository implements CollocationRepository {
         [word],
       ),
       this.#pool.query<CollocationRow>(
-        `SELECT w1.word, c.cooccurrence, c.significance
+        `SELECT w1.word, c.cooccurrence, c.significance, s.sentence
        FROM collocations c
        JOIN words w1 ON w1.id = c.left_word_id
        JOIN words w2 ON w2.id = c.right_word_id
-LEFT JOIN collocation_examples ce
-ON ce.left_word_id = c.left_word_id AND ce.right_word_id = c.right_word_id
+        LEFT JOIN collocation_examples ce
+        ON ce.left_word_id = c.left_word_id AND ce.right_word_id = c.right_word_id
+LEFT JOIN sentences s ON s.id = ce.sentence_id
        WHERE w2.word = $1
        ORDER BY c.significance DESC
        LIMIT 60`,
