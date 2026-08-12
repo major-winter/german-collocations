@@ -12,7 +12,7 @@ export function Layout({ children }: LayoutProps) {
     return (
         <div className="min-h-screen flex flex-col">
             <header className="pt-8 pb-4 text-center">
-                <h1 className="text-4xl font-medium">German Collocations</h1>
+                <h1 className="text-4xl font-medium">Deustche Kollokationen</h1>
                 <p className="text-sm text-muted-foreground">
                     Find which words commonly appear before and after any German word
                 </p>

@@ -1,13 +1,16 @@
+import { CollocationEntry } from "@collocations/types";
+
 export interface CollocationRow {
   word: string;
   cooccurrence: number;
   significance: number;
+  sentence: string | null;
 }
 
 export interface CollocationLookup {
   wordId: number;
-  followedBy: CollocationRow[];
-  precededBy: CollocationRow[];
+  followedBy: CollocationEntry[];
+  precededBy: CollocationEntry[];
 }
 
 export interface CollocationRepository {

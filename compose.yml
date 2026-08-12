@@ -68,5 +68,21 @@ services:
       VITE_API_URL: http://localhost:3000
     depends_on:
       - backend
+
+  extract-examples:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+        DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro
+    command: ['node', 'scripts/extract-examples.ts']
+    profiles:
+      - manual
+
 volumes:
   postgres_data:

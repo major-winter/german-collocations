@@ -55,12 +55,10 @@ export function Word() {
                 <>
                     <CollocationList
                         title="Commonly followed by"
-                        entries={state.data.followedBy}
-                    />
+                        entries={state.data.followedBy} direction={"followed"}                    />
                     <CollocationList
                         title="Commonly preceded by"
-                        entries={state.data.precededBy}
-                    />
+                        entries={state.data.precededBy} direction={"followed"}                    />
                 </>
             )}
         </main>

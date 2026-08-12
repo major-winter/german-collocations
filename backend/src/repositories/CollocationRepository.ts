@@ -4,6 +4,30 @@ import type {
   CollocationRepository,
   CollocationRow,
 } from "../contracts/CollocationRepository.ts";
+import type { CollocationEntry } from "@collocations/types";
+
+function groupRows(rows: CollocationRow[]): CollocationEntry[] {
+  const entries = new Map<string, CollocationEntry>();
+
+  for (const row of rows) {
+    const existing = entries.get(row.word);
+
+    if (existing) {
+      if (row.sentence) {
+        existing.examples.push(row.sentence);
+      }
+    } else {
+      entries.set(row.word, {
+        word: row.word,
+        cooccurrence: row.cooccurrence,
+        significance: row.significance,
+        examples: row.sentence ? [row.sentence] : [],
+      });
+    }
+  }
+
+  return Array.from(entries.values());
+}
 
 export class PgCollocationRepository implements CollocationRepository {
   #pool: Pool;
@@ -21,13 +45,16 @@ export class PgCollocationRepository implements CollocationRepository {
 
     const [followedByResult, precededByResult] = await Promise.all([
       this.#pool.query<CollocationRow>(
-        `SELECT w2.word, c.cooccurrence, c.significance
+        `SELECT w2.word, c.cooccurrence, c.significance, s.sentence
         FROM collocations c
         JOIN words w1 ON w1.id = c.left_word_id
         JOIN words w2 ON w2.id = c.right_word_id
+        LEFT JOIN collocation_examples ce
+          ON ce.left_word_id = c.left_word_id and ce.right_word_id = c.right_word_id
+        LEFT JOIN sentences s ON s.id = ce.sentence_id
         WHERE w1.word = $1
         ORDER BY c.significance DESC
-        LIMIT 20`,
+        LIMIT 60`,
         [word],
       ),
       this.#pool.query<CollocationRow>(
@@ -35,16 +62,18 @@ export class PgCollocationRepository implements CollocationRepository {
        FROM collocations c
        JOIN words w1 ON w1.id = c.left_word_id
        JOIN words w2 ON w2.id = c.right_word_id
+LEFT JOIN collocation_examples ce
+ON ce.left_word_id = c.left_word_id AND ce.right_word_id = c.right_word_id
        WHERE w2.word = $1
        ORDER BY c.significance DESC
-       LIMIT 20`,
+       LIMIT 60`,
         [word],
       ),
     ]);
     return {
       wordId: wordRow.id,
-      followedBy: followedByResult.rows,
-      precededBy: precededByResult.rows,
+      followedBy: groupRows(followedByResult.rows),
+      precededBy: groupRows(precededByResult.rows),
     };
   }
 }
