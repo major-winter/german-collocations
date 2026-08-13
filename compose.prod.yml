@@ -1,3 +1,4 @@
+name: german_collocations
 services:
   db:
     image: postgres:18
