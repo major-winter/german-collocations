@@ -68,20 +68,20 @@ services:
       - backend
       - frontend
 
-extract-examples:
-    build:
-      context: .
-      dockerfile: database/Dockerfile
-    depends_on:
-      db:
-        condition: service_healthy
-    environment:
-      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
-    volumes:
-      - ./data:/data:ro
-    command: ['node', 'scripts/extract-examples.ts']
-    profiles:
-      - manual
+  extract-examples:
+      build:
+        context: .
+        dockerfile: database/Dockerfile
+      depends_on:
+        db:
+          condition: service_healthy
+      environment:
+        DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+      volumes:
+        - ./data:/data:ro
+      command: ['node', 'scripts/extract-examples.ts']
+      profiles:
+        - manual
 
 volumes:
   postgres_data:
