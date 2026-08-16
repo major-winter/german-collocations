@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -11,6 +11,10 @@ interface SearchBoxProps {
 export function SearchBox({ initialValue }: SearchBoxProps) {
     const [value, setValue] = useState(initialValue);
     const navigate = useNavigate();
+
+    useEffect(() => {
+        setValue(decodeURIComponent(initialValue));
+    }, [initialValue])
 
     function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();

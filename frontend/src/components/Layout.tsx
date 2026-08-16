@@ -1,21 +1,25 @@
-interface LayoutProps {
-    children: React.ReactNode
-}
-
 import type { ReactNode } from 'react';
+import { matchPath, useLocation } from 'react-router';
+import { SearchBox } from './SearchBox';
 
 interface LayoutProps {
     children: ReactNode;
 }
 
 export function Layout({ children }: LayoutProps) {
+    const location = useLocation();
+
+    const match = matchPath("/wort/:word", location.pathname);
+    const currentWord = match?.params.word ?? "";
+
     return (
         <div className="min-h-screen flex flex-col">
-            <header className="pt-8 pb-4 text-center">
+            <header className="pt-8 pb-4 text-center max-w-xl mx-auto px-4 w-full">
                 <h1 className="text-4xl font-medium">Deustche Kollokationen</h1>
                 <p className="text-sm text-muted-foreground">
                     Hier finden Sie häufige Wortverbindungen
                 </p>
+                <SearchBox initialValue={currentWord} />
             </header>
 
             <main className="flex-1 w-full max-w-xl mx-auto px-4">

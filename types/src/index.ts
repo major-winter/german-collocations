@@ -10,3 +10,6 @@ export interface CollocationResponse {
   followedBy: CollocationEntry[];
   precededBy: CollocationEntry[];
 }
+
+export type WordSuggestion = { word: string; frequency: number; score: number };
+
