@@ -20,12 +20,12 @@ FROM (
            word,
            frequency,
            GREATEST(
-               similarity(word_normalized, normalize_de($1)),
-               0.8 * similarity(word_folded, fold_de($1))
+               word_similarity(normalize_de($1), word_normalized),
+               0.8 * word_similarity(fold_de($1), word_folded)
            ) AS score
     FROM   words
-    WHERE  word_normalized % normalize_de($1)
-       OR  word_folded     % fold_de($1)
+    WHERE  normalize_de($1) <% word_normalized
+       OR  fold_de($1)      <% word_folded
     ORDER  BY word_normalized, frequency DESC
 ) candidates
 ORDER BY score * ln(frequency + 1) DESC
