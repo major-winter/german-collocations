@@ -1,10 +1,11 @@
-import { CollocationEntry } from "@collocations/types";
+import { CollocationEntry, CollocationSection } from "@collocations/types";
 
 export interface CollocationRow {
   word: string;
   cooccurrence: number;
   significance: number;
   sentence: string | null;
+  section: CollocationSection;
 }
 
 export interface CollocationLookup {

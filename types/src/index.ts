@@ -1,8 +1,11 @@
+export type CollocationSection = 'noun' | 'verb' | 'adjective' | 'preposition' | 'other';
+
 export interface CollocationEntry {
   word: string;
   cooccurrence: number;
   significance: number;
   examples: string[];
+  section: CollocationSection;
 }
 
 export interface CollocationResponse {
