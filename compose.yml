@@ -84,5 +84,19 @@ services:
     profiles:
       - manual
 
+  load-pos:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-pos.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
 volumes:
   postgres_data:
