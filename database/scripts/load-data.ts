@@ -5,6 +5,7 @@ import path from "node:path";
 import { isNonAlphabetic, isStopword } from "../src/filters.ts";
 
 const DATA_DIR = process.env.DATA_DIR ?? "/data";
+const CORPUS_PREFIX = process.env.CORPUS_PREFIX ?? "deu_news_2025_100K";
 const BATCH_SIZE = 1000;
 
 type WordRow = [id: number, word: string, frequency: number];
@@ -133,8 +134,8 @@ async function main(): Promise<void> {
   const url = process.env.DATABASE_URL;
   if (!url) throw new Error("DATABASE_URL is not set");
 
-  const wordsFile = path.join(DATA_DIR, "deu_news_2025_100K-words.txt");
-  const coFile = path.join(DATA_DIR, "deu_news_2025_100K-co_n.txt");
+  const wordsFile = path.join(DATA_DIR, `${CORPUS_PREFIX}-words.txt`);
+  const coFile = path.join(DATA_DIR, `${CORPUS_PREFIX}-co_n.txt`);
 
   const client = new Client({ connectionString: url });
   await client.connect();

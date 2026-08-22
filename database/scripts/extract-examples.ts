@@ -65,9 +65,8 @@ async function processFile(
   client: Client,
   wordIndex: WordIndex,
   pairCounts: PairCounts,
-  dataDir: string,
+  filePath: string,
 ) {
-  const filePath = path.join(dataDir, "deu_news_2025_100K-sentences.txt");
   let remainingPairs = pairCounts.size;
   let sentencesInserted = 0;
   let examplesInserted = 0;
@@ -149,6 +148,7 @@ async function main(): Promise<void> {
   if (!url) throw new Error('DATABASE_URL is not set');
 
   const dataDir = process.env.DATA_DIR ?? '/data';
+  const corpusPrefix = process.env.CORPUS_PREFIX ?? 'deu_news_2025_100K';
 
   const client = new Client({ connectionString: url });
 
@@ -167,7 +167,8 @@ async function main(): Promise<void> {
       pairCounts.set(`${pair.leftWordId}-${pair.rightWordId}`, 0);
     }
 
-    await processFile(client, wordIndex, pairCounts, dataDir);
+    const sentencesFile = path.join(dataDir, `${corpusPrefix}-sentences.txt`);
+    await processFile(client, wordIndex, pairCounts, sentencesFile);
   } finally {
     await client.end();
     console.log('Disconnected');
