@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
 import { ArrowRight, ArrowLeft } from 'lucide-react';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
@@ -6,6 +7,39 @@ interface CollocationListProps {
     title: string;
     direction: 'followed' | 'preceded';
     entries: CollocationEntry[];
+    queryWord: string;
+}
+
+// Sentences and collocate words are the exact surface forms from the
+// corpus (see CollocationRepository.ts), so matching on literal word
+// tokens - not lemmas - is correct here. \p{L}+ (rather than \w+) is
+// needed because German words contain umlauts/ß, which \w excludes.
+function highlightCollocates(sentence: string, targets: string[]): ReactNode[] {
+    const targetSet = new Set(targets.map((t) => t.toLowerCase()));
+    const pattern = /\p{L}+/gu;
+    const nodes: ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    let key = 0;
+
+    while ((match = pattern.exec(sentence)) !== null) {
+        const word = match[0];
+        if (targetSet.has(word.toLowerCase())) {
+            if (match.index > lastIndex) {
+                nodes.push(sentence.slice(lastIndex, match.index));
+            }
+            nodes.push(
+                <mark key={key++} className="bg-primary/15 text-foreground font-semibold not-italic rounded-sm px-0.5">
+                    {word}
+                </mark>,
+            );
+            lastIndex = match.index + word.length;
+        }
+    }
+    if (lastIndex < sentence.length) {
+        nodes.push(sentence.slice(lastIndex));
+    }
+    return nodes;
 }
 
 const SECTION_ORDER: CollocationSection[] = ['noun', 'verb', 'adjective', 'preposition', 'other'];
@@ -31,7 +65,7 @@ function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, Co
     return groups;
 }
 
-export function CollocationList({ title, direction, entries }: CollocationListProps) {
+export function CollocationList({ title, direction, entries, queryWord }: CollocationListProps) {
     const Icon = direction === 'followed' ? ArrowRight : ArrowLeft;
     const groups = groupBySection(entries);
 
@@ -59,7 +93,7 @@ export function CollocationList({ title, direction, entries }: CollocationListPr
                                                 <div className="mt-1.5 space-y-1 border-t pt-1.5">
                                                     {entry.examples.map((sentence, i) => (
                                                         <p key={i} className="text-xs text-muted-foreground italic">
-                                                            {sentence}
+                                                            {highlightCollocates(sentence, [queryWord, entry.word])}
                                                         </p>
                                                     ))}
                                                 </div>
