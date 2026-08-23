@@ -103,11 +103,13 @@ export function Word() {
                 title="Commonly followed by"
                 direction="followed"
                 entries={state.data.followedBy}
+                queryWord={state.data.word}
             />
             <CollocationList
                 title="Commonly preceded by"
                 direction="preceded"
                 entries={state.data.precededBy}
+                queryWord={state.data.word}
             />
         </div>
     );
