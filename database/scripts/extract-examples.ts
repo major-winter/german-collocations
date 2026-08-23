@@ -36,28 +36,25 @@ JOIN words w2 ON w2.id = c.right_word_id
   }));
 }
 
-function buildWordIndex(pairs: CollocationPair[]): WordIndex {
+// Indexed by leftWord only: collocation pairs are directional neighbor
+// pairs (Leipzig's co_n.txt), so an example sentence must show leftWord
+// immediately followed by rightWord, not just both words anywhere in it.
+function buildLeftIndex(pairs: CollocationPair[]): WordIndex {
   const index: WordIndex = new Map();
   for (const pair of pairs) {
-    const leftEntries = index.get(pair.leftWord) ?? [];
-    leftEntries.push(pair);
-    index.set(pair.leftWord, leftEntries);
-
-    const rightEntries = index.get(pair.rightWord) ?? [];
-    rightEntries.push(pair);
-    index.set(pair.rightWord, rightEntries);
+    const entries = index.get(pair.leftWord) ?? [];
+    entries.push(pair);
+    index.set(pair.leftWord, entries);
   }
 
   return index;
 }
 
-function tokenizeSentence(sentence: string) {
-  return new Set(
-    sentence
-      .split(/\s+/)
-      .map((token) => token.replace(/[^\p{L}\p{N}]/gu, ""))
-      .filter((token) => token.length > 0),
-  );
+function tokenizeSentence(sentence: string): string[] {
+  return sentence
+    .split(/\s+/)
+    .map((token) => token.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter((token) => token.length > 0);
 }
 
 // Existing counts, not zero, so a resumed run doesn't re-scan pairs that
@@ -119,7 +116,7 @@ async function insertExamplesBatch(
 
 async function processFile(
   client: Client,
-  wordIndex: WordIndex,
+  leftIndex: WordIndex,
   pairCounts: PairCounts,
   filePath: string,
 ) {
@@ -156,31 +153,30 @@ async function processFile(
 
     const sentenceId = parseInt(line.substring(0, tabIndex), 10);
     const sentence = line.substring(tabIndex + 1);
-    const words = tokenizeSentence(sentence);
+    const tokens = tokenizeSentence(sentence);
 
-    let sentenceNeeded = false;
     const matchedPairs: CollocationPair[] = [];
+    const matchedKeys = new Set<string>();
 
-    for (const word of words) {
-      const candidates = wordIndex.get(word);
+    for (let i = 0; i < tokens.length - 1; i++) {
+      const candidates = leftIndex.get(tokens[i]);
       if (!candidates) continue;
 
       for (const pair of candidates) {
+        if (pair.rightWord !== tokens[i + 1]) continue;
+
         const key = `${pair.leftWordId}-${pair.rightWordId}`;
+        if (matchedKeys.has(key)) continue;
+
         const count = pairCounts.get(key)!;
         if (count >= MAX_EXAMPLES) continue;
 
-        // Determine the other word in the pair
-        const otherWord =
-          word === pair.leftWord ? pair.rightWord : pair.leftWord;
-        if (!words.has(otherWord)) continue;
-
+        matchedKeys.add(key);
         matchedPairs.push(pair);
-        sentenceNeeded = true;
       }
     }
 
-    if (!sentenceNeeded) continue;
+    if (matchedPairs.length === 0) continue;
 
     sentenceBatch.push([sentenceId, sentence]);
     sentencesInserted++;
@@ -229,8 +225,8 @@ async function main(): Promise<void> {
     const pairs = await loadCollocationPairs(client);
     console.log(`Loaded ${pairs.length} collocation pairs`);
 
-    const wordIndex = buildWordIndex(pairs);
-    console.log(`Word index built: ${wordIndex.size} unique words`);
+    const leftIndex = buildLeftIndex(pairs);
+    console.log(`Left-word index built: ${leftIndex.size} unique words`);
 
     const pairCounts: PairCounts = await loadExistingExampleCounts(client);
     for (const pair of pairs) {
@@ -240,7 +236,7 @@ async function main(): Promise<void> {
     console.log(`Resuming from ${pairCounts.size} tracked pairs (existing example counts loaded)`);
 
     const sentencesFile = path.join(dataDir, `${corpusPrefix}-sentences.txt`);
-    await processFile(client, wordIndex, pairCounts, sentencesFile);
+    await processFile(client, leftIndex, pairCounts, sentencesFile);
   } finally {
     await client.end();
     console.log('Disconnected');
