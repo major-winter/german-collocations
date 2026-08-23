@@ -1,6 +1,6 @@
 import { createReadStream } from "fs";
 import path from "path";
-import { Client, Pool } from "pg";
+import { Client } from "pg";
 import { createInterface } from "readline";
 
 interface CollocationPair {
@@ -60,16 +60,88 @@ function tokenizeSentence(sentence: string) {
   );
 }
 
+// Existing counts, not zero, so a resumed run doesn't re-scan pairs that
+// already have their 3 examples, and doesn't insert past the cap.
+async function loadExistingExampleCounts(
+  client: Client,
+): Promise<Map<string, number>> {
+  const result = await client.query(`
+    SELECT left_word_id, right_word_id, count(*) AS count
+    FROM collocation_examples
+    GROUP BY left_word_id, right_word_id
+  `);
+
+  const counts = new Map<string, number>();
+  for (const row of result.rows) {
+    counts.set(`${row.left_word_id}-${row.right_word_id}`, Number(row.count));
+  }
+  return counts;
+}
+
 const MAX_EXAMPLES = 3;
+const BATCH_SIZE = 1000;
+
+type SentenceRow = [id: number, sentence: string];
+type ExampleRow = [leftWordId: number, rightWordId: number, sentenceId: number];
+
+async function insertSentencesBatch(
+  client: Client,
+  batch: SentenceRow[],
+): Promise<void> {
+  if (batch.length === 0) return;
+
+  const placeholders = batch
+    .map((_, i) => `($${i * 2 + 1}, $${i * 2 + 2})`)
+    .join(", ");
+
+  await client.query(
+    `INSERT INTO sentences (id, sentence) VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+    batch.flat(),
+  );
+}
+
+async function insertExamplesBatch(
+  client: Client,
+  batch: ExampleRow[],
+): Promise<void> {
+  if (batch.length === 0) return;
+
+  const placeholders = batch
+    .map((_, i) => `($${i * 3 + 1}, $${i * 3 + 2}, $${i * 3 + 3})`)
+    .join(", ");
+
+  await client.query(
+    `INSERT INTO collocation_examples (left_word_id, right_word_id, sentence_id)
+     VALUES ${placeholders} ON CONFLICT DO NOTHING`,
+    batch.flat(),
+  );
+}
+
 async function processFile(
   client: Client,
   wordIndex: WordIndex,
   pairCounts: PairCounts,
   filePath: string,
 ) {
-  let remainingPairs = pairCounts.size;
+  let remainingPairs = 0;
+  for (const count of pairCounts.values()) {
+    if (count < MAX_EXAMPLES) remainingPairs++;
+  }
+
   let sentencesInserted = 0;
   let examplesInserted = 0;
+
+  let sentenceBatch: SentenceRow[] = [];
+  let exampleBatch: ExampleRow[] = [];
+
+  // Sentences before examples, always - an example batch can reference a
+  // sentence added in the same cycle that hasn't been committed yet.
+  const flush = async () => {
+    await insertSentencesBatch(client, sentenceBatch);
+    await insertExamplesBatch(client, exampleBatch);
+    sentenceBatch = [];
+    exampleBatch = [];
+  };
 
   const rl = createInterface({
     input: createReadStream(filePath, "utf8"),
@@ -110,24 +182,16 @@ async function processFile(
 
     if (!sentenceNeeded) continue;
 
-    // Insert sentence first (FK order)
-    await client.query(
-      "INSERT INTO sentences (id, sentence) VALUES ($1, $2) ON CONFLICT DO NOTHING",
-      [sentenceId, sentence],
-    );
+    sentenceBatch.push([sentenceId, sentence]);
     sentencesInserted++;
 
-    // Insert each matched pair's example
+    // Queue each matched pair's example
     for (const pair of matchedPairs) {
       const key = `${pair.leftWordId}-${pair.rightWordId}`;
       const count = pairCounts.get(key)!;
       if (count >= MAX_EXAMPLES) continue; // re-check — another match in this sentence may have incremented
 
-      await client.query(
-        `INSERT INTO collocation_examples (left_word_id, right_word_id, sentence_id)
-         VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`,
-        [pair.leftWordId, pair.rightWordId, sentenceId],
-      );
+      exampleBatch.push([pair.leftWordId, pair.rightWordId, sentenceId]);
 
       pairCounts.set(key, count + 1);
       examplesInserted++;
@@ -136,7 +200,13 @@ async function processFile(
         remainingPairs--;
       }
     }
+
+    if (exampleBatch.length >= BATCH_SIZE || sentenceBatch.length >= BATCH_SIZE) {
+      await flush();
+    }
   }
+
+  await flush();
 
   console.log(`Sentences inserted: ${sentencesInserted}`);
   console.log(`Examples inserted: ${examplesInserted}`);
@@ -162,10 +232,12 @@ async function main(): Promise<void> {
     const wordIndex = buildWordIndex(pairs);
     console.log(`Word index built: ${wordIndex.size} unique words`);
 
-    const pairCounts: PairCounts = new Map();
+    const pairCounts: PairCounts = await loadExistingExampleCounts(client);
     for (const pair of pairs) {
-      pairCounts.set(`${pair.leftWordId}-${pair.rightWordId}`, 0);
+      const key = `${pair.leftWordId}-${pair.rightWordId}`;
+      if (!pairCounts.has(key)) pairCounts.set(key, 0);
     }
+    console.log(`Resuming from ${pairCounts.size} tracked pairs (existing example counts loaded)`);
 
     const sentencesFile = path.join(dataDir, `${corpusPrefix}-sentences.txt`);
     await processFile(client, wordIndex, pairCounts, sentencesFile);
