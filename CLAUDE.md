@@ -46,15 +46,16 @@ of the deploy path. See `tools/pos-tagging/README.md`.
 ## Where the real history lives
 
 - `decisions.md` (+ `decisions-26-28.md`, `decisions-29-32.md`,
-  `decisions-33-35.md`, ...) — chronological decision log with
-  reasoning. Read before revisiting any past choice.
+  `decisions-33-35.md`, `decisions-36-38.md`, ...) — chronological
+  decision log with reasoning. Read before revisiting any past choice.
 - `architecture.md` — current schema, data pipeline, and open
   questions.
 - `glossary.md` — corpus-linguistics and project-specific terms.
 - `milestone-N-session-notes.md`, `production-outage-session-notes.md`,
   `fuzzy-search-session-notes.md`, `example-sentences-session-notes.md`,
-  `pos-tagging-session-notes.md` — "why is it built this way" / "hit
-  this error before" notes, one per feature/incident.
+  `pos-tagging-session-notes.md`, `1M-corpus-upgrade-session-notes.md`
+  — "why is it built this way" / "hit this error before" notes, one
+  per feature/incident.
 
 ## Recurring failure classes (check these first when something's broken)
 
@@ -62,6 +63,17 @@ of the deploy path. See `tools/pos-tagging/README.md`.
    `--build` silently reuses old images. This has caused more
    debugging detours than anything else in this project's history.
    Always `--build` after any source or migration file edit.
+   Two things that make this worse in production, both hit during the
+   1M corpus upgrade: `docker compose build` with no service names
+   silently skips any service gated behind `profiles: manual` (build
+   it explicitly, or pass `--profile manual`); and building a fresh
+   image does **not** restart an already-running long-lived service
+   (`backend`/`frontend`/`caddy`) — follow `build` with `docker
+   compose -f compose.prod.yml up -d`, or the old container keeps
+   serving the old code indefinitely with no error. Verify with
+   `docker inspect <container> --format '{{.State.StartedAt}}'`
+   against the image's build time if a deploy "doesn't seem to have
+   taken."
 2. **A decision logged as applied to "both compose files" often isn't.**
    The production outage was caused by exactly this — `name:`
    present in `compose.yml`, missing from `compose.prod.yml`. When a
@@ -69,6 +81,15 @@ of the deploy path. See `tools/pos-tagging/README.md`.
 3. **`ON CONFLICT DO NOTHING` only suppresses duplicate-key conflicts**,
    not FK violations — the `validIds`/lookup-map pattern is required
    to skip orphaned or unresolvable rows safely.
+4. **Leipzig word IDs are not stable across package sizes.** The same
+   numeric ID means a different word in the `100K` vs `1M` packages.
+   A corpus package upgrade is always `TRUNCATE ... CASCADE` + full
+   reload, never incremental — see decision #37.
+5. **The VM has two git checkouts of this repo under different
+   OS-login users; only one is live.** Confirm which one with `docker
+   inspect <container> --format '{{index .Config.Labels
+   "com.docker.compose.project.config_files"}}'` before trusting
+   `git log`/`git status` from a checkout found by guessing a path.
 
 ## Conventions
 
