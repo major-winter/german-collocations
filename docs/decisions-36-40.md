@@ -140,3 +140,36 @@ both local and production databases — the previously-loaded data
 reflected the old, looser matching and needed to be thrown away, not
 patched. See `docs/1M-corpus-upgrade-session-notes.md` for the
 redeploy.
+
+### 40. Dropped before/after direction from the collocations API
+
+With POS-section grouping in place (decision #36), considered whether
+the `followedBy`/`precededBy` split was still pulling its weight
+against the added surface area of maintaining two parallel result
+sets. Explicitly confirmed with the user before implementing, since
+direction is real information (the app's own description is "what
+words most commonly appear immediately before/after" the queried
+word) — this was a deliberate scope cut, not an oversight.
+
+**Chosen: drop direction entirely.** `CollocationResponse` (and the
+matching backend contracts) now expose a single flat `collocations:
+CollocationEntry[]`, still POS-sectioned and significance-ranked, with
+no indication of which side of the queried word a partner appeared
+on. `CollocationRepository.findByWord` combines what were two
+separate directional queries into one, via `UNION ALL` over both
+branches before ranking, rather than running two queries and merging
+in JS — ranking (`ROW_NUMBER() OVER (PARTITION BY section ...)`) needs
+to see both directions together to produce a correct top-10-per-section
+across the combined set, not two top-10s concatenated.
+
+One correctness trap surfaced and fixed while implementing this: the
+same partner word can legitimately appear via two distinct
+`(left_word_id, right_word_id)` pairs now that both directions feed
+the same list (confirmed empirically against real data — not just a
+theoretical case). `groupRows` was deduping by word text, which would
+have silently merged example sentences from two unrelated pairs under
+one entry with only one of the two pairs' cooccurrence/significance
+numbers. Fixed by deduping on pair identity instead. The frontend's
+list-rendering key had the same latent bug (`entry.word` as a React
+key, which collides when the same word legitimately appears twice in
+one section) — fixed alongside it.

@@ -46,7 +46,7 @@ of the deploy path. See `tools/pos-tagging/README.md`.
 ## Where the real history lives
 
 - `decisions.md` (+ `decisions-26-28.md`, `decisions-29-32.md`,
-  `decisions-33-35.md`, `decisions-36-39.md`, ...) — chronological
+  `decisions-33-35.md`, `decisions-36-40.md`, ...) — chronological
   decision log with reasoning. Read before revisiting any past choice.
 - `architecture.md` — current schema, data pipeline, and open
   questions.
