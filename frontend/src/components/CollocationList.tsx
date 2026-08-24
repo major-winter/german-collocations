@@ -67,9 +67,6 @@ export function CollocationList({ entries, queryWord }: CollocationListProps) {
 
     return (
         <section className="mb-6">
-            <h2 className="text-sm font-medium text-muted-foreground mb-2">
-                Collocations
-            </h2>
             {entries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No results.</p>
             ) : (
