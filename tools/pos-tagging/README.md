@@ -95,3 +95,54 @@ real corpus-style sentences before committing to it.
 This script needs the dependency parser, unlike `tag_words.py` (tagger
 only), so it's slower — expect roughly 1,000 sentences/sec, i.e. ~15-20
 minutes for a 1M-sentence corpus.
+
+## Lemma extraction
+
+A third script: `extract_lemmas.py`. Same one-shot-offline-tool
+contract again, but this one re-derives collocation data at *lemma*
+granularity instead of exact surface form, so inflected variants of the
+same word (`Einsatz`/`Einsätze`/`Einsatzes`/`Einsätzen`) share one
+collocation profile instead of four siloed ones, and near-duplicate
+partners (`kommen`/`kommt`/`kam`/`gekommen`/`kamen`) merge into a single
+entry instead of splitting a 10-slot list section five ways.
+
+```bash
+cd tools/pos-tagging
+source .venv/bin/activate
+python extract_lemmas.py --input ../../data/sentences.txt \
+  --word-lemma-output word_lemma.tsv \
+  --lemma-collocations-output lemma_collocations.tsv
+```
+
+Only the tagger and lemmatizer are needed (`disable=['parser', 'ner']`)
+— verified by hand that lemma accuracy is identical with the parser
+disabled, so this reuses `tag_words.py`'s fast speed class (~1,000
+sentences/sec) rather than `score_sentence_simplicity.py`'s slower one.
+Lemmatization needs sentence context to be reliable, though: an isolated
+word like "Einsatzes" mistags as an adjective with lemma "einsatz" out
+of context, but resolves correctly to noun/"Einsatz" inside a real
+sentence — this script always runs over full sentences, never isolated
+words, for that reason.
+
+Two outputs:
+
+- `word_lemma.tsv`: `word\tlemma\tcount`, same shape as `tag_words.py`'s
+  `word_pos.tsv` — raw counts per (surface form, lemma) pair.
+- `lemma_collocations.tsv`: `left_lemma\tright_lemma\tcount` — adjacency
+  counts between lemmas, tallied directly from the corpus rather than
+  merged from Leipzig's surface-form-keyed `co_n.txt` after the fact.
+
+**Applies the same word/collocation filter as
+`database/src/filters.ts`'s `isStopword`/`isNonAlphabetic`** (a literal
+copy, not a shared file — this tool is intentionally standalone from
+the rest of the repo, same as `tag_words.py`). This isn't optional:
+skipping it lets a stopword's cooccurrence get tallied from the full
+unfiltered corpus scan while its frequency (sourced from the
+already-filtered `words` table downstream) stays near zero, which
+produces a nonsensical result — "der"/"und" scoring higher by logDice
+than genuine collocations. Found this the hard way; see decision #44.
+A filtered token stays in the per-sentence position sequence (so it
+still correctly breaks adjacency between its neighbors) but is excluded
+from both output counters — this matches how Leipzig's own `co_n.txt`
+already behaves (a stopword-adjacent pair is dropped, not bridged over
+to connect the next real word).
