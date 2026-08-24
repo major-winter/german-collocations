@@ -49,7 +49,7 @@ per-word — confirms the mechanism targets the right thing.
 no threshold is free. This one also cuts some real-but-modest pairs —
 e.g. "Interesse für" (15.24), a legitimate alternative to "Interesse an,"
 falls below the preposition floor. Considered 50th and 90th percentile
-as alternatives (discussed with the user): 50th wouldn't have caught
+as alternatives: 50th wouldn't have caught
 "Einsatz am" at all (28.98 sits above the preposition median); 90th would
 leave many words with far fewer than 10 results per section, some
 sections empty. Went with 75th as the balance.

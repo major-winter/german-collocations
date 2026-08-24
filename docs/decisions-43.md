@@ -1,13 +1,12 @@
 ### 43. Replaced significance-based ranking with logDice (supersedes #42)
 
-A second spurious "collocation" was flagged by hand shortly after #42
-shipped: "Einsatz war" — "war" is a form of the copula "sein," not a real
-collocate of "Einsatz," any more than "am" was. Same failure mode, and it
-was tempting to patch it the same way (a POS-based exclusion list for
-auxiliary/modal verb forms, on top of #42's per-section significance
-floors). Explicitly told not to: "We need a scientific approach, not just
-tuning the current data" — stop patching individual symptoms and fix the
-underlying metric instead.
+A second spurious "collocation" surfaced shortly after #42 shipped:
+"Einsatz war" — "war" is a form of the copula "sein," not a real
+collocate of "Einsatz," any more than "am" was. Same failure mode. A
+POS-based exclusion list for auxiliary/modal verb forms (on top of #42's
+per-section floors) would have patched this specific case, but every fix
+so far had been a reaction to one symptom at a time rather than a fix to
+the underlying metric — the right move was to address the metric itself.
 
 Root-caused: the `significance` column (loaded verbatim from Leipzig's
 `co_n.txt`) is a chi-square-style statistical-significance measure — its
@@ -72,9 +71,9 @@ per-section `SECTION_MIN_SIGNIFICANCE` floors and the
 (the top-10-per-section cap from decision #36) is unrelated to this
 change and is untouched. `significance` and `cooccurrence` are still
 returned in the API response (still real, correct statistics worth
-showing), they're just no longer the ranking/filtering key — confirmed
-via research that neither field is read anywhere in the frontend, so no
-contract change was needed.
+showing), they're just no longer the ranking/filtering key — neither
+field is read anywhere in the frontend, so no contract change was
+needed.
 
 Also updated the footer copy ("Ranked by statistical significance" →
 "Ranked by collocation strength" in `frontend/src/components/Layout.tsx`)
