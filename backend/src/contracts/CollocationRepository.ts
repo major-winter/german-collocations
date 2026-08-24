@@ -1,8 +1,8 @@
 import { CollocationEntry, CollocationSection } from "@collocations/types";
 
 export interface CollocationRow {
-  leftWordId: number;
-  rightWordId: number;
+  leftLemmaId: number;
+  rightLemmaId: number;
   word: string;
   cooccurrence: number;
   significance: number;
