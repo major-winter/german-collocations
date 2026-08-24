@@ -76,6 +76,15 @@ default itself to `deu_news_2025_1M` alongside this change, so a future
 invocation without an explicit override doesn't silently produce IDs that
 don't match what's loaded.
 
-Production deploy (shipping `sentence_simplicity.tsv` to the VM, rerunning
-`extract-examples` there) is a separate, later step — not done as part of
-this decision.
+Deployed the same day: rather than shipping `sentence_simplicity.tsv` and
+rerunning `extract-examples` on the VM (the matching script has crashed
+there repeatedly before, per decision #38's disk-I/O findings), followed
+the pattern established in the 1M-corpus-upgrade session — `pg_dump`'d
+`sentences`/`collocation_examples` from local (already regenerated),
+`scp`'d the dump to the VM, `TRUNCATE`'d production's stale versions, and
+restored via `psql` in FK-safe order (`sentences` before
+`collocation_examples`). No backend/frontend rebuild needed since the API
+response shape is unchanged, only which sentences get selected. Verified:
+all four row counts (`words`, `collocations`, `sentences`,
+`collocation_examples`) match local exactly, and the live site serves the
+new short, single-clause examples.
