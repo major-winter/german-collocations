@@ -17,6 +17,42 @@ const DOMINANCE_THRESHOLD = 0.8;
 // "LIMIT/pagination interaction").
 const PER_SECTION_LIMIT = 10;
 
+// Decision #42: PER_SECTION_LIMIT alone means a word with few genuinely
+// strong partners in a section gets backfilled with whatever's left down
+// to rank 10, however weak - e.g. "Einsatz am" (significance 28.98, the
+// last of Einsatz's 10 shown prepositions - "am" isn't a collocate of
+// "Einsatz", it's just a common preposition riding along). One global
+// floor doesn't work: sections sit on very different natural scales
+// (prepositions: only a few dozen distinct types, so they co-occur with
+// almost everything - preposition significance median is 14.4 vs 22-37
+// for the other sections). Each section's floor is that section's own
+// 75th-percentile significance, computed empirically across the whole
+// collocations table - confirmed against 10 real query words that this
+// cuts backfill noise like "Einsatz am" while keeping strong pairs like
+// "Polizei am" (709.48, that word's #1 preposition). Trade-off, same
+// shape as the MAX_EXAMPLE_WORDS tuning in decision #41: also trims some
+// real-but-modest pairs (e.g. "Interesse für", a legitimate alternative
+// to "Interesse an", sits at 15.24 - below the preposition floor).
+const SECTION_MIN_SIGNIFICANCE: Record<string, number> = {
+  noun: 67.95,
+  verb: 42.99,
+  adjective: 46.36,
+  preposition: 29.8,
+  other: 69.84,
+};
+
+function sectionMinSignificanceCase(sectionColumn: string): string {
+  return `
+    CASE ${sectionColumn}
+      WHEN 'noun' THEN ${SECTION_MIN_SIGNIFICANCE.noun}
+      WHEN 'verb' THEN ${SECTION_MIN_SIGNIFICANCE.verb}
+      WHEN 'adjective' THEN ${SECTION_MIN_SIGNIFICANCE.adjective}
+      WHEN 'preposition' THEN ${SECTION_MIN_SIGNIFICANCE.preposition}
+      WHEN 'other' THEN ${SECTION_MIN_SIGNIFICANCE.other}
+    END
+  `;
+}
+
 // Repeated verbatim inside the same query (Postgres window functions
 // can't reference a SELECT-list alias in PARTITION BY), so it's kept as
 // a single JS constant rather than two copies that could drift.
@@ -83,6 +119,7 @@ const COLLOCATIONS_QUERY = `
     ON ce.left_word_id = r.left_word_id AND ce.right_word_id = r.right_word_id
   LEFT JOIN sentences s ON s.id = ce.sentence_id
   WHERE r.rn <= ${PER_SECTION_LIMIT}
+    AND r.significance >= ${sectionMinSignificanceCase("r.section")}
   ORDER BY r.significance DESC
 `;
 
