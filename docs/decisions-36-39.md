@@ -100,3 +100,43 @@ batch size (e.g. every N lines scanned, regardless of how full the
 batch is) would bound the amount of at-risk work without giving up the
 throughput win from batching, and is the natural next step if this
 script needs to run against production again.
+
+**Update**: superseded in practice by decision #39, which replaced
+`buildWordIndex` entirely — the double-counting side effect described
+above no longer occurs, since a pair can no longer be discovered twice
+from the same sentence.
+
+### 39. Example-sentence matching requires true left-right adjacency
+
+Found after this feature had already shipped to production once:
+`extract-examples.ts`'s original matching only checked that both words
+of a pair appeared *anywhere* in a candidate sentence, in either
+order, with no requirement that they be adjacent. This produced
+"example sentences" for a `(left, right)` collocation pair where the
+two words were nowhere near each other — e.g. an example for
+`schrieb → auf` pulled from "schrieb Milei auf dem
+Kurznachrichtendienst..." (both words present, not adjacent, not the
+actual collocation). Leipzig's `co_n.txt` records directional
+*neighbor* pairs, not "co-occurs somewhere in the same sentence" —
+the matching logic didn't reflect that.
+
+**Chosen: require `tokens[i] === leftWord && tokens[i+1] === rightWord`**
+in the tokenized sentence. `buildWordIndex` (indexed both words, into
+a shared bidirectional map) was replaced with `buildLeftIndex`
+(indexed by `leftWord` only), and matching walks token pairs directly
+rather than checking set membership. A `matchedKeys` set per sentence
+prevents the same pair being queued twice.
+
+Two side benefits, neither the primary motivation but both worth
+recording: the stricter match is far more selective, so the full 1M
+corpus scan dropped from ~40 minutes to under a minute locally; and it
+incidentally fixed the "examples inserted" log-counter
+double-counting described in decision #38's update, since a pair can
+no longer be matched twice from the same sentence via two different
+trigger words.
+
+Required a full regenerate of `sentences`/`collocation_examples` in
+both local and production databases — the previously-loaded data
+reflected the old, looser matching and needed to be thrown away, not
+patched. See `docs/1M-corpus-upgrade-session-notes.md` for the
+redeploy.

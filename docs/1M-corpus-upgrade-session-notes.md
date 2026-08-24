@@ -158,3 +158,31 @@ images.
 All five match the local database exactly. Live site confirmed
 serving correct POS-section-grouped results with example sentences at
 german-collocations.chickenkiller.com.
+
+## Follow-up: example sentences weren't actually adjacent (found in a later session)
+
+A separate session caught a real correctness bug in the data this
+session had just shipped: `extract-examples.ts`'s matching only
+required both words of a pair to appear *somewhere* in a sentence, not
+adjacently. Example sentences for a collocation pair could — and did
+— show the two words scattered across an unrelated part of the
+sentence. Fixed by requiring true `left, right` token adjacency; see
+decision #39 for the full reasoning.
+
+Redeployed using the same pattern established earlier in this
+document: regenerated `sentences`/`collocation_examples` locally from
+a clean slate (36.9s this time — the stricter match is far more
+selective, so batches fill and the corpus scan terminates much
+faster), `pg_dump`'d just those two tables, `scp`'d the dump to the
+VM, `TRUNCATE`'d production's stale versions, and `pg_restore`'d the
+corrected data directly rather than re-running the matching script on
+the VM. Also rebuilt and — this time — actually recreated the
+`frontend` container (`docker compose ... up -d`, not just `build`) to
+pick up the new highlighting feature that shipped alongside the fix,
+applying the gotcha documented earlier in this same file instead of
+repeating it.
+
+Final corrected state: `sentences` 461,041, `collocation_examples`
+748,707 (both local and production, verified identical). Spot-checked
+directly against raw sentence text to confirm genuine adjacency, not
+just row counts.
