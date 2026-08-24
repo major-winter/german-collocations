@@ -13,8 +13,7 @@ export class CollocationServiceImpl implements CollocationService {
 
     return {
       word: word,
-      followedBy: collocations.followedBy,
-      precededBy: collocations.precededBy,
+      collocations: collocations.collocations,
     };
   }
 }

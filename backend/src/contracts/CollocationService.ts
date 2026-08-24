@@ -3,8 +3,7 @@ import type { CollocationRow } from "./CollocationRepository.ts";
 
 export interface CollocationResult {
   word: string;
-  followedBy: CollocationEntry[];
-  precededBy: CollocationEntry[];
+  collocations: CollocationEntry[];
 }
 
 export interface CollocationService {

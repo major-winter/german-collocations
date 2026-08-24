@@ -32,65 +32,79 @@ const SECTION_CASE = `
 `;
 
 /**
- * Builds the directional collocation query.
- *
- * fixedSide is the side holding the queried word (constant across all
- * result rows); the other side is the "partner" whose dominant POS
- * drives the section. Ranking happens in the `ranked` CTE, over the
- * distinct (left_word_id, right_word_id) pairs - before the example
- * sentences join, which can multiply rows per pair and would otherwise
- * skew ROW_NUMBER().
+ * Builds one direction's branch: fixedSide is the side holding the
+ * queried word, the other side is the "partner" whose dominant POS
+ * drives the section. No direction is exposed in the output - this is
+ * combined with the other branch in COLLOCATIONS_QUERY below, so a
+ * word is shown regardless of whether it's the corpus's left or right
+ * neighbor of the queried word.
  */
-function buildDirectionalQuery(fixedSide: "left" | "right"): string {
+function buildBranchQuery(fixedSide: "left" | "right"): string {
   const partnerWord = fixedSide === "left" ? "w2.word" : "w1.word";
   const fixedWord = fixedSide === "left" ? "w1.word" : "w2.word";
   const partnerId = fixedSide === "left" ? "w2.id" : "w1.id";
 
   return `
-    WITH ranked AS (
-      SELECT
-        c.left_word_id,
-        c.right_word_id,
-        ${partnerWord} AS word,
-        c.cooccurrence,
-        c.significance,
-        ${SECTION_CASE} AS section,
-        ROW_NUMBER() OVER (
-          PARTITION BY ${SECTION_CASE}
-          ORDER BY c.significance DESC
-        ) AS rn
-      FROM collocations c
-      JOIN words w1 ON w1.id = c.left_word_id
-      JOIN words w2 ON w2.id = c.right_word_id
-      LEFT JOIN word_dominant_pos wdp
-        ON wdp.word_id = ${partnerId} AND wdp.share >= ${DOMINANCE_THRESHOLD}
-      WHERE ${fixedWord} = $1
-    )
-    SELECT r.word, r.cooccurrence, r.significance, r.section, s.sentence
-    FROM ranked r
-    LEFT JOIN collocation_examples ce
-      ON ce.left_word_id = r.left_word_id AND ce.right_word_id = r.right_word_id
-    LEFT JOIN sentences s ON s.id = ce.sentence_id
-    WHERE r.rn <= ${PER_SECTION_LIMIT}
-    ORDER BY r.significance DESC
+    SELECT
+      c.left_word_id,
+      c.right_word_id,
+      ${partnerWord} AS word,
+      c.cooccurrence,
+      c.significance,
+      ${SECTION_CASE} AS section
+    FROM collocations c
+    JOIN words w1 ON w1.id = c.left_word_id
+    JOIN words w2 ON w2.id = c.right_word_id
+    LEFT JOIN word_dominant_pos wdp
+      ON wdp.word_id = ${partnerId} AND wdp.share >= ${DOMINANCE_THRESHOLD}
+    WHERE ${fixedWord} = $1
   `;
 }
 
-const FOLLOWED_BY_QUERY = buildDirectionalQuery("left");
-const PRECEDED_BY_QUERY = buildDirectionalQuery("right");
+// Ranking happens once, over both directions combined - over the
+// distinct (left_word_id, right_word_id) pairs, before the example
+// sentences join, which can multiply rows per pair and would
+// otherwise skew ROW_NUMBER().
+const COLLOCATIONS_QUERY = `
+  WITH combined AS (
+    ${buildBranchQuery("left")}
+    UNION ALL
+    ${buildBranchQuery("right")}
+  ),
+  ranked AS (
+    SELECT *,
+      ROW_NUMBER() OVER (PARTITION BY section ORDER BY significance DESC) AS rn
+    FROM combined
+  )
+  SELECT r.left_word_id AS "leftWordId", r.right_word_id AS "rightWordId",
+    r.word, r.cooccurrence, r.significance, r.section, s.sentence
+  FROM ranked r
+  LEFT JOIN collocation_examples ce
+    ON ce.left_word_id = r.left_word_id AND ce.right_word_id = r.right_word_id
+  LEFT JOIN sentences s ON s.id = ce.sentence_id
+  WHERE r.rn <= ${PER_SECTION_LIMIT}
+  ORDER BY r.significance DESC
+`;
 
+// Keyed by (left_word_id, right_word_id), not by word text - the same
+// partner word can appear via two distinct pairs now that both
+// directions are combined (e.g. "X folgt Y" and "Y folgt X" both
+// significant), and each pair has its own cooccurrence/significance.
+// Keying by word text would silently mix example sentences from two
+// unrelated pairs under one entry.
 function groupRows(rows: CollocationRow[]): CollocationEntry[] {
   const entries = new Map<string, CollocationEntry>();
 
   for (const row of rows) {
-    const existing = entries.get(row.word);
+    const key = `${row.leftWordId}-${row.rightWordId}`;
+    const existing = entries.get(key);
 
     if (existing) {
       if (row.sentence) {
         existing.examples.push(row.sentence);
       }
     } else {
-      entries.set(row.word, {
+      entries.set(key, {
         word: row.word,
         cooccurrence: row.cooccurrence,
         significance: row.significance,
@@ -117,14 +131,10 @@ export class PgCollocationRepository implements CollocationRepository {
     const wordRow = wordResult.rows[0];
     if (!wordRow) return null;
 
-    const [followedByResult, precededByResult] = await Promise.all([
-      this.#pool.query<CollocationRow>(FOLLOWED_BY_QUERY, [word]),
-      this.#pool.query<CollocationRow>(PRECEDED_BY_QUERY, [word]),
-    ]);
+    const result = await this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [word]);
     return {
       wordId: wordRow.id,
-      followedBy: groupRows(followedByResult.rows),
-      precededBy: groupRows(precededByResult.rows),
+      collocations: groupRows(result.rows),
     };
   }
 }

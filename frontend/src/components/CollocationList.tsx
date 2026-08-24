@@ -1,11 +1,8 @@
 import type { ReactNode } from 'react';
 import { Card } from '@/components/ui/card';
-import { ArrowRight, ArrowLeft } from 'lucide-react';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
 
 interface CollocationListProps {
-    title: string;
-    direction: 'followed' | 'preceded';
     entries: CollocationEntry[];
     queryWord: string;
 }
@@ -65,15 +62,13 @@ function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, Co
     return groups;
 }
 
-export function CollocationList({ title, direction, entries, queryWord }: CollocationListProps) {
-    const Icon = direction === 'followed' ? ArrowRight : ArrowLeft;
+export function CollocationList({ entries, queryWord }: CollocationListProps) {
     const groups = groupBySection(entries);
 
     return (
         <section className="mb-6">
-            <h2 className="text-sm font-medium text-muted-foreground mb-2 flex items-center gap-1">
-                <Icon className="h-4 w-4" />
-                {title}
+            <h2 className="text-sm font-medium text-muted-foreground mb-2">
+                Collocations
             </h2>
             {entries.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No results.</p>
@@ -85,8 +80,8 @@ export function CollocationList({ title, direction, entries, queryWord }: Colloc
                                 {SECTION_LABELS[section]}
                             </h3>
                             <div className="flex flex-col gap-1.5">
-                                {groups.get(section)!.map((entry) => (
-                                    <div key={entry.word}>
+                                {groups.get(section)!.map((entry, i) => (
+                                    <div key={`${entry.word}-${i}`}>
                                         <Card className="px-4 py-2.5 hover:bg-accent transition-colors cursor-pointer">
                                             <span className="text-sm">{entry.word}</span>
                                             {entry.examples.length > 0 && (

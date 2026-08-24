@@ -100,15 +100,7 @@ export function Word() {
     return (
         <div>
             <CollocationList
-                title="Commonly followed by"
-                direction="followed"
-                entries={state.data.followedBy}
-                queryWord={state.data.word}
-            />
-            <CollocationList
-                title="Commonly preceded by"
-                direction="preceded"
-                entries={state.data.precededBy}
+                entries={state.data.collocations}
                 queryWord={state.data.word}
             />
         </div>

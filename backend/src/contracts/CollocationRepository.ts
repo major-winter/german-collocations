@@ -1,6 +1,8 @@
 import { CollocationEntry, CollocationSection } from "@collocations/types";
 
 export interface CollocationRow {
+  leftWordId: number;
+  rightWordId: number;
   word: string;
   cooccurrence: number;
   significance: number;
@@ -10,8 +12,7 @@ export interface CollocationRow {
 
 export interface CollocationLookup {
   wordId: number;
-  followedBy: CollocationEntry[];
-  precededBy: CollocationEntry[];
+  collocations: CollocationEntry[];
 }
 
 export interface CollocationRepository {
