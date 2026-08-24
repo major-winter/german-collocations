@@ -1,5 +1,14 @@
 ### 42. Per-section significance floor to stop weak backfill in collocation lists
 
+> **Superseded by decision #43.** The per-section floors here were
+> replaced entirely by a single logDice-based threshold once a second,
+> structurally similar bug ("Einsatz war") showed that patching
+> `significance` per-symptom didn't scale. `SECTION_MIN_SIGNIFICANCE`
+> and `sectionMinSignificanceCase` no longer exist in the codebase — see
+> `docs/decisions-43.md` for why and what replaced them. Left here as
+> history, per this project's rule that decisions are logged, not
+> silently reversed.
+
 Spotted a real quality bug: `Einsatz` listed `am` as one of its top-10
 prepositions, but "am" isn't a collocate of "Einsatz" — it's a common
 preposition that rides along with almost any noun. Root cause: decision

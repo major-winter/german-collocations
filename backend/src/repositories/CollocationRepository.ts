@@ -17,41 +17,22 @@ const DOMINANCE_THRESHOLD = 0.8;
 // "LIMIT/pagination interaction").
 const PER_SECTION_LIMIT = 10;
 
-// Decision #42: PER_SECTION_LIMIT alone means a word with few genuinely
-// strong partners in a section gets backfilled with whatever's left down
-// to rank 10, however weak - e.g. "Einsatz am" (significance 28.98, the
-// last of Einsatz's 10 shown prepositions - "am" isn't a collocate of
-// "Einsatz", it's just a common preposition riding along). One global
-// floor doesn't work: sections sit on very different natural scales
-// (prepositions: only a few dozen distinct types, so they co-occur with
-// almost everything - preposition significance median is 14.4 vs 22-37
-// for the other sections). Each section's floor is that section's own
-// 75th-percentile significance, computed empirically across the whole
-// collocations table - confirmed against 10 real query words that this
-// cuts backfill noise like "Einsatz am" while keeping strong pairs like
-// "Polizei am" (709.48, that word's #1 preposition). Trade-off, same
-// shape as the MAX_EXAMPLE_WORDS tuning in decision #41: also trims some
-// real-but-modest pairs (e.g. "Interesse für", a legitimate alternative
-// to "Interesse an", sits at 15.24 - below the preposition floor).
-const SECTION_MIN_SIGNIFICANCE: Record<string, number> = {
-  noun: 67.95,
-  verb: 42.99,
-  adjective: 46.36,
-  preposition: 29.8,
-  other: 69.84,
-};
-
-function sectionMinSignificanceCase(sectionColumn: string): string {
-  return `
-    CASE ${sectionColumn}
-      WHEN 'noun' THEN ${SECTION_MIN_SIGNIFICANCE.noun}
-      WHEN 'verb' THEN ${SECTION_MIN_SIGNIFICANCE.verb}
-      WHEN 'adjective' THEN ${SECTION_MIN_SIGNIFICANCE.adjective}
-      WHEN 'preposition' THEN ${SECTION_MIN_SIGNIFICANCE.preposition}
-      WHEN 'other' THEN ${SECTION_MIN_SIGNIFICANCE.other}
-    END
-  `;
-}
+// Decision #43 (supersedes #42's per-section significance floors): raw
+// `significance` is a chi-square-style statistic - it scales with raw
+// frequency, so common function words (prepositions, copula/auxiliary
+// verb forms) look "significant" with almost any content word purely by
+// volume, even when the actual lexical association is weak ("Einsatz
+// war" - "war" is just the copula "sein", not a real collocate).
+// logDice (Rychlý 2008, Sketch Engine's default association measure)
+// fixes this by normalizing against both words' own corpus frequency.
+// 6.3 is the whole collocations table's own 75th-percentile logDice -
+// confirmed empirically this cleanly separates flagged-bad pairs like
+// "Einsatz war" (5.08) and "Einsatz am" (4.46) from strong ones like
+// "Polizei am" (7.19) and "Angst vor" (8.20), and naturally suppresses
+// AUX/copula noise without any stopword list (only 2.4% of AUX-tagged
+// partners clear this floor, vs 29.0% of true VERB partners) - see
+// docs/decisions-43.md.
+const MIN_LOG_DICE = 6.3;
 
 // Repeated verbatim inside the same query (Postgres window functions
 // can't reference a SELECT-list alias in PARTITION BY), so it's kept as
@@ -87,6 +68,7 @@ function buildBranchQuery(fixedSide: "left" | "right"): string {
       ${partnerWord} AS word,
       c.cooccurrence,
       c.significance,
+      14 + log(2, 2.0 * c.cooccurrence / (w1.frequency + w2.frequency)) AS log_dice,
       ${SECTION_CASE} AS section
     FROM collocations c
     JOIN words w1 ON w1.id = c.left_word_id
@@ -109,7 +91,7 @@ const COLLOCATIONS_QUERY = `
   ),
   ranked AS (
     SELECT *,
-      ROW_NUMBER() OVER (PARTITION BY section ORDER BY significance DESC) AS rn
+      ROW_NUMBER() OVER (PARTITION BY section ORDER BY log_dice DESC) AS rn
     FROM combined
   )
   SELECT r.left_word_id AS "leftWordId", r.right_word_id AS "rightWordId",
@@ -119,8 +101,8 @@ const COLLOCATIONS_QUERY = `
     ON ce.left_word_id = r.left_word_id AND ce.right_word_id = r.right_word_id
   LEFT JOIN sentences s ON s.id = ce.sentence_id
   WHERE r.rn <= ${PER_SECTION_LIMIT}
-    AND r.significance >= ${sectionMinSignificanceCase("r.section")}
-  ORDER BY r.significance DESC
+    AND r.log_dice >= ${MIN_LOG_DICE}
+  ORDER BY r.log_dice DESC
 `;
 
 // Keyed by (left_word_id, right_word_id), not by word text - the same

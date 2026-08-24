@@ -28,7 +28,7 @@ export function Layout({ children }: LayoutProps) {
 
             <footer className="py-6 text-center">
                 <p className="text-xs text-muted-foreground">
-                    Data from Leipzig Corpora Collection · Ranked by statistical significance
+                    Data from Leipzig Corpora Collection · Ranked by collocation strength
                 </p>
             </footer>
         </div>
