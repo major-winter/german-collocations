@@ -78,6 +78,68 @@ async function loadExistingExampleCounts(
 const MAX_EXAMPLES = 3;
 const BATCH_SIZE = 1000;
 
+// Decision #41: thresholds chosen empirically against the spaCy-scored
+// corpus (score_sentence_simplicity.py). 12 words was tried first and
+// rejected - it left 36.7% of pairs with zero examples (14.6% even in
+// the top significance decile, i.e. the pairs actually shown in the UI).
+// 15 words brought that down to 24.4% (10.6% in the top decile) with no
+// visible quality loss in manual sampling, so it's the current cutoff -
+// loosening further starts trading simplicity for coverage, tightening
+// starves too many pairs. clause_count <= 1 means "at most one verb/aux
+// with its own subject" - see tools/pos-tagging/README.md for why that's
+// the signal used instead of finite-verb or raw `oc` counts.
+const MAX_EXAMPLE_WORDS = 15;
+const MAX_EXAMPLE_CLAUSES = 1;
+
+interface SentenceSimplicity {
+  wordCount: number;
+  clauseCount: number;
+}
+
+type SimplicityMap = Map<number, SentenceSimplicity>;
+
+// Read from disk, not the database - these are a one-time selection
+// input produced offline by score_sentence_simplicity.py, not something
+// queried at request time, so there's no reason to load them into a
+// table (unlike word_pos, which backs the live word_dominant_pos view).
+async function loadSentenceSimplicity(dataDir: string): Promise<SimplicityMap> {
+  const filePath = path.join(dataDir, 'sentence_simplicity.tsv');
+  const map: SimplicityMap = new Map();
+
+  const rl = createInterface({
+    input: createReadStream(filePath, 'utf8'),
+    crlfDelay: Infinity,
+  });
+
+  for await (const line of rl) {
+    if (!line.trim()) continue;
+
+    const parts = line.split('\t');
+    if (parts.length !== 3) continue;
+
+    const [idStr, wordCountStr, clauseCountStr] = parts;
+    const sentenceId = parseInt(idStr, 10);
+    const wordCount = parseInt(wordCountStr, 10);
+    const clauseCount = parseInt(clauseCountStr, 10);
+    if (Number.isNaN(sentenceId) || Number.isNaN(wordCount) || Number.isNaN(clauseCount)) {
+      continue;
+    }
+
+    map.set(sentenceId, { wordCount, clauseCount });
+  }
+
+  console.log(`loaded simplicity scores for ${map.size.toLocaleString()} sentences`);
+  return map;
+}
+
+function isSimpleEnough(simplicity: SentenceSimplicity | undefined): boolean {
+  return (
+    simplicity !== undefined &&
+    simplicity.wordCount <= MAX_EXAMPLE_WORDS &&
+    simplicity.clauseCount <= MAX_EXAMPLE_CLAUSES
+  );
+}
+
 type SentenceRow = [id: number, sentence: string];
 type ExampleRow = [leftWordId: number, rightWordId: number, sentenceId: number];
 
@@ -119,6 +181,7 @@ async function processFile(
   leftIndex: WordIndex,
   pairCounts: PairCounts,
   filePath: string,
+  simplicityMap: SimplicityMap,
 ) {
   let remainingPairs = 0;
   for (const count of pairCounts.values()) {
@@ -152,6 +215,12 @@ async function processFile(
     if (tabIndex === -1) continue;
 
     const sentenceId = parseInt(line.substring(0, tabIndex), 10);
+
+    // Cheap early-exit, same spirit as the remainingPairs check above:
+    // skip all matching work for a sentence that doesn't read simply,
+    // before paying for tokenization.
+    if (!isSimpleEnough(simplicityMap.get(sentenceId))) continue;
+
     const sentence = line.substring(tabIndex + 1);
     const tokens = tokenizeSentence(sentence);
 
@@ -214,7 +283,11 @@ async function main(): Promise<void> {
   if (!url) throw new Error('DATABASE_URL is not set');
 
   const dataDir = process.env.DATA_DIR ?? '/data';
-  const corpusPrefix = process.env.CORPUS_PREFIX ?? 'deu_news_2025_100K';
+  // Decision #37: the live DB has been on the 1M package since the corpus
+  // upgrade, and Leipzig sentence/word IDs aren't stable across package
+  // sizes - defaulting to 100K here would silently produce IDs that don't
+  // match what's already loaded.
+  const corpusPrefix = process.env.CORPUS_PREFIX ?? 'deu_news_2025_1M';
 
   const client = new Client({ connectionString: url });
 
@@ -235,8 +308,10 @@ async function main(): Promise<void> {
     }
     console.log(`Resuming from ${pairCounts.size} tracked pairs (existing example counts loaded)`);
 
+    const simplicityMap = await loadSentenceSimplicity(dataDir);
+
     const sentencesFile = path.join(dataDir, `${corpusPrefix}-sentences.txt`);
-    await processFile(client, leftIndex, pairCounts, sentencesFile);
+    await processFile(client, leftIndex, pairCounts, sentencesFile, simplicityMap);
   } finally {
     await client.end();
     console.log('Disconnected');

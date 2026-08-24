@@ -50,3 +50,48 @@ Tags are spaCy's Universal POS (UPOS) — coarse categories like `NOUN`,
 set. Punctuation, symbols, whitespace, and other non-word tokens
 (`PUNCT`, `SYM`, `SPACE`, `X`) are dropped, since they can never match
 a row in the `words` table.
+
+## Sentence simplicity scoring
+
+A second, separate script: `score_sentence_simplicity.py`. Same
+one-shot-offline-tool contract as `tag_words.py` above, but this one
+scores each *sentence* for how simple it reads, so
+`database/scripts/extract-examples.ts` can prefer simple sentences
+when picking collocation example sentences instead of taking whatever
+it meets first in file order.
+
+```bash
+cd tools/pos-tagging
+source .venv/bin/activate
+python score_sentence_simplicity.py --input ../../data/sentences.txt --output sentence_simplicity.tsv
+```
+
+Output: `sentence_simplicity.tsv`, tab-separated
+`sentence_id\tword_count\tclause_count`, one row per sentence. Raw
+counts, not a baked-in "is this simple" boolean — the threshold lives
+in `extract-examples.ts` (`MAX_EXAMPLE_WORDS`/`MAX_EXAMPLE_CLAUSES`),
+so it can be retuned without repaying the cost of a full corpus parse.
+
+`clause_count` counts VERB/AUX tokens that have their own subject
+child (dependency label `sb`) — this is the part worth explaining,
+since two more obvious approaches were tried first and rejected:
+
+- Counting finite verbs via spaCy's morphology (`VerbForm=Fin`) is
+  unreliable in `de_core_news_sm` — it silently missed finite verbs in
+  real test sentences.
+- Counting the `oc` dependency label directly is overloaded: it fires
+  both for genuine subordinate/complement clauses *and* for ordinary
+  periphrastic aux+participle constructions (passive `wurden
+  evakuiert`, perfect `habe angerufen`), producing false positives.
+
+Requiring an `sb` child of its own sidesteps both problems —
+periphrastic constructions share the aux's subject (the participle has
+no `sb` child), and compound predicates ("ging ... und aß", shared
+subject) collapse to one clause — while relative clauses, reported
+speech ("... ", sagte X), and genuine subordinate clauses still count,
+since each introduces its own subject. Verified by hand against 10
+real corpus-style sentences before committing to it.
+
+This script needs the dependency parser, unlike `tag_words.py` (tagger
+only), so it's slower — expect roughly 1,000 sentences/sec, i.e. ~15-20
+minutes for a 1M-sentence corpus.
