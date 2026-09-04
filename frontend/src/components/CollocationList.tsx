@@ -1,18 +1,29 @@
 import type { ReactNode } from 'react';
-import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
 
 interface CollocationListProps {
     entries: CollocationEntry[];
-    queryWord: string;
 }
 
-// Sentences and collocate words are the exact surface forms from the
-// corpus (see CollocationRepository.ts), so matching on literal word
-// tokens - not lemmas - is correct here. \p{L}+ (rather than \w+) is
-// needed because German words contain umlauts/ß, which \w excludes.
-function highlightCollocates(sentence: string, targets: string[]): ReactNode[] {
-    const targetSet = new Set(targets.map((t) => t.toLowerCase()));
+// Matches against a given example's own searchWord/collocateWord - the
+// literal surface-form tokens for that specific sentence, already
+// disambiguated by the backend via lemma id (see CollocationRepository
+// .ts's groupRows) - not against CollocationEntry.word or a page-level
+// query string, since decision #44 means a sentence's actual words can
+// differ from their own lemma's spelling (e.g. "Gedankens" for a
+// "Gedanken" entry). \p{L}+ (rather than \w+) is needed because German
+// words contain umlauts/ß, which \w excludes.
+function highlightCollocates(
+    sentence: string,
+    searchWord: string,
+    collocateWord: string,
+    paintClassName: string,
+): ReactNode[] {
+    const boldFor = new Map([
+        [searchWord.toLowerCase(), true],
+        [collocateWord.toLowerCase(), false],
+    ]);
     const pattern = /\p{L}+/gu;
     const nodes: ReactNode[] = [];
     let lastIndex = 0;
@@ -21,14 +32,16 @@ function highlightCollocates(sentence: string, targets: string[]): ReactNode[] {
 
     while ((match = pattern.exec(sentence)) !== null) {
         const word = match[0];
-        if (targetSet.has(word.toLowerCase())) {
+        const wordLower = word.toLowerCase();
+        const isBold = boldFor.get(wordLower);
+        if (isBold !== undefined) {
             if (match.index > lastIndex) {
                 nodes.push(sentence.slice(lastIndex, match.index));
             }
             nodes.push(
-                <mark key={key++} className="bg-primary/15 text-foreground font-semibold not-italic rounded-sm px-0.5">
+                <span key={key++} className={cn('not-italic', isBold && 'font-semibold', paintClassName)}>
                     {word}
-                </mark>,
+                </span>,
             );
             lastIndex = match.index + word.length;
         }
@@ -49,6 +62,14 @@ const SECTION_LABELS: Record<CollocationSection, string> = {
     other: 'Other',
 };
 
+const PAINT_COLORS: Record<CollocationSection, string> = {
+    noun: 'text-blue-600 dark:text-blue-400',
+    verb: 'text-orange-600 dark:text-orange-400',
+    adjective: 'text-green-600 dark:text-green-400',
+    preposition: 'text-purple-600 dark:text-purple-400',
+    other: 'text-foreground',
+};
+
 function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, CollocationEntry[]> {
     const groups = new Map<CollocationSection, CollocationEntry[]>();
     for (const entry of entries) {
@@ -62,7 +83,7 @@ function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, Co
     return groups;
 }
 
-export function CollocationList({ entries, queryWord }: CollocationListProps) {
+export function CollocationList({ entries }: CollocationListProps) {
     const groups = groupBySection(entries);
 
     return (
@@ -72,27 +93,36 @@ export function CollocationList({ entries, queryWord }: CollocationListProps) {
             ) : (
                 <div className="flex flex-col gap-4">
                     {SECTION_ORDER.filter((section) => groups.has(section)).map((section) => (
-                        <div key={section}>
-                            <h3 className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1.5">
+                        <div key={section} className="py-3">
+                            <h3
+                                className={cn(
+                                    'text-xs font-medium uppercase tracking-wide mb-1.5',
+                                    PAINT_COLORS[section],
+                                )}
+                            >
                                 {SECTION_LABELS[section]}
                             </h3>
                             <div className="flex flex-col gap-1.5">
-                                {groups.get(section)!.map((entry, i) => (
-                                    <div key={`${entry.word}-${i}`}>
-                                        <Card className="px-4 py-2.5 hover:bg-accent transition-colors cursor-pointer">
-                                            <span className="text-sm">{entry.word}</span>
-                                            {entry.examples.length > 0 && (
-                                                <div className="mt-1.5 space-y-1 border-t pt-1.5">
-                                                    {entry.examples.map((sentence, i) => (
-                                                        <p key={i} className="text-xs text-muted-foreground italic">
-                                                            {highlightCollocates(sentence, [queryWord, entry.word])}
-                                                        </p>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </Card>
-                                    </div>
-                                ))}
+                                {groups
+                                    .get(section)!
+                                    .filter((entry) => entry.examples.length > 0)
+                                    .map((entry, i) => (
+                                        <div
+                                            key={`${entry.word}-${i}`}
+                                            className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors cursor-pointer space-y-1"
+                                        >
+                                            {entry.examples.map((example, i) => (
+                                                <p key={i} className="text-xs text-muted-foreground italic">
+                                                    {highlightCollocates(
+                                                        example.sentence,
+                                                        example.searchWord,
+                                                        example.collocateWord,
+                                                        PAINT_COLORS[section],
+                                                    )}
+                                                </p>
+                                            ))}
+                                        </div>
+                                    ))}
                             </div>
                         </div>
                     ))}

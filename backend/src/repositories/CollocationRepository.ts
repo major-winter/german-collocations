@@ -109,16 +109,25 @@ const COLLOCATIONS_QUERY = `
     FROM combined
   )
   SELECT r.left_lemma_id AS "leftLemmaId", r.right_lemma_id AS "rightLemmaId",
-    r.word, r.cooccurrence, r.log_dice AS significance, r.section, ex.sentence
+    r.word, r.cooccurrence, r.log_dice AS significance, r.section,
+    ex.sentence, ex."leftWord", ex."rightWord"
   FROM ranked r
   LEFT JOIN LATERAL (
-    SELECT s.sentence
+    -- wl/wr are the literal surface-form words behind this specific
+    -- example's (left_word_id, right_word_id) - not necessarily r.word,
+    -- since this join already widens past the exact surface pair the
+    -- lemma was ranked under (see comment above). Returned alongside
+    -- the sentence so the frontend can highlight the words that
+    -- actually appear in it, not the lemma text.
+    SELECT s.sentence, wl.word AS "leftWord", wr.word AS "rightWord"
     FROM collocation_examples ce
     JOIN word_dominant_lemma wdl_l
       ON wdl_l.word_id = ce.left_word_id AND wdl_l.lemma_id = r.left_lemma_id
     JOIN word_dominant_lemma wdl_r
       ON wdl_r.word_id = ce.right_word_id AND wdl_r.lemma_id = r.right_lemma_id
     JOIN sentences s ON s.id = ce.sentence_id
+    JOIN words wl ON wl.id = ce.left_word_id
+    JOIN words wr ON wr.id = ce.right_word_id
     ORDER BY s.id
     LIMIT 3
   ) ex ON true
@@ -133,16 +142,32 @@ const COLLOCATIONS_QUERY = `
 // significant), and each pair has its own cooccurrence/logDice.
 // Keying by word text would silently mix example sentences from two
 // unrelated pairs under one entry.
-function groupRows(rows: CollocationRow[]): CollocationEntry[] {
+// queryLemmaId picks out, per row, which of leftWord/rightWord is the
+// surface form of the word the user looked up vs. its collocate - by
+// lemma id, not by string equality against `word`, since either side's
+// literal surface form can differ from its own lemma's spelling (the
+// same divergence documented above for the LATERAL join).
+function groupRows(rows: CollocationRow[], queryLemmaId: number): CollocationEntry[] {
   const entries = new Map<string, CollocationEntry>();
 
   for (const row of rows) {
     const key = `${row.leftLemmaId}-${row.rightLemmaId}`;
+    const isQueryLeft = row.leftLemmaId === queryLemmaId;
+    // searchWord/collocateWord are only ever null together with
+    // sentence - all three come from the same LATERAL row.
+    const example =
+      row.sentence && row.leftWord && row.rightWord
+        ? {
+            sentence: row.sentence,
+            searchWord: isQueryLeft ? row.leftWord : row.rightWord,
+            collocateWord: isQueryLeft ? row.rightWord : row.leftWord,
+          }
+        : null;
     const existing = entries.get(key);
 
     if (existing) {
-      if (row.sentence) {
-        existing.examples.push(row.sentence);
+      if (example) {
+        existing.examples.push(example);
       }
     } else {
       entries.set(key, {
@@ -150,7 +175,7 @@ function groupRows(rows: CollocationRow[]): CollocationEntry[] {
         cooccurrence: row.cooccurrence,
         significance: row.significance,
         section: row.section,
-        examples: row.sentence ? [row.sentence] : [],
+        examples: example ? [example] : [],
       });
     }
   }
@@ -191,7 +216,7 @@ export class PgCollocationRepository implements CollocationRepository {
     ]);
     return {
       wordId: wordRow.id,
-      collocations: groupRows(result.rows),
+      collocations: groupRows(result.rows, lemmaRow.lemma_id),
     };
   }
 }

@@ -99,10 +99,7 @@ export function Word() {
 
     return (
         <div>
-            <CollocationList
-                entries={state.data.collocations}
-                queryWord={state.data.word}
-            />
+            <CollocationList entries={state.data.collocations} />
         </div>
     );
 }

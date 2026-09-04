@@ -7,6 +7,8 @@ export interface CollocationRow {
   cooccurrence: number;
   significance: number;
   sentence: string | null;
+  leftWord: string | null;
+  rightWord: string | null;
   section: CollocationSection;
 }
 
