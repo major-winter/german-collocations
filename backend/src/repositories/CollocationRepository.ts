@@ -119,17 +119,30 @@ const COLLOCATIONS_QUERY = `
     -- lemma was ranked under (see comment above). Returned alongside
     -- the sentence so the frontend can highlight the words that
     -- actually appear in it, not the lemma text.
-    SELECT s.sentence, wl.word AS "leftWord", wr.word AS "rightWord"
-    FROM collocation_examples ce
-    JOIN word_dominant_lemma wdl_l
-      ON wdl_l.word_id = ce.left_word_id AND wdl_l.lemma_id = r.left_lemma_id
-    JOIN word_dominant_lemma wdl_r
-      ON wdl_r.word_id = ce.right_word_id AND wdl_r.lemma_id = r.right_lemma_id
-    JOIN sentences s ON s.id = ce.sentence_id
-    JOIN words wl ON wl.id = ce.left_word_id
-    JOIN words wr ON wr.id = ce.right_word_id
-    ORDER BY s.id
-    LIMIT 3
+    --
+    -- words is joined OUTSIDE the LIMIT 3, against the already-picked
+    -- 3 rows - not inlined into the same FROM list as ce/word_dominant
+    -- _lemma/sentences. Joining it inline measured as a real regression
+    -- (213ms vs. 135ms baseline, EXPLAIN ANALYZE on prod, decision #47):
+    -- the extra join changed the planner's join order, fetching words
+    -- for a ~27k-row unfiltered fan-out before the LIMIT/filter applied,
+    -- instead of after. This shape forces the cheap, already-proven
+    -- LIMIT 3 to run first, so words only ever does 2 cheap
+    -- primary-key lookups.
+    SELECT sub.sentence, wl.word AS "leftWord", wr.word AS "rightWord"
+    FROM (
+      SELECT s.sentence, ce.left_word_id, ce.right_word_id
+      FROM collocation_examples ce
+      JOIN word_dominant_lemma wdl_l
+        ON wdl_l.word_id = ce.left_word_id AND wdl_l.lemma_id = r.left_lemma_id
+      JOIN word_dominant_lemma wdl_r
+        ON wdl_r.word_id = ce.right_word_id AND wdl_r.lemma_id = r.right_lemma_id
+      JOIN sentences s ON s.id = ce.sentence_id
+      ORDER BY s.id
+      LIMIT 3
+    ) sub
+    JOIN words wl ON wl.id = sub.left_word_id
+    JOIN words wr ON wr.id = sub.right_word_id
   ) ex ON true
   WHERE r.rn <= ${PER_SECTION_LIMIT}
     AND r.log_dice >= ${MIN_LOG_DICE}
