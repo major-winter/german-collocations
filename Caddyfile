@@ -1,4 +1,6 @@
 german-collocations.chickenkiller.com {
+    encode gzip zstd
+
     handle /api/* {
         reverse_proxy backend:3000
     }
