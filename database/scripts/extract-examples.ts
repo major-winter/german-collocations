@@ -12,8 +12,6 @@ interface CollocationPair {
 
 type WordIndex = Map<string, CollocationPair[]>;
 
-type PairCounts = Map<string, number>;
-
 async function loadCollocationPairs(
   client: Client,
 ): Promise<CollocationPair[]> {
@@ -57,46 +55,17 @@ function tokenizeSentence(sentence: string): string[] {
     .filter((token) => token.length > 0);
 }
 
-// Existing counts, not zero, so a resumed run doesn't re-scan pairs that
-// already have their 3 examples, and doesn't insert past the cap.
-async function loadExistingExampleCounts(
-  client: Client,
-): Promise<Map<string, number>> {
-  const result = await client.query(`
-    SELECT left_word_id, right_word_id, count(*) AS count
-    FROM collocation_examples
-    GROUP BY left_word_id, right_word_id
-  `);
-
-  const counts = new Map<string, number>();
-  for (const row of result.rows) {
-    counts.set(`${row.left_word_id}-${row.right_word_id}`, Number(row.count));
-  }
-  return counts;
-}
-
 const MAX_EXAMPLES = 3;
 const BATCH_SIZE = 1000;
 
-// Decision #41: thresholds chosen empirically against the spaCy-scored
-// corpus (score_sentence_simplicity.py). 12 words was tried first and
-// rejected - it left 36.7% of pairs with zero examples (14.6% even in
-// the top significance decile, i.e. the pairs actually shown in the UI).
-// 15 words brought that down to 24.4% (10.6% in the top decile) with no
-// visible quality loss in manual sampling, so it's the current cutoff -
-// loosening further starts trading simplicity for coverage, tightening
-// starves too many pairs. clause_count <= 1 means "at most one verb/aux
-// with its own subject" - see tools/pos-tagging/README.md for why that's
-// the signal used instead of finite-verb or raw `oc` counts.
-const MAX_EXAMPLE_WORDS = 15;
-const MAX_EXAMPLE_CLAUSES = 1;
-
-interface SentenceSimplicity {
+interface Candidate {
+  sentenceId: number;
+  sentence: string;
   wordCount: number;
   clauseCount: number;
 }
 
-type SimplicityMap = Map<number, SentenceSimplicity>;
+type SimplicityMap = Map<number, { wordCount: number; clauseCount: number }>;
 
 // Read from disk, not the database - these are a one-time selection
 // input produced offline by score_sentence_simplicity.py, not something
@@ -132,12 +101,39 @@ async function loadSentenceSimplicity(dataDir: string): Promise<SimplicityMap> {
   return map;
 }
 
-function isSimpleEnough(simplicity: SentenceSimplicity | undefined): boolean {
-  return (
-    simplicity !== undefined &&
-    simplicity.wordCount <= MAX_EXAMPLE_WORDS &&
-    simplicity.clauseCount <= MAX_EXAMPLE_CLAUSES
-  );
+// Decision #48 (docs/decisions-48.md... see the step-1 entry): ranks
+// candidates instead of gating them against a fixed threshold, so a pair
+// with only awkward matches still gets its least-awkward ones instead of
+// nothing. Clause count is the primary signal (a single-clause sentence
+// beats a multi-clause one regardless of length) with word count as the
+// tiebreaker - same priority order decision #41 gave the two signals when
+// they were a hard AND'd threshold.
+function compareCandidates(a: Candidate, b: Candidate): number {
+  if (a.clauseCount !== b.clauseCount) return a.clauseCount - b.clauseCount;
+  return a.wordCount - b.wordCount;
+}
+
+// Keeps at most MAX_EXAMPLES per pair, sorted best-first, evicting the
+// current worst only when a strictly better candidate shows up - a plain
+// bounded insertion sort, not a heap, since MAX_EXAMPLES is 3.
+function considerCandidate(
+  bestByPair: Map<string, Candidate[]>,
+  key: string,
+  candidate: Candidate,
+): void {
+  const list = bestByPair.get(key) ?? [];
+
+  if (list.length < MAX_EXAMPLES) {
+    list.push(candidate);
+    list.sort(compareCandidates);
+    bestByPair.set(key, list);
+    return;
+  }
+
+  if (compareCandidates(candidate, list[list.length - 1]) < 0) {
+    list[list.length - 1] = candidate;
+    list.sort(compareCandidates);
+  }
 }
 
 type SentenceRow = [id: number, sentence: string];
@@ -176,32 +172,20 @@ async function insertExamplesBatch(
   );
 }
 
-async function processFile(
-  client: Client,
+// No early exit and no resumable pair-count state (contrast with the
+// pre-decision-48 version): ranking requires comparing every matching
+// sentence in the corpus against a pair's current best 3, so a sentence
+// that would improve a pair's examples can appear anywhere in the file,
+// including after that pair already has 3 weaker candidates. Same
+// full-file-scan tradeoff decision #39 already found cheap (~under a
+// minute locally at 1M-sentence scale).
+async function findBestExamples(
   leftIndex: WordIndex,
-  pairCounts: PairCounts,
   filePath: string,
   simplicityMap: SimplicityMap,
-) {
-  let remainingPairs = 0;
-  for (const count of pairCounts.values()) {
-    if (count < MAX_EXAMPLES) remainingPairs++;
-  }
-
-  let sentencesInserted = 0;
-  let examplesInserted = 0;
-
-  let sentenceBatch: SentenceRow[] = [];
-  let exampleBatch: ExampleRow[] = [];
-
-  // Sentences before examples, always - an example batch can reference a
-  // sentence added in the same cycle that hasn't been committed yet.
-  const flush = async () => {
-    await insertSentencesBatch(client, sentenceBatch);
-    await insertExamplesBatch(client, exampleBatch);
-    sentenceBatch = [];
-    exampleBatch = [];
-  };
+): Promise<Map<string, Candidate[]>> {
+  const bestByPair = new Map<string, Candidate[]>();
+  let sentencesScanned = 0;
 
   const rl = createInterface({
     input: createReadStream(filePath, "utf8"),
@@ -209,22 +193,21 @@ async function processFile(
   });
 
   for await (const line of rl) {
-    if (remainingPairs === 0) break;
+    sentencesScanned++;
 
     const tabIndex = line.indexOf("\t");
     if (tabIndex === -1) continue;
 
     const sentenceId = parseInt(line.substring(0, tabIndex), 10);
 
-    // Cheap early-exit, same spirit as the remainingPairs check above:
-    // skip all matching work for a sentence that doesn't read simply,
-    // before paying for tokenization.
-    if (!isSimpleEnough(simplicityMap.get(sentenceId))) continue;
+    // A sentence with no simplicity score can't be ranked, so it's
+    // excluded rather than treated as infinitely simple or complex.
+    const simplicity = simplicityMap.get(sentenceId);
+    if (!simplicity) continue;
 
     const sentence = line.substring(tabIndex + 1);
     const tokens = tokenizeSentence(sentence);
 
-    const matchedPairs: CollocationPair[] = [];
     const matchedKeys = new Set<string>();
 
     for (let i = 0; i < tokens.length - 1; i++) {
@@ -236,38 +219,63 @@ async function processFile(
 
         const key = `${pair.leftWordId}-${pair.rightWordId}`;
         if (matchedKeys.has(key)) continue;
-
-        const count = pairCounts.get(key)!;
-        if (count >= MAX_EXAMPLES) continue;
-
         matchedKeys.add(key);
-        matchedPairs.push(pair);
+
+        considerCandidate(bestByPair, key, {
+          sentenceId,
+          sentence,
+          wordCount: simplicity.wordCount,
+          clauseCount: simplicity.clauseCount,
+        });
       }
     }
+  }
 
-    if (matchedPairs.length === 0) continue;
+  console.log(`Sentences scanned: ${sentencesScanned}`);
+  return bestByPair;
+}
 
-    sentenceBatch.push([sentenceId, sentence]);
-    sentencesInserted++;
+async function writeResults(
+  client: Client,
+  pairs: CollocationPair[],
+  bestByPair: Map<string, Candidate[]>,
+): Promise<void> {
+  let sentenceBatch: SentenceRow[] = [];
+  let exampleBatch: ExampleRow[] = [];
+  const queuedSentenceIds = new Set<number>();
 
-    // Queue each matched pair's example
-    for (const pair of matchedPairs) {
-      const key = `${pair.leftWordId}-${pair.rightWordId}`;
-      const count = pairCounts.get(key)!;
-      if (count >= MAX_EXAMPLES) continue; // re-check — another match in this sentence may have incremented
+  let sentencesInserted = 0;
+  let examplesInserted = 0;
+  let pairsWithExamples = 0;
 
-      exampleBatch.push([pair.leftWordId, pair.rightWordId, sentenceId]);
+  const flush = async () => {
+    await insertSentencesBatch(client, sentenceBatch);
+    await insertExamplesBatch(client, exampleBatch);
+    sentenceBatch = [];
+    exampleBatch = [];
+  };
 
-      pairCounts.set(key, count + 1);
+  for (const pair of pairs) {
+    const key = `${pair.leftWordId}-${pair.rightWordId}`;
+    const candidates = bestByPair.get(key);
+    if (!candidates || candidates.length === 0) continue;
+    pairsWithExamples++;
+
+    for (const candidate of candidates) {
+      // A sentence can be the best example for more than one pair - only
+      // queue its insert once regardless of how many pairs reference it.
+      if (!queuedSentenceIds.has(candidate.sentenceId)) {
+        queuedSentenceIds.add(candidate.sentenceId);
+        sentenceBatch.push([candidate.sentenceId, candidate.sentence]);
+        sentencesInserted++;
+      }
+
+      exampleBatch.push([pair.leftWordId, pair.rightWordId, candidate.sentenceId]);
       examplesInserted++;
 
-      if (count + 1 >= MAX_EXAMPLES) {
-        remainingPairs--;
+      if (sentenceBatch.length >= BATCH_SIZE || exampleBatch.length >= BATCH_SIZE) {
+        await flush();
       }
-    }
-
-    if (exampleBatch.length >= BATCH_SIZE || sentenceBatch.length >= BATCH_SIZE) {
-      await flush();
     }
   }
 
@@ -275,7 +283,7 @@ async function processFile(
 
   console.log(`Sentences inserted: ${sentencesInserted}`);
   console.log(`Examples inserted: ${examplesInserted}`);
-  console.log(`Pairs still without max examples: ${remainingPairs}`);
+  console.log(`Pairs with at least one example: ${pairsWithExamples} / ${pairs.length}`);
 }
 
 async function main(): Promise<void> {
@@ -295,23 +303,26 @@ async function main(): Promise<void> {
     await client.connect();
     console.log('Connected to database');
 
+    // Full re-selection, not additive: ranking needs every matching
+    // sentence in the corpus compared against a pair's current best 3, so
+    // there's no way to "resume" from a partial previous run without
+    // re-scanning anyway. Same TRUNCATE + full re-extract pattern decision
+    // #41 used for its own threshold change.
+    await client.query('TRUNCATE collocation_examples, sentences');
+    console.log('Truncated collocation_examples and sentences');
+
     const pairs = await loadCollocationPairs(client);
     console.log(`Loaded ${pairs.length} collocation pairs`);
 
     const leftIndex = buildLeftIndex(pairs);
     console.log(`Left-word index built: ${leftIndex.size} unique words`);
 
-    const pairCounts: PairCounts = await loadExistingExampleCounts(client);
-    for (const pair of pairs) {
-      const key = `${pair.leftWordId}-${pair.rightWordId}`;
-      if (!pairCounts.has(key)) pairCounts.set(key, 0);
-    }
-    console.log(`Resuming from ${pairCounts.size} tracked pairs (existing example counts loaded)`);
-
     const simplicityMap = await loadSentenceSimplicity(dataDir);
 
     const sentencesFile = path.join(dataDir, `${corpusPrefix}-sentences.txt`);
-    await processFile(client, leftIndex, pairCounts, sentencesFile, simplicityMap);
+    const bestByPair = await findBestExamples(leftIndex, sentencesFile, simplicityMap);
+
+    await writeResults(client, pairs, bestByPair);
   } finally {
     await client.end();
     console.log('Disconnected');
