@@ -72,12 +72,12 @@ export function Word() {
 
     if (state.status === "notFound") {
         return (
-            <div>
-                <p>No results for "{word}".</p>
+            <div className="text-center">
+                <p>Keine Ergebnisse für „{word}“.</p>
                 {state.suggestions.length > 0 ? (
                     <div>
                         <p>Did you mean:</p>
-                        <ul className="flex flex-wrap gap-2 list-none">
+                        <ul className="flex flex-wrap justify-center gap-2 list-none">
                             {state.suggestions.map((s) => (
                                 <li key={s.word}>
                                     <Link to={`/wort/${encodeURIComponent(s.word)}`}

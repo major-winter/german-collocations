@@ -89,7 +89,7 @@ export function CollocationList({ entries }: CollocationListProps) {
     return (
         <section className="mb-6">
             {entries.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No results.</p>
+                <p className="text-sm text-muted-foreground text-center">Keine Ergebnisse.</p>
             ) : (
                 <div className="flex flex-col gap-4">
                     {SECTION_ORDER.filter((section) => groups.has(section)).map((section) => (

@@ -18,25 +18,36 @@ export function Layout({ children }: LayoutProps) {
             <header
                 className={
                     isWordPage
-                        ? "pt-4 pb-4 text-left max-w-xl mx-auto px-4 w-full"
+                        ? "pt-4 pb-4 max-w-xl mx-auto px-4 w-full flex items-center gap-3"
                         : "pt-8 pb-4 text-center max-w-xl mx-auto px-4 w-full"
                 }
             >
                 {isWordPage ? (
-                    <h1 className="text-lg font-medium">
-                        Deutsche <span className="text-indigo-600 dark:text-indigo-400">Kollokationen</span>
-                    </h1>
+                    <>
+                        <div className="flex items-center gap-2 shrink-0">
+                            <span className="flex items-center justify-center w-7 h-7 rounded-md bg-indigo-600 dark:bg-indigo-500 text-white text-xs font-semibold">
+                                DK
+                            </span>
+                            <h1 className="text-lg font-medium">Deutsche Kollokationen</h1>
+                        </div>
+                        <div className="flex-1">
+                            <SearchBox initialValue={currentWord} />
+                        </div>
+                    </>
                 ) : (
                     <>
-                        <h1 className="text-4xl font-medium">
-                            Deutsche <span className="text-indigo-600 dark:text-indigo-400">Kollokationen</span>
-                        </h1>
+                        <div className="flex items-center justify-center gap-2">
+                            <span className="flex items-center justify-center w-9 h-9 rounded-md bg-indigo-600 dark:bg-indigo-500 text-white text-sm font-semibold">
+                                DK
+                            </span>
+                            <h1 className="text-4xl font-medium">Deutsche Kollokationen</h1>
+                        </div>
                         <p className="text-sm text-muted-foreground">
                             Hier finden Sie häufige Wortverbindungen
                         </p>
+                        <SearchBox initialValue={currentWord} />
                     </>
                 )}
-                <SearchBox initialValue={currentWord} />
             </header>
 
             <main className="flex-1 w-full max-w-xl mx-auto px-4">
