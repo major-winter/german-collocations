@@ -54,13 +54,22 @@ from decisions #44/#47 are unaffected - this only changes which
 sentences get written to `collocation_examples`, not its schema or how
 it's read).
 
-**Not done in this pass**: production deploy. Decision #41's own
-extraction run crashed repeatedly when executed directly on the
-production VM (decision #38's disk-I/O findings, `pd-standard` HDD-
-class disk) - the established mitigation is running extraction locally
-and shipping a `pg_dump` of `sentences`/`collocation_examples` to the
-VM rather than re-running the script there. Follow that same pattern
-next, not a direct on-VM run.
+**Deployed same day**, following decision #41's established pattern
+rather than re-running the script on the VM (decision #38's disk-I/O
+findings - `pd-standard` HDD-class disk, repeated crashes on a direct
+on-VM run previously): `pg_dump -Fc --data-only --table=sentences
+--table=collocation_examples` from the local `db` container, `gcloud
+compute scp` to the VM, `docker cp` into the production `db`
+container, `TRUNCATE collocation_examples, sentences`, then
+`pg_restore --data-only --disable-triggers` (disabling triggers
+sidesteps needing the dump to be in FK-safe order, since a data-only
+dump of two independently-listed tables isn't guaranteed to restore
+`sentences` before `collocation_examples` otherwise). Verified: local
+and production `sentences`/`collocation_examples` row counts match
+exactly (507,981 / 748,707), and the live
+`/api/collocations/Zeit` response returns examples for all 24 entries.
+No backend/frontend rebuild needed - API response shape is unchanged,
+only which sentences got selected, same as decision #41's own deploy.
 
 **Still open, unrelated to this change**: the lemma-fragmentation
 finding from the coverage roadmap background (spaCy mis-lemmatizing
