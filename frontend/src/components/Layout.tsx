@@ -11,14 +11,31 @@ export function Layout({ children }: LayoutProps) {
 
     const match = matchPath("/wort/:word", location.pathname);
     const currentWord = match?.params.word ?? "";
+    const isWordPage = Boolean(match);
 
     return (
         <div className="min-h-screen flex flex-col">
-            <header className="pt-8 pb-4 text-center max-w-xl mx-auto px-4 w-full">
-                <h1 className="text-4xl font-medium">Deustche Kollokationen</h1>
-                <p className="text-sm text-muted-foreground">
-                    Hier finden Sie häufige Wortverbindungen
-                </p>
+            <header
+                className={
+                    isWordPage
+                        ? "pt-4 pb-4 text-left max-w-xl mx-auto px-4 w-full"
+                        : "pt-8 pb-4 text-center max-w-xl mx-auto px-4 w-full"
+                }
+            >
+                {isWordPage ? (
+                    <h1 className="text-lg font-medium">
+                        Deutsche <span className="text-indigo-600 dark:text-indigo-400">Kollokationen</span>
+                    </h1>
+                ) : (
+                    <>
+                        <h1 className="text-4xl font-medium">
+                            Deutsche <span className="text-indigo-600 dark:text-indigo-400">Kollokationen</span>
+                        </h1>
+                        <p className="text-sm text-muted-foreground">
+                            Hier finden Sie häufige Wortverbindungen
+                        </p>
+                    </>
+                )}
                 <SearchBox initialValue={currentWord} />
             </header>
 
