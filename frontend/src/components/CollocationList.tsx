@@ -55,18 +55,18 @@ function highlightCollocates(
 const SECTION_ORDER: CollocationSection[] = ['noun', 'verb', 'adjective', 'preposition', 'other'];
 
 const SECTION_LABELS: Record<CollocationSection, string> = {
-    noun: 'Nouns',
-    verb: 'Verbs',
-    adjective: 'Adjectives',
-    preposition: 'Prepositions',
-    other: 'Other',
+    noun: 'Substantive',
+    verb: 'Verben',
+    adjective: 'Adjektive',
+    preposition: 'Präpositionen',
+    other: 'Sonstige',
 };
 
 const PAINT_COLORS: Record<CollocationSection, string> = {
-    noun: 'text-blue-600 dark:text-blue-400',
-    verb: 'text-orange-600 dark:text-orange-400',
-    adjective: 'text-green-600 dark:text-green-400',
-    preposition: 'text-purple-600 dark:text-purple-400',
+    noun: 'text-pos-noun',
+    verb: 'text-pos-verb',
+    adjective: 'text-pos-adjective',
+    preposition: 'text-pos-preposition',
     other: 'text-foreground',
 };
 
@@ -109,7 +109,7 @@ export function CollocationList({ entries }: CollocationListProps) {
                                     .map((entry, i) => (
                                         <div
                                             key={`${entry.word}-${i}`}
-                                            className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors cursor-pointer space-y-1"
+                                            className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors space-y-1"
                                         >
                                             {entry.examples.map((example, i) => (
                                                 <p key={i} className="text-xs text-muted-foreground italic">

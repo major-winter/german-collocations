@@ -63,11 +63,11 @@ export function Word() {
     }, [word]);
 
     if (state.status === "loading") {
-        return <p>Loading…</p>;
+        return <p className="text-sm text-muted-foreground text-center">Loading…</p>;
     }
 
     if (state.status === "error") {
-        return <p role="alert">{state.message}</p>;
+        return <p role="alert" className="text-sm text-center">{state.message}</p>;
     }
 
     if (state.status === "notFound") {
