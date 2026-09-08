@@ -48,6 +48,10 @@
   --color-pos-verb: var(--pos-verb);
   --color-pos-adjective: var(--pos-adjective);
   --color-pos-preposition: var(--pos-preposition);
+  --color-case-nominativ: var(--case-nominativ);
+  --color-case-akkusativ: var(--case-akkusativ);
+  --color-case-dativ: var(--case-dativ);
+  --color-case-genitiv: var(--case-genitiv);
 }
 
 :root {
@@ -90,6 +94,27 @@
   --pos-verb: oklch(0.62 0.17 65);
   --pos-adjective: oklch(0.62 0.18 145);
   --pos-preposition: oklch(0.62 0.18 300);
+  /* Grammatical-case colors: a second, deliberately separate dimension
+     from the POS palette above (decision #51) - German case (Nominativ/
+     Akkusativ/Dativ/Genitiv) is the one grammar axis with real currency
+     in German-learner color-coding conventions (research in the
+     conversation preceding decision #53's follow-up), unlike
+     part-of-speech itself, which is more an English-worksheet
+     convention. Used for GovernedPrepositions' case label and
+     CollocationList's verb-argument relation badges (Subjekt/
+     Akkusativobjekt/Dativobjekt/Genitivobjekt map onto these same four
+     cases). Hues placed in the gaps between the POS hues above (verb 65,
+     adjective 145, noun 250, preposition 300) so the two systems don't
+     read as one confused dimension - exact separation isn't perfect
+     (8 hues in one wheel), acceptable since these render as small
+     badges/dots, not large text blocks, and Genitiv/Genitivobjekt is
+     rare enough in practice that its near-preposition hue rarely
+     appears alongside a preposition-colored element in the same view.
+  */
+  --case-nominativ: oklch(0.62 0.16 5);
+  --case-akkusativ: oklch(0.62 0.16 110);
+  --case-dativ: oklch(0.62 0.16 200);
+  --case-genitiv: oklch(0.62 0.16 320);
 }
 
 .dark {
@@ -128,6 +153,10 @@
   --pos-verb: oklch(0.80 0.15 65);
   --pos-adjective: oklch(0.80 0.15 145);
   --pos-preposition: oklch(0.78 0.16 300);
+  --case-nominativ: oklch(0.78 0.14 5);
+  --case-akkusativ: oklch(0.80 0.14 110);
+  --case-dativ: oklch(0.80 0.14 200);
+  --case-genitiv: oklch(0.78 0.14 320);
 }
 
 @layer base {

@@ -126,5 +126,47 @@ services:
     command: ['node', 'scripts/load-lemma-collocations.ts']
     profiles: ['manual']       # keeps it from running on every `up`
 
+  load-verb-prepositions:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-verb-prepositions.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
+  load-verb-arguments:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-verb-arguments.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
+  load-verb-argument-examples:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-verb-argument-examples.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
 volumes:
   postgres_data:

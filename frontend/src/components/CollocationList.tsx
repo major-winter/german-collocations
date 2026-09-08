@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
+import { caseColorClass, relationAbbreviation } from '../lib/grammaticalCase.ts';
 
 interface CollocationListProps {
     entries: CollocationEntry[];
@@ -39,7 +40,7 @@ function highlightCollocates(
                 nodes.push(sentence.slice(lastIndex, match.index));
             }
             nodes.push(
-                <span key={key++} className={cn('not-italic', isBold && 'font-semibold', paintClassName)}>
+                <span key={key++} className={cn('not-italic', isBold ? 'font-semibold' : paintClassName)}>
                     {word}
                 </span>,
             );
@@ -111,6 +112,16 @@ export function CollocationList({ entries }: CollocationListProps) {
                                             key={`${entry.word}-${i}`}
                                             className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors space-y-1"
                                         >
+                                            {entry.relation && (
+                                                <span
+                                                    className={cn(
+                                                        'block text-[10px] font-semibold uppercase tracking-wide',
+                                                        caseColorClass(entry.relation),
+                                                    )}
+                                                >
+                                                    {relationAbbreviation(entry.relation)}
+                                                </span>
+                                            )}
                                             {entry.examples.map((example, i) => (
                                                 <p key={i} className="text-xs text-muted-foreground italic">
                                                     {highlightCollocates(

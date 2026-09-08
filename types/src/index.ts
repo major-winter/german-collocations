@@ -14,17 +14,33 @@ export interface CollocationExample {
   collocateWord: string;
 }
 
+// relation is only set for entries sourced from verb_arguments (decision
+// #53's noun/verb section replacement) - 'Subjekt' | 'Akkusativobjekt' |
+// 'Dativobjekt' | 'Genitivobjekt'. Undefined for lemma_collocations-
+// sourced entries, which have no single grammatical relation to name.
 export interface CollocationEntry {
   word: string;
   cooccurrence: number;
   significance: number;
   examples: CollocationExample[];
   section: CollocationSection;
+  relation?: string;
+}
+
+// Decision #52 (docs/decisions-52.md): a governed preposition (Rektion) is
+// a grammatical fact ("warten" requires "auf" + Akkusativ), not a ranked
+// collocate - rendered as its own callout (GovernedPrepositions.tsx), not
+// folded into CollocationEntry's "preposition" section. `case` is empty
+// when spaCy's morphology didn't resolve a Case feature.
+export interface GovernedPreposition {
+  preposition: string;
+  case: string;
 }
 
 export interface CollocationResponse {
   word: string;
   collocations: CollocationEntry[];
+  governedPrepositions: GovernedPreposition[];
 }
 
 export type WordSuggestion = { word: string; frequency: number; score: number };

@@ -3,8 +3,9 @@ import type {
   CollocationLookup,
   CollocationRepository,
   CollocationRow,
+  VerbArgumentRow,
 } from "../contracts/CollocationRepository.ts";
-import type { CollocationEntry } from "@collocations/types";
+import type { CollocationEntry, CollocationSection, GovernedPreposition } from "@collocations/types";
 
 // Decision #36 (docs/decisions-33-35.md), now applied at lemma
 // granularity (lemma_dominant_pos, decision #44): a lemma's dominant
@@ -27,6 +28,39 @@ const PER_SECTION_LIMIT = 10;
 // in decision #43 and re-verified (not re-derived) at lemma granularity
 // in decision #44 - see that decision for the re-verification numbers.
 const MIN_LOG_DICE = 6.3;
+
+// Decision #52 (docs/decisions-52.md): governed prepositions are ranked
+// by share of the verb's own total attached-PP count, not logDice - a
+// different, smaller population than lemma_collocations' raw adjacency.
+// 0.20 and MAX=2 were tuned against 8 hand-picked Rektion verbs (0.10 let
+// through generic locative adjuncts like "warten in", 0.15 still let
+// through a journalistic-template artifact "achten bei" - see that
+// decision for the full comparison). MIN_COUNT=5 is a light noise floor
+// verified against the real verb_preposition.tsv: 81,310 of its 99,547
+// rows (over 80%) have a count under 5, mostly rare/misparsed verb
+// lemmas where a single co-occurrence trivially reaches high share.
+const MIN_GOVERNED_PREPOSITION_COUNT = 5;
+const MIN_GOVERNED_PREPOSITION_SHARE = 0.2;
+const MAX_GOVERNED_PREPOSITIONS = 2;
+
+// Decision #53 (docs/decisions-53.md): verb_arguments-derived noun/verb
+// sections are a ranked list (like lemma_collocations' other sections),
+// not a single grammatical fact like governed prepositions - so this
+// uses a light noise floor, not a dominance floor. Provisional pending
+// inspection of the full-corpus load (see decision #53's threshold
+// section) the same way MIN_LOG_DICE/MIN_GOVERNED_PREPOSITION_SHARE were
+// tuned against real data before being finalized.
+const MIN_ARGUMENT_COUNT = 3;
+
+// Temporarily off (see decisions-53.md's follow-up note): the user
+// wants the noun/verb sections back on plain lemma_collocations
+// adjacency for now, despite the feature working correctly end-to-end.
+// Schema, loaders, and the query itself are untouched and left fully
+// functional - this only skips running VERB_ARGUMENTS_QUERY and
+// merging its results, so re-enabling later is this one flag.
+// GovernedPrepositions (decision #52) is unaffected - explicitly kept
+// on by the user.
+const VERB_ARGUMENTS_ENABLED = false;
 
 // Repeated verbatim inside the same query (Postgres window functions
 // can't reference a SELECT-list alias in PARTITION BY), so it's kept as
@@ -149,6 +183,120 @@ const COLLOCATIONS_QUERY = `
   ORDER BY r.log_dice DESC
 `;
 
+// Decision #53: replaces, for a verb headword, the "noun" section
+// (verb_lemma_id = $1 - which nouns are genuinely this verb's subject/
+// object) and, for a noun headword, the "verb" section (argument_lemma_id
+// = $1 - which verbs genuinely govern this noun as subject/object). A
+// real lemma only ever matches one side (a noun lemma is never itself a
+// verb_lemma_id), so both branches run unconditionally and whichever is
+// empty costs one cheap indexed lookup.
+//
+// DISTINCT ON (verb_lemma_id, argument_lemma_id, section) collapses the
+// rare case of the same (verb, argument) pair qualifying under more than
+// one relation (e.g. "die Regierung unterstuetzt" vs. "man unterstuetzt
+// die Regierung" - "Regierung" as both Subjekt and Akkusativobjekt of
+// "unterstuetzen") down to one row, keeping the higher-share relation -
+// CollocationEntry has no field to show two relations for the same word
+// as visually distinct facts, so showing both would just look like a
+// duplicate.
+const VERB_ARGUMENTS_QUERY = `
+  WITH verb_side AS (
+    SELECT
+      va.verb_lemma_id, va.argument_lemma_id, va.grammatical_relation,
+      l_arg.lemma AS word,
+      va.count AS cooccurrence,
+      (va.count::real / SUM(va.count) OVER (PARTITION BY va.grammatical_relation))::real AS share,
+      'noun'::text AS section
+    FROM verb_arguments va
+    JOIN lemmas l_arg ON l_arg.id = va.argument_lemma_id
+    WHERE va.verb_lemma_id = $1
+      AND va.count >= ${MIN_ARGUMENT_COUNT}
+  ),
+  -- share can't be a window function over va here, unlike verb_side:
+  -- WHERE runs before the window function, so partitioning by
+  -- verb_lemma_id while already filtered to one fixed argument_lemma_id
+  -- leaves at most one row per (verb_lemma_id, grammatical_relation) -
+  -- that's the table's own primary key - making every partition a
+  -- singleton and every share exactly 1.0 (caught empirically: real
+  -- verbs' top "verb" section entries came back in plain alphabetical
+  -- insertion order, not ranked - see docs/decisions-53.md). The LATERAL
+  -- below computes each row's total from the full, unfiltered set of
+  -- that verb's own rows (via idx_verb_arguments_verb - cheap, bounded
+  -- by one verb's own argument count, not a full-table scan), the same
+  -- quantity verb_side's window function gets for free by filtering to
+  -- one verb first.
+  argument_side AS (
+    SELECT
+      va.verb_lemma_id, va.argument_lemma_id, va.grammatical_relation,
+      l_verb.lemma AS word,
+      va.count AS cooccurrence,
+      (va.count::real / totals.total)::real AS share,
+      'verb'::text AS section
+    FROM verb_arguments va
+    JOIN lemmas l_verb ON l_verb.id = va.verb_lemma_id
+    JOIN LATERAL (
+      SELECT SUM(va2.count) AS total
+      FROM verb_arguments va2
+      WHERE va2.verb_lemma_id = va.verb_lemma_id
+        AND va2.grammatical_relation = va.grammatical_relation
+    ) totals ON true
+    WHERE va.argument_lemma_id = $1
+      AND va.count >= ${MIN_ARGUMENT_COUNT}
+  ),
+  combined AS (
+    SELECT DISTINCT ON (verb_lemma_id, argument_lemma_id, section)
+      verb_lemma_id, argument_lemma_id, grammatical_relation, word, cooccurrence, share, section
+    FROM (
+      SELECT * FROM verb_side
+      UNION ALL
+      SELECT * FROM argument_side
+    ) u
+    ORDER BY verb_lemma_id, argument_lemma_id, section, share DESC
+  ),
+  ranked AS (
+    SELECT *,
+      ROW_NUMBER() OVER (PARTITION BY section ORDER BY share DESC) AS rn
+    FROM combined
+  )
+  SELECT r.verb_lemma_id AS "verbLemmaId", r.argument_lemma_id AS "argumentLemmaId",
+    r.word, r.cooccurrence, r.share AS significance, r.section,
+    r.grammatical_relation AS "relation",
+    ex.sentence, ex."verbSurface", ex."argumentSurface"
+  FROM ranked r
+  LEFT JOIN LATERAL (
+    SELECT sentence, verb_surface AS "verbSurface", argument_surface AS "argumentSurface"
+    FROM verb_argument_examples vae
+    WHERE vae.verb_lemma_id = r.verb_lemma_id
+      AND vae.argument_lemma_id = r.argument_lemma_id
+      AND vae.grammatical_relation = r.grammatical_relation
+    LIMIT 3
+  ) ex ON true
+  WHERE r.rn <= ${PER_SECTION_LIMIT}
+  ORDER BY r.share DESC
+`;
+
+// Decision #52: a governed preposition is a grammatical fact ("warten"
+// requires "auf" + Akkusativ), ranked by share of the verb's own total
+// attached-PP count - see the module-level threshold comment above.
+const GOVERNED_PREPOSITIONS_QUERY = `
+  WITH totals AS (
+    SELECT verb_lemma_id, SUM(count) AS total
+    FROM verb_prepositions
+    WHERE verb_lemma_id = $1
+    GROUP BY verb_lemma_id
+  )
+  SELECT l.lemma AS preposition, vp.grammatical_case AS "case",
+    (vp.count::real / t.total) AS share
+  FROM verb_prepositions vp
+  JOIN totals t ON t.verb_lemma_id = vp.verb_lemma_id
+  JOIN lemmas l ON l.id = vp.preposition_lemma_id
+  WHERE vp.verb_lemma_id = $1
+    AND vp.count >= ${MIN_GOVERNED_PREPOSITION_COUNT}
+    AND (vp.count::real / t.total) >= ${MIN_GOVERNED_PREPOSITION_SHARE}
+  ORDER BY share DESC
+  LIMIT ${MAX_GOVERNED_PREPOSITIONS}
+`;
+
 // Keyed by (left_lemma_id, right_lemma_id), not by word text - the same
 // partner lemma can appear via two distinct pairs now that both
 // directions are combined (e.g. "X folgt Y" and "Y folgt X" both
@@ -196,6 +344,48 @@ function groupRows(rows: CollocationRow[], queryLemmaId: number): CollocationEnt
   return Array.from(entries.values());
 }
 
+// Same shape as groupRows, but keyed by (verbLemmaId, argumentLemmaId,
+// section) - section is part of the key here (unlike groupRows) because,
+// unlike the symmetric lemma_collocations pairing, a verb_arguments row
+// already has a fixed verb/argument role per section (see
+// VERB_ARGUMENTS_QUERY's DISTINCT ON), so section is never ambiguous for
+// a given pair and including it just guards against a hypothetical
+// collision rather than resolving a real one.
+function groupVerbArgumentRows(rows: VerbArgumentRow[], queryLemmaId: number): CollocationEntry[] {
+  const entries = new Map<string, CollocationEntry>();
+
+  for (const row of rows) {
+    const key = `${row.verbLemmaId}-${row.argumentLemmaId}-${row.section}`;
+    const isQueryVerbSide = row.verbLemmaId === queryLemmaId;
+    const example =
+      row.sentence && row.verbSurface && row.argumentSurface
+        ? {
+            sentence: row.sentence,
+            searchWord: isQueryVerbSide ? row.verbSurface : row.argumentSurface,
+            collocateWord: isQueryVerbSide ? row.argumentSurface : row.verbSurface,
+          }
+        : null;
+    const existing = entries.get(key);
+
+    if (existing) {
+      if (example) {
+        existing.examples.push(example);
+      }
+    } else {
+      entries.set(key, {
+        word: row.word,
+        cooccurrence: row.cooccurrence,
+        significance: row.significance,
+        section: row.section,
+        relation: row.relation,
+        examples: example ? [example] : [],
+      });
+    }
+  }
+
+  return Array.from(entries.values());
+}
+
 export class PgCollocationRepository implements CollocationRepository {
   #pool: Pool;
   constructor(pool: Pool) {
@@ -222,14 +412,38 @@ export class PgCollocationRepository implements CollocationRepository {
     );
 
     const lemmaRow = lemmaResult.rows[0];
-    if (!lemmaRow) return { wordId: wordRow.id, collocations: [] };
+    if (!lemmaRow)
+      return { wordId: wordRow.id, collocations: [], governedPrepositions: [] };
 
-    const result = await this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [
-      lemmaRow.lemma_id,
-    ]);
+    const lemmaId = lemmaRow.lemma_id;
+
+    const [collocationsResult, verbArgumentsResult, governedPrepositionsResult] =
+      await Promise.all([
+        this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [lemmaId]),
+        VERB_ARGUMENTS_ENABLED
+          ? this.#pool.query<VerbArgumentRow>(VERB_ARGUMENTS_QUERY, [lemmaId])
+          : Promise.resolve({ rows: [] as VerbArgumentRow[] }),
+        this.#pool.query<{ preposition: string; case: string }>(GOVERNED_PREPOSITIONS_QUERY, [
+          lemmaId,
+        ]),
+      ]);
+
+    const argumentEntries = groupVerbArgumentRows(verbArgumentsResult.rows, lemmaId);
+    // Sections verb_arguments actually produced data for, for this
+    // lemma, replace the corresponding lemma_collocations-sourced
+    // section entirely (decision #53's "replace section-by-section"
+    // scope) rather than sitting alongside it - a lemma only ever
+    // qualifies on one side (noun or verb), so this is either empty or
+    // a single section in practice.
+    const supersededSections = new Set<CollocationSection>(argumentEntries.map((e) => e.section));
+    const adjacencyEntries = groupRows(collocationsResult.rows, lemmaId).filter(
+      (entry) => !supersededSections.has(entry.section),
+    );
+
     return {
       wordId: wordRow.id,
-      collocations: groupRows(result.rows, lemmaRow.lemma_id),
+      collocations: [...adjacencyEntries, ...argumentEntries],
+      governedPrepositions: governedPrepositionsResult.rows,
     };
   }
 }
