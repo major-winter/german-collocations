@@ -107,17 +107,73 @@ import spacy
 # whichever pronoun happened to be the grammatical subject.
 STOPWORDS = {
     # Pronouns
-    "ich", "du", "er", "sie", "es", "wir", "ihr", "mich", "dich", "sich",
-    "uns", "euch", "mir", "dir", "ihm", "ihn", "ihnen", "mein", "dein",
-    "sein", "unser", "euer", "man", "allen", "alle",
+    "ich",
+    "du",
+    "er",
+    "sie",
+    "es",
+    "wir",
+    "ihr",
+    "mich",
+    "dich",
+    "sich",
+    "uns",
+    "euch",
+    "mir",
+    "dir",
+    "ihm",
+    "ihn",
+    "ihnen",
+    "mein",
+    "dein",
+    "sein",
+    "unser",
+    "euer",
+    "man",
+    "allen",
+    "alle",
     # Articles / determiners
-    "der", "die", "das", "den", "dem", "des", "ein", "eine", "einem",
-    "einen", "einer", "eines", "dieser", "diese", "dieses", "diesem",
-    "diesen", "jeder", "jede", "jedes", "jedem", "jeden",
+    "der",
+    "die",
+    "das",
+    "den",
+    "dem",
+    "des",
+    "ein",
+    "eine",
+    "einem",
+    "einen",
+    "einer",
+    "eines",
+    "dieser",
+    "diese",
+    "dieses",
+    "diesem",
+    "diesen",
+    "jeder",
+    "jede",
+    "jedes",
+    "jedem",
+    "jeden",
     # Conjunctions / particles
-    "und", "oder", "aber", "auch", "noch", "dann", "denn", "doch",
-    "schon", "nur", "nicht", "sondern", "weil", "dass", "wenn", "ob",
-    "als", "wie",
+    "und",
+    "oder",
+    "aber",
+    "auch",
+    "noch",
+    "dann",
+    "denn",
+    "doch",
+    "schon",
+    "nur",
+    "nicht",
+    "sondern",
+    "weil",
+    "dass",
+    "wenn",
+    "ob",
+    "als",
+    "wie",
 }
 
 
@@ -347,7 +403,9 @@ def extract_corpus(
     sentence_stream = read_sentences(input_path)
     text_and_id = ((text, sentence_id) for sentence_id, text in sentence_stream)
 
-    for doc, sentence_id in nlp.pipe(text_and_id, batch_size=pipe_batch_size, as_tuples=True):
+    for doc, sentence_id in nlp.pipe(
+        text_and_id, batch_size=pipe_batch_size, as_tuples=True
+    ):
         word_count, clause_count = score_sentence(doc)
 
         for token in doc:
@@ -359,7 +417,14 @@ def extract_corpus(
                 consider_candidate(
                     best_examples_by_triple,
                     triple,
-                    (clause_count, word_count, sentence_id, doc.text, token.text, argument_token.text),
+                    (
+                        clause_count,
+                        word_count,
+                        sentence_id,
+                        doc.text,
+                        token.text,
+                        argument_token.text,
+                    ),
                 )
 
         sentences_processed += 1
@@ -387,15 +452,26 @@ def write_output(counts: Counter, output_path: Path) -> None:
 
 def write_examples_output(best_examples_by_triple: dict, output_path: Path) -> None:
     with output_path.open("w", encoding="utf-8") as f:
-        for (verb, relation, argument) in sorted(best_examples_by_triple.keys()):
+        for verb, relation, argument in sorted(best_examples_by_triple.keys()):
             candidates = best_examples_by_triple[(verb, relation, argument)]
-            for _clause_count, _word_count, _sentence_id, sentence, verb_surface, argument_surface in candidates:
-                f.write(f"{verb}\t{relation}\t{argument}\t{sentence}\t{verb_surface}\t{argument_surface}\n")
+            for (
+                _clause_count,
+                _word_count,
+                _sentence_id,
+                sentence,
+                verb_surface,
+                argument_surface,
+            ) in candidates:
+                f.write(
+                    f"{verb}\t{relation}\t{argument}\t{sentence}\t{verb_surface}\t{argument_surface}\n"
+                )
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input", type=Path, required=True, help="Path to sentences.txt")
+    parser.add_argument(
+        "--input", type=Path, required=True, help="Path to sentences.txt"
+    )
     parser.add_argument(
         "--output", type=Path, required=True, help="Path to write verb_argument.tsv to"
     )

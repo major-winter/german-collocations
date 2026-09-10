@@ -29,6 +29,24 @@ export interface VerbArgumentRow {
   section: CollocationSection;
 }
 
+// Rows from adjective_attributes (decision #54, docs/decisions-54.md):
+// same fixed-side shape as VerbArgumentRow, not CollocationRow's
+// symmetric left/right - a row always has a fixed noun side and
+// adjective side. No `relation` field, unlike VerbArgumentRow: a (noun,
+// adjective) pair only ever means one thing (attributive modification),
+// so there's nothing to disambiguate.
+export interface AdjectiveAttributeRow {
+  nounLemmaId: number;
+  adjectiveLemmaId: number;
+  word: string;
+  cooccurrence: number;
+  significance: number;
+  sentence: string | null;
+  nounSurface: string | null;
+  adjectiveSurface: string | null;
+  section: CollocationSection;
+}
+
 export interface CollocationLookup {
   wordId: number;
   collocations: CollocationEntry[];

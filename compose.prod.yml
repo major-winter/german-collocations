@@ -169,6 +169,34 @@ services:
     command: ['node', 'scripts/load-verb-argument-examples.ts']
     profiles: ['manual']       # keeps it from running on every `up`
 
+  load-adjective-attributes:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-adjective-attributes.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
+  load-adjective-attribute-examples:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-adjective-attribute-examples.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
 volumes:
   postgres_data:
   caddy_data:

@@ -112,16 +112,15 @@ export function CollocationList({ entries }: CollocationListProps) {
                                             key={`${entry.word}-${i}`}
                                             className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors space-y-1"
                                         >
-                                            {entry.relation && (
-                                                <span
-                                                    className={cn(
-                                                        'block text-[10px] font-semibold uppercase tracking-wide',
-                                                        caseColorClass(entry.relation),
-                                                    )}
-                                                >
-                                                    {relationAbbreviation(entry.relation)}
-                                                </span>
-                                            )}
+                                            {/* {entry.relation && ( <span */}
+                                            {/*         className={cn( */}
+                                            {/*             'block text-[10px] font-semibold uppercase tracking-wide', */}
+                                            {/*             caseColorClass(entry.relation), */}
+                                            {/*         )} */}
+                                            {/*     > */}
+                                            {/*         {relationAbbreviation(entry.relation)} */}
+                                            {/*     </span> */}
+                                            {/* )} */}
                                             {entry.examples.map((example, i) => (
                                                 <p key={i} className="text-xs text-muted-foreground italic">
                                                     {highlightCollocates(

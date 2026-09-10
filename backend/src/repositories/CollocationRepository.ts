@@ -1,11 +1,16 @@
 import { Pool } from "pg";
 import type {
+  AdjectiveAttributeRow,
   CollocationLookup,
   CollocationRepository,
   CollocationRow,
   VerbArgumentRow,
 } from "../contracts/CollocationRepository.ts";
-import type { CollocationEntry, CollocationSection, GovernedPreposition } from "@collocations/types";
+import type {
+  CollocationEntry,
+  CollocationSection,
+  GovernedPreposition,
+} from "@collocations/types";
 
 // Decision #36 (docs/decisions-33-35.md), now applied at lemma
 // granularity (lemma_dominant_pos, decision #44): a lemma's dominant
@@ -52,6 +57,15 @@ const MAX_GOVERNED_PREPOSITIONS = 2;
 // tuned against real data before being finalized.
 const MIN_ARGUMENT_COUNT = 3;
 
+// Decision #54 (docs/decisions-54.md): same light-noise-floor reasoning
+// as MIN_ARGUMENT_COUNT, re-verified against the real full-corpus
+// adjective_attribute.tsv rather than assumed equal just because the
+// shape of the query is the same - 90.4% of its 444,470 distinct (noun,
+// adjective) pairs have a count under 3 (vs. verb_arguments' 85% under
+// the same floor), an even steeper long tail, so the same threshold
+// value excludes at least as much noise here.
+const MIN_ADJECTIVE_ATTRIBUTE_COUNT = 3;
+
 // Temporarily off (see decisions-53.md's follow-up note): the user
 // wants the noun/verb sections back on plain lemma_collocations
 // adjacency for now, despite the feature working correctly end-to-end.
@@ -91,8 +105,10 @@ const SECTION_CASE = `
  */
 function buildBranchQuery(fixedSide: "left" | "right"): string {
   const partnerLemmaText = fixedSide === "left" ? "l2.lemma" : "l1.lemma";
-  const fixedId = fixedSide === "left" ? "lc.left_lemma_id" : "lc.right_lemma_id";
-  const partnerId = fixedSide === "left" ? "lc.right_lemma_id" : "lc.left_lemma_id";
+  const fixedId =
+    fixedSide === "left" ? "lc.left_lemma_id" : "lc.right_lemma_id";
+  const partnerId =
+    fixedSide === "left" ? "lc.right_lemma_id" : "lc.left_lemma_id";
 
   return `
     SELECT
@@ -297,6 +313,107 @@ const GOVERNED_PREPOSITIONS_QUERY = `
   LIMIT ${MAX_GOVERNED_PREPOSITIONS}
 `;
 
+// Decision #54: replaces, for a noun headword, the "adjective" section
+// (noun_lemma_id = $1 - which adjectives genuinely modify this noun
+// attributively) and, for an adjective headword, the "noun" section
+// (adjective_lemma_id = $1 - which nouns this adjective genuinely
+// modifies). Same fixed-side/unconditional-both-branches shape as
+// VERB_ARGUMENTS_QUERY - see that query's comment for why running both
+// branches unconditionally is cheap (one indexed lookup) even though a
+// real lemma only ever matches one side.
+//
+// No DISTINCT ON needed here, unlike VERB_ARGUMENTS_QUERY: with no
+// grammatical_relation column, adjective_attributes' primary key is
+// already exactly (noun_lemma_id, adjective_lemma_id) - there's no
+// second relation a pair could qualify under, so noun_side and
+// argument_side can never both surface the same pair.
+//
+// noun_side's share ("what share of this noun's own attributive-
+// adjective mentions point to this specific adjective") is computed via
+// SUM(aa.count) OVER () with no PARTITION BY - safe here, unlike
+// adjective_side, only because noun_side's WHERE already filters to one
+// fixed noun_lemma_id, so every row still in scope when the window
+// function runs already shares that same noun; an unpartitioned SUM
+// over them is exactly that noun's own total, for free. adjective_side
+// has no such filter to lean on (WHERE fixes adjective_lemma_id, not
+// noun_lemma_id), so it needs the LATERAL join below - same trap
+// decision #53 hit and fixed, applied here from the start instead of
+// re-discovering it.
+const ADJECTIVE_ATTRIBUTES_QUERY = `
+  WITH noun_side AS (
+    SELECT
+      aa.noun_lemma_id, aa.adjective_lemma_id,
+      l_adj.lemma AS word,
+      aa.count AS cooccurrence,
+      (aa.count::real / SUM(aa.count) OVER ())::real AS share,
+      'adjective'::text AS section
+    FROM adjective_attributes aa
+    JOIN lemmas l_adj ON l_adj.id = aa.adjective_lemma_id
+    WHERE aa.noun_lemma_id = $1
+      AND aa.count >= ${MIN_ADJECTIVE_ATTRIBUTE_COUNT}
+  ),
+  -- share can't be a window function over aa here, unlike noun_side:
+  -- WHERE runs before the window function, so filtering to one fixed
+  -- adjective_lemma_id first would leave at most one row (that's the
+  -- table's own primary key), making every share exactly 1.0 - the
+  -- same shape of bug decision #53 hit.
+  --
+  -- Unlike VERB_ARGUMENTS_QUERY's argument_side, though, a LATERAL join
+  -- is the wrong fix here, not the right one: argument_side's total
+  -- genuinely varies per row (grouped by verb_lemma_id, which differs
+  -- row to row), so a correlated subquery is required there.
+  -- adjective_lemma_id is fixed to $1 for every row in this branch,
+  -- though - the total is one single number for the whole query, not a
+  -- per-row value - so a LATERAL was tried first and measured (EXPLAIN
+  -- ANALYZE, see docs/decisions-54.md) at 983ms / 2.2M buffer hits for
+  -- "groß" (1,043 qualifying rows): Postgres re-evaluated the identical
+  -- correlated subquery once per outer row instead of recognizing it
+  -- doesn't depend on the row, an O(n²) blowup. Replaced with a plain
+  -- scalar subquery computed once and CROSS JOIN'd in - same value,
+  -- evaluated a single time: 4.4ms after the fix, see Verification.
+  adjective_totals AS (
+    SELECT SUM(count) AS total
+    FROM adjective_attributes
+    WHERE adjective_lemma_id = $1
+  ),
+  adjective_side AS (
+    SELECT
+      aa.noun_lemma_id, aa.adjective_lemma_id,
+      l_noun.lemma AS word,
+      aa.count AS cooccurrence,
+      (aa.count::real / adjective_totals.total)::real AS share,
+      'noun'::text AS section
+    FROM adjective_attributes aa
+    JOIN lemmas l_noun ON l_noun.id = aa.noun_lemma_id
+    CROSS JOIN adjective_totals
+    WHERE aa.adjective_lemma_id = $1
+      AND aa.count >= ${MIN_ADJECTIVE_ATTRIBUTE_COUNT}
+  ),
+  combined AS (
+    SELECT * FROM noun_side
+    UNION ALL
+    SELECT * FROM adjective_side
+  ),
+  ranked AS (
+    SELECT *,
+      ROW_NUMBER() OVER (PARTITION BY section ORDER BY share DESC) AS rn
+    FROM combined
+  )
+  SELECT r.noun_lemma_id AS "nounLemmaId", r.adjective_lemma_id AS "adjectiveLemmaId",
+    r.word, r.cooccurrence, r.share AS significance, r.section,
+    ex.sentence, ex."nounSurface", ex."adjectiveSurface"
+  FROM ranked r
+  LEFT JOIN LATERAL (
+    SELECT sentence, noun_surface AS "nounSurface", adjective_surface AS "adjectiveSurface"
+    FROM adjective_attribute_examples aae
+    WHERE aae.noun_lemma_id = r.noun_lemma_id
+      AND aae.adjective_lemma_id = r.adjective_lemma_id
+    LIMIT 3
+  ) ex ON true
+  WHERE r.rn <= ${PER_SECTION_LIMIT}
+  ORDER BY r.share DESC
+`;
+
 // Keyed by (left_lemma_id, right_lemma_id), not by word text - the same
 // partner lemma can appear via two distinct pairs now that both
 // directions are combined (e.g. "X folgt Y" and "Y folgt X" both
@@ -308,7 +425,10 @@ const GOVERNED_PREPOSITIONS_QUERY = `
 // lemma id, not by string equality against `word`, since either side's
 // literal surface form can differ from its own lemma's spelling (the
 // same divergence documented above for the LATERAL join).
-function groupRows(rows: CollocationRow[], queryLemmaId: number): CollocationEntry[] {
+function groupRows(
+  rows: CollocationRow[],
+  queryLemmaId: number,
+): CollocationEntry[] {
   const entries = new Map<string, CollocationEntry>();
 
   for (const row of rows) {
@@ -351,7 +471,10 @@ function groupRows(rows: CollocationRow[], queryLemmaId: number): CollocationEnt
 // VERB_ARGUMENTS_QUERY's DISTINCT ON), so section is never ambiguous for
 // a given pair and including it just guards against a hypothetical
 // collision rather than resolving a real one.
-function groupVerbArgumentRows(rows: VerbArgumentRow[], queryLemmaId: number): CollocationEntry[] {
+function groupVerbArgumentRows(
+  rows: VerbArgumentRow[],
+  queryLemmaId: number,
+): CollocationEntry[] {
   const entries = new Map<string, CollocationEntry>();
 
   for (const row of rows) {
@@ -362,7 +485,9 @@ function groupVerbArgumentRows(rows: VerbArgumentRow[], queryLemmaId: number): C
         ? {
             sentence: row.sentence,
             searchWord: isQueryVerbSide ? row.verbSurface : row.argumentSurface,
-            collocateWord: isQueryVerbSide ? row.argumentSurface : row.verbSurface,
+            collocateWord: isQueryVerbSide
+              ? row.argumentSurface
+              : row.verbSurface,
           }
         : null;
     const existing = entries.get(key);
@@ -378,6 +503,54 @@ function groupVerbArgumentRows(rows: VerbArgumentRow[], queryLemmaId: number): C
         significance: row.significance,
         section: row.section,
         relation: row.relation,
+        examples: example ? [example] : [],
+      });
+    }
+  }
+
+  return Array.from(entries.values());
+}
+
+// Same shape as groupVerbArgumentRows, but keyed by (nounLemmaId,
+// adjectiveLemmaId) with no section suffix needed: adjective_attributes'
+// primary key already guarantees a (noun, adjective) pair is never
+// ambiguous between the two query branches (see ADJECTIVE_ATTRIBUTES
+// _QUERY's comment on why no DISTINCT ON is needed), unlike
+// groupVerbArgumentRows where the same pair genuinely can qualify under
+// two different relations. No `relation` field set on the resulting
+// CollocationEntry - undefined, same as any lemma_collocations-sourced
+// entry, since there's only one relation this table can mean.
+function groupAdjectiveAttributeRows(
+  rows: AdjectiveAttributeRow[],
+  queryLemmaId: number,
+): CollocationEntry[] {
+  const entries = new Map<string, CollocationEntry>();
+
+  for (const row of rows) {
+    const key = `${row.nounLemmaId}-${row.adjectiveLemmaId}`;
+    const isQueryNounSide = row.nounLemmaId === queryLemmaId;
+    const example =
+      row.sentence && row.nounSurface && row.adjectiveSurface
+        ? {
+            sentence: row.sentence,
+            searchWord: isQueryNounSide ? row.nounSurface : row.adjectiveSurface,
+            collocateWord: isQueryNounSide
+              ? row.adjectiveSurface
+              : row.nounSurface,
+          }
+        : null;
+    const existing = entries.get(key);
+
+    if (existing) {
+      if (example) {
+        existing.examples.push(example);
+      }
+    } else {
+      entries.set(key, {
+        word: row.word,
+        cooccurrence: row.cooccurrence,
+        significance: row.significance,
+        section: row.section,
         examples: example ? [example] : [],
       });
     }
@@ -417,32 +590,51 @@ export class PgCollocationRepository implements CollocationRepository {
 
     const lemmaId = lemmaRow.lemma_id;
 
-    const [collocationsResult, verbArgumentsResult, governedPrepositionsResult] =
-      await Promise.all([
-        this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [lemmaId]),
-        VERB_ARGUMENTS_ENABLED
-          ? this.#pool.query<VerbArgumentRow>(VERB_ARGUMENTS_QUERY, [lemmaId])
-          : Promise.resolve({ rows: [] as VerbArgumentRow[] }),
-        this.#pool.query<{ preposition: string; case: string }>(GOVERNED_PREPOSITIONS_QUERY, [
-          lemmaId,
-        ]),
-      ]);
+    const [
+      collocationsResult,
+      verbArgumentsResult,
+      adjectiveAttributesResult,
+      governedPrepositionsResult,
+    ] = await Promise.all([
+      this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [lemmaId]),
+      VERB_ARGUMENTS_ENABLED
+        ? this.#pool.query<VerbArgumentRow>(VERB_ARGUMENTS_QUERY, [lemmaId])
+        : Promise.resolve({ rows: [] as VerbArgumentRow[] }),
+      this.#pool.query<AdjectiveAttributeRow>(ADJECTIVE_ATTRIBUTES_QUERY, [
+        lemmaId,
+      ]),
+      this.#pool.query<{ preposition: string; case: string }>(
+        GOVERNED_PREPOSITIONS_QUERY,
+        [lemmaId],
+      ),
+    ]);
 
-    const argumentEntries = groupVerbArgumentRows(verbArgumentsResult.rows, lemmaId);
-    // Sections verb_arguments actually produced data for, for this
-    // lemma, replace the corresponding lemma_collocations-sourced
-    // section entirely (decision #53's "replace section-by-section"
-    // scope) rather than sitting alongside it - a lemma only ever
-    // qualifies on one side (noun or verb), so this is either empty or
-    // a single section in practice.
-    const supersededSections = new Set<CollocationSection>(argumentEntries.map((e) => e.section));
+    const argumentEntries = groupVerbArgumentRows(
+      verbArgumentsResult.rows,
+      lemmaId,
+    );
+    const attributeEntries = groupAdjectiveAttributeRows(
+      adjectiveAttributesResult.rows,
+      lemmaId,
+    );
+    // Sections verb_arguments/adjective_attributes actually produced
+    // data for, for this lemma, replace the corresponding
+    // lemma_collocations-sourced section entirely (decision #53's
+    // "replace section-by-section" scope, extended by decision #54)
+    // rather than sitting alongside it - a lemma only ever qualifies on
+    // one side per table (noun or verb; noun or adjective), so each
+    // contributes at most one or two sections in practice.
+    const supersededSections = new Set<CollocationSection>([
+      ...argumentEntries.map((e) => e.section),
+      ...attributeEntries.map((e) => e.section),
+    ]);
     const adjacencyEntries = groupRows(collocationsResult.rows, lemmaId).filter(
       (entry) => !supersededSections.has(entry.section),
     );
 
     return {
       wordId: wordRow.id,
-      collocations: [...adjacencyEntries, ...argumentEntries],
+      collocations: [...adjacencyEntries, ...argumentEntries, ...attributeEntries],
       governedPrepositions: governedPrepositionsResult.rows,
     };
   }
