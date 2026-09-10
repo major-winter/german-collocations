@@ -60,7 +60,7 @@ const MIN_ARGUMENT_COUNT = 3;
 // merging its results, so re-enabling later is this one flag.
 // GovernedPrepositions (decision #52) is unaffected - explicitly kept
 // on by the user.
-const VERB_ARGUMENTS_ENABLED = false;
+const VERB_ARGUMENTS_ENABLED = true;
 
 // Repeated verbatim inside the same query (Postgres window functions
 // can't reference a SELECT-list alias in PARTITION BY), so it's kept as

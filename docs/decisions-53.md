@@ -293,3 +293,29 @@ collocates - part of the original motivation for this decision) now
 correctly shows no noun-section entries at all, and `Auto`'s verb
 section reverted to its old adjacency-sourced list. Re-enabling later is
 this one flag flip plus a rebuild.
+
+#### Follow-up: re-enabled (2026-09-10)
+
+`VERB_ARGUMENTS_ENABLED` flipped back to `true`. Data was already fully
+loaded locally (814,710 rows in `verb_arguments`, 99,547 in
+`verb_prepositions`, 994,016 in `verb_argument_examples` - matching this
+decision's original full-corpus numbers), so this was purely the flag
+flip plus a `backend` rebuild/restart - no loader re-run needed.
+
+Re-verified via the live endpoint: `kaufen`'s `noun` section now returns
+`Kunde`/`Mensch`/`Stadt`/`Land` as `Subjekt` and `Aktie` as
+`Akkusativobjekt`; `Auto`'s `verb` section returns
+`überschlagen`/`zusammengestoßen` as `Akkusativobjekt` and
+`stießen`/`kollidiert`/`mitgeschleifen` as `Subjekt` - consistent with
+this decision's original verification data.
+
+Also closed a gap both this decision and #52 explicitly left open: an
+actual in-browser check (not just `curl`/transformed-source reading).
+Loaded `/wort/kaufen` and `/wort/Auto` in the running dev frontend and
+confirmed the relation badges render correctly above their example
+sentences.
+
+`GovernedPrepositions` (#52) was unaffected by this toggle the whole
+time and was independently re-confirmed working before this session
+(`warten` → `auf`, Akkusativ, 46.6% share) - the toggle only ever gated
+the noun/verb section replacement.
