@@ -234,11 +234,82 @@ just confirmed as one real data point.
 **Not yet done**: an actual in-browser visual check (same gap noted in
 decisions #51/#52/#53 - no headless-browser tooling available in this
 environment; the frontend dev server was confirmed to compile with no
-errors, and the feature needed no frontend source changes at all since
-`CollocationList.tsx` already handles arbitrary sections generically).
-Not yet deployed to production (`compose.prod.yml`) - this session's
-work is local/dev-verified only; production deploy (migrate, copy the
-two new TSVs to the production host's data directory, rebuild+restart
-`backend`, run both new loaders there) is a follow-up step.
-Noun-noun genitive attributes - the other relation decision #53 raised
-alongside adjective-noun and explicitly deferred - remains unbuilt.
+errors, and the feature itself needed no frontend source changes at all
+since `CollocationList.tsx` already handles arbitrary sections
+generically). Noun-noun genitive attributes - the other relation
+decision #53 raised alongside adjective-noun and explicitly deferred -
+remains unbuilt.
+
+#### Follow-up: unrelated relation-badge change discovered mid-session, and a build break it caused
+
+Before committing, found `frontend/src/components/CollocationList.tsx`
+already had a staged, uncommitted edit neither made nor explained in
+this session: the `entry.relation` badge block (Subjekt/Akkusativobjekt/
+etc. labels, decision #53) was commented out rather than removed. Since
+this predated and was unrelated to the adjective-attributes work, and
+its origin was unclear, it was flagged to the user before committing
+anything rather than silently included or discarded - confirmed as
+intentional and kept as-is.
+
+That edit left `caseColorClass`/`relationAbbreviation` imported but
+unused. `tsc --noEmit` (this repo's local `typecheck` script) didn't
+catch it, but `tsc -b` - the strict project-reference build mode
+`Dockerfile.prod` actually runs (`npm run build` → `tsc -b && vite
+build`) - treats an import whose bindings are *all* unused as a hard
+error (`TS6192`), which only surfaced once the production Docker build
+ran it. Fixed by removing the now-unused import line; no behavior
+change beyond what the original edit already did (relation badges
+stay hidden). Worth remembering for future sessions: local `typecheck`
+and the prod build's `tsc -b` are not equivalent checks - a change that
+passes one can still break the other.
+
+#### Follow-up: deployed to production (2026-09-10)
+
+Deployed same day, following the established mechanism (decisions
+#48/#51): `git push` → `gcloud compute ssh` into
+`german-collocations-instance` (`us-central1-a`) → operations as
+`tuanchuhoang` (the live checkout's owner, confirmed via `docker
+inspect`'s compose-project-config-files label per CLAUDE.md failure
+class #5, not assumed from path).
+
+`adjective_attribute.tsv`/`adjective_attribute_examples.tsv` don't
+exist on the production host by default (gitignored, not part of the
+repo) - `gcloud compute scp`'d both to the `tuanchu` OS-login user's
+home directory, then `sudo mv`+`chown`'d into
+`tuanchuhoang`'s bind-mounted `./data/` (the `tuanchu` login has no
+read access to `tuanchuhoang`'s home directory or the Docker socket
+directly - every command needed either `sudo -u tuanchuhoang` or plain
+`sudo`, depending on whether it needed the target user's file
+ownership or just root).
+
+`docker compose -f compose.prod.yml build migrate` →
+`run --rm migrate` (migrations 012/013 applied) → `--profile manual
+build load-adjective-attributes load-adjective-attribute-examples` →
+`run --rm` each. Both matched production's already-loaded `lemmas`
+table at exactly the same rate as the local load: 444,344/126 skipped
+and 569,207/150 skipped - identical counts to the local dev load
+recorded in the Verification section above, confirming the production
+`lemmas` table (loaded independently, in an earlier session) resolves
+adjective-attribute lemma text exactly like the local one does. The
+examples loader (569K rows, ~100MB) exceeded a 120s foreground timeout
+and had to be tracked as a background job to completion - consistent
+with this VM's previously-documented slow `pd-standard` (HDD-class)
+disk under bulk-insert I/O (`docs/1M-corpus-upgrade-session-notes.md`).
+
+`docker compose -f compose.prod.yml build backend frontend` → `up -d
+backend frontend` (not `build` alone - CLAUDE.md failure class #1).
+Verified via `docker inspect --format '{{.State.StartedAt}}'` that both
+containers actually restarted (StartedAt matched the deploy time, not a
+stale earlier start).
+
+Verified against the live public site
+(`german-collocations.chickenkiller.com`, not just the VM's internal
+`localhost:3000` - which turned out not to be published to the host at
+all in `compose.prod.yml`, only reachable through the `caddy` reverse
+proxy): `/api/collocations/Regierung`'s adjective section and
+`/api/collocations/groß`'s noun section returned results identical to
+the local-dev spot-check above. Confirmed no regression to decision
+#53's data: `/api/collocations/warten`'s `noun` section still returns
+`relation`-tagged entries (`Jahr`→`Akkusativobjekt` etc.) - the
+API-level data is unaffected by the frontend badge-rendering change
+above, which only hides the badge client-side.
