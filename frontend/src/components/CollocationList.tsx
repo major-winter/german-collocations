@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
-import { caseColorClass, relationAbbreviation } from '../lib/grammaticalCase.ts';
 
 interface CollocationListProps {
     entries: CollocationEntry[];
