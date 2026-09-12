@@ -55,6 +55,12 @@ const MAX_GOVERNED_PREPOSITIONS = 2;
 // inspection of the full-corpus load (see decision #53's threshold
 // section) the same way MIN_LOG_DICE/MIN_GOVERNED_PREPOSITION_SHARE were
 // tuned against real data before being finalized.
+//
+// Decision #55 (docs/decisions-55.md): this floor only applies when at
+// least one of the fixed lemma's own pairs clears it - see verb_side/
+// argument_side's any_meets_floor. A verb or noun with nothing above the
+// floor (e.g. "weiterfahren", max count 2) falls back to showing its
+// best available pairs unfiltered, rather than an empty section.
 const MIN_ARGUMENT_COUNT = 3;
 
 // Decision #54 (docs/decisions-54.md): same light-noise-floor reasoning
@@ -216,17 +222,30 @@ const COLLOCATIONS_QUERY = `
 // as visually distinct facts, so showing both would just look like a
 // duplicate.
 const VERB_ARGUMENTS_QUERY = `
-  WITH verb_side AS (
+  WITH verb_side_all AS (
     SELECT
       va.verb_lemma_id, va.argument_lemma_id, va.grammatical_relation,
       l_arg.lemma AS word,
       va.count AS cooccurrence,
       (va.count::real / SUM(va.count) OVER (PARTITION BY va.grammatical_relation))::real AS share,
-      'noun'::text AS section
+      'noun'::text AS section,
+      -- bool_or() OVER () with no PARTITION BY, over rows already
+      -- filtered to this one verb_lemma_id: does *any* of this verb's
+      -- own argument pairs clear the noise floor? Decision #55: a verb
+      -- with none (e.g. "weiterfahren", max count 2) showed an empty
+      -- section even though real, non-noise example sentences existed
+      -- for its below-floor pairs - the floor is meant to hide noise
+      -- among otherwise-plentiful data, not to blank out a verb that
+      -- simply has no high-count pair at all. See docs/decisions-55.md.
+      bool_or(va.count >= ${MIN_ARGUMENT_COUNT}) OVER () AS any_meets_floor
     FROM verb_arguments va
     JOIN lemmas l_arg ON l_arg.id = va.argument_lemma_id
     WHERE va.verb_lemma_id = $1
-      AND va.count >= ${MIN_ARGUMENT_COUNT}
+  ),
+  verb_side AS (
+    SELECT verb_lemma_id, argument_lemma_id, grammatical_relation, word, cooccurrence, share, section
+    FROM verb_side_all
+    WHERE cooccurrence >= ${MIN_ARGUMENT_COUNT} OR NOT any_meets_floor
   ),
   -- share can't be a window function over va here, unlike verb_side:
   -- WHERE runs before the window function, so partitioning by
@@ -241,13 +260,17 @@ const VERB_ARGUMENTS_QUERY = `
   -- by one verb's own argument count, not a full-table scan), the same
   -- quantity verb_side's window function gets for free by filtering to
   -- one verb first.
-  argument_side AS (
+  argument_side_all AS (
     SELECT
       va.verb_lemma_id, va.argument_lemma_id, va.grammatical_relation,
       l_verb.lemma AS word,
       va.count AS cooccurrence,
       (va.count::real / totals.total)::real AS share,
-      'verb'::text AS section
+      'verb'::text AS section,
+      -- Same fallback signal as verb_side_all's any_meets_floor, but
+      -- over this noun's own full set of governing-verb pairs (fixed by
+      -- argument_lemma_id = $1 below) instead of a verb's arguments.
+      bool_or(va.count >= ${MIN_ARGUMENT_COUNT}) OVER () AS any_meets_floor
     FROM verb_arguments va
     JOIN lemmas l_verb ON l_verb.id = va.verb_lemma_id
     JOIN LATERAL (
@@ -257,7 +280,11 @@ const VERB_ARGUMENTS_QUERY = `
         AND va2.grammatical_relation = va.grammatical_relation
     ) totals ON true
     WHERE va.argument_lemma_id = $1
-      AND va.count >= ${MIN_ARGUMENT_COUNT}
+  ),
+  argument_side AS (
+    SELECT verb_lemma_id, argument_lemma_id, grammatical_relation, word, cooccurrence, share, section
+    FROM argument_side_all
+    WHERE cooccurrence >= ${MIN_ARGUMENT_COUNT} OR NOT any_meets_floor
   ),
   combined AS (
     SELECT DISTINCT ON (verb_lemma_id, argument_lemma_id, section)

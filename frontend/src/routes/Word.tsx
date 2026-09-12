@@ -100,8 +100,8 @@ export function Word() {
 
     return (
         <div>
-            <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} />
-            <CollocationList entries={state.data.collocations} />
+            {/* <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} /> */}
+            <CollocationList word={state.data.word} entries={state.data.collocations} />
         </div>
     );
 }

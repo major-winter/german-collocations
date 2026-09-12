@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
 
 interface CollocationListProps {
+    word: string;
     entries: CollocationEntry[];
 }
 
@@ -83,7 +84,7 @@ function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, Co
     return groups;
 }
 
-export function CollocationList({ entries }: CollocationListProps) {
+export function CollocationList({ word, entries }: CollocationListProps) {
     const groups = groupBySection(entries);
 
     return (
@@ -105,7 +106,6 @@ export function CollocationList({ entries }: CollocationListProps) {
                             <div className="flex flex-col gap-1.5">
                                 {groups
                                     .get(section)!
-                                    .filter((entry) => entry.examples.length > 0)
                                     .map((entry, i) => (
                                         <div
                                             key={`${entry.word}-${i}`}
@@ -120,16 +120,25 @@ export function CollocationList({ entries }: CollocationListProps) {
                                             {/*         {relationAbbreviation(entry.relation)} */}
                                             {/*     </span> */}
                                             {/* )} */}
-                                            {entry.examples.map((example, i) => (
-                                                <p key={i} className="text-xs text-muted-foreground italic">
-                                                    {highlightCollocates(
-                                                        example.sentence,
-                                                        example.searchWord,
-                                                        example.collocateWord,
-                                                        PAINT_COLORS[section],
-                                                    )}
+                                            {entry.examples.length > 0 ? (
+                                                entry.examples.map((example, i) => (
+                                                    <p key={i} className="text-xs text-muted-foreground italic">
+                                                        {highlightCollocates(
+                                                            example.sentence,
+                                                            example.searchWord,
+                                                            example.collocateWord,
+                                                            PAINT_COLORS[section],
+                                                        )}
+                                                    </p>
+                                                ))
+                                            ) : (
+                                                <p className="text-xs text-muted-foreground">
+                                                    <span className="font-semibold not-italic">{word}</span>{' '}
+                                                    <span className={cn('not-italic', PAINT_COLORS[section])}>
+                                                        {entry.word}
+                                                    </span>
                                                 </p>
-                                            ))}
+                                            )}
                                         </div>
                                     ))}
                             </div>
