@@ -88,3 +88,51 @@ available despite not clearing it" - revisit if that distinction turns
 out to matter to a learner (e.g. a low-confidence indicator), but not
 requested here. Whether `adjective_attributes` needs the same fallback
 is open, not decided either way.
+
+#### Follow-up: deployed to production (2026-09-12)
+
+Deployed same day, following the established mechanism (decisions
+#48/#51/#54): `git push` → `gcloud compute ssh` into
+`german-collocations-instance` (`us-central1-a`) → confirmed the live
+checkout via `docker inspect`'s compose-project-config-files label
+(`/home/tuanchuhoang/german-collocations`, CLAUDE.md failure class #5)
+→ operations as `tuanchuhoang`.
+
+`git pull` picked up two commits behind: this fix plus an unrelated
+layout change already bundled in by the user (`b4256a6`, also touched
+`Layout.tsx`/`SearchBox.tsx`/`Word.tsx` and a whitespace-only fix to
+migration 001 - no re-migration needed, content-only formatting).
+
+`docker compose -f compose.prod.yml build backend frontend` failed on
+the frontend: `tsc -b` (the prod build's strict project-reference
+check, same one decision #54's follow-up flagged as distinct from local
+`tsc --noEmit`) hit `TS6133` on `Word.tsx` - a `GovernedPrepositions`
+import left behind when its JSX usage got commented out in the same
+bundled layout change. Exact repeat of decision #54's own follow-up bug,
+same root cause (commented-out JSX, forgotten import), same fix
+(removed the import, committed as `dbcdd99`, left the commented-out
+JSX alone since it's someone else's in-progress change, not mine to
+resolve). Reproduced locally first via `npx tsc -b` before touching
+anything, confirmed clean after the fix, then pushed and re-pulled on
+prod before rebuilding again - this time both `backend` and `frontend`
+built clean.
+
+`docker compose -f compose.prod.yml up -d backend frontend` (not
+`build` alone - CLAUDE.md failure class #1). Verified via `docker
+inspect --format '{{.State.StartedAt}}'` that both containers actually
+restarted (StartedAt matched the deploy time).
+
+Verified against the live public site
+(`german-collocations.chickenkiller.com`): `/api/collocations/weiterfahren`
+now returns a 10-entry "noun" section with attached examples (Richtung,
+Fahrer, Fahrzeug, Auto, Duo, ...), matching the local-dev verification
+above. Confirmed no regression: `/api/collocations/warten`'s noun
+section is unchanged (10 entries, cooccurrence 4-28). Site itself
+responds `200`.
+
+Worth noting for next time: this is the second time in two consecutive
+feature sessions (#54, #55) that a layout/UI change left a stray unused
+import that only the prod build's `tsc -b` catches. Since this keeps
+recurring, running `npx tsc -b` (not just `tsc --noEmit`) before pushing
+any frontend change - not just before a deploy - would catch it earlier;
+raised here as an observation, not yet adopted as a standing rule.
