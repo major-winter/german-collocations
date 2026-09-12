@@ -4,7 +4,6 @@ import type { CollocationResponse, WordSuggestion } from "@collocations/types";
 import { fetchCollocations } from "../api/collocations.ts";
 import { fetchSearch } from "../api/search.ts";
 import { CollocationList } from "../components/CollocationList.tsx";
-import { GovernedPrepositions } from "../components/GovernedPrepositions.tsx";
 
 import { API_BASE_URL } from "../config.ts";
 
