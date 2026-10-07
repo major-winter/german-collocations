@@ -76,6 +76,22 @@ docs/decisions-53.md):
   the "nk" head, not "Leute" - the quantifier gets extracted instead of
   the real noun. Rare enough in practice not to special-case here.
 
+Proper nouns (decision #56): names ("Trump", "Merz", "Deutschland") are
+real grammatical subjects/objects but not collocates a learner should
+memorize, so they're dropped. de_core_news_sm's NOUN/PROPN split is too
+inconsistent per token to filter on directly - the same name comes out
+PROPN in one sentence and NOUN in the next ("Trump" was NOUN in 8 of 131
+sampled argument tokens), which would leave a thin residue of every name
+behind, and would shave counts off genuine nouns occasionally mis-tagged
+PROPN ("Mann", "Kind"). So the decision is made per lemma, not per token:
+every NOUN/PROPN token in the corpus is tallied by lemma during the same
+parse, and a lemma tagged PROPN in a strict majority of its occurrences
+has all of its triples dropped at write time. Known limitation, not
+fixed: a name the model tags NOUN most of the time ("Putin", "Russland")
+still gets through. spaCy's NER was measured as a second signal and
+rejected - it marks "Haus"/"Staat"/"Sohn"/"Straße" as entities often
+enough to drop them too.
+
 Example sentences: unlike lemma_collocations (decision #44), whose
 examples come from collocation_examples (decision #41), a subject/object
 pair is frequently NOT linearly adjacent - the entire reason this script
@@ -207,6 +223,11 @@ EXCLUDED_POS = {"PUNCT", "SYM", "SPACE", "X"}
 CLAUSE_VERB_POS = {"VERB", "AUX"}
 MAX_EXAMPLES = 3
 
+# Argument candidates, and the tags tallied per lemma to decide which of
+# those candidates are proper nouns - see module docstring.
+NOUN_POS = {"NOUN", "PROPN"}
+PROPER_NOUN_MIN_SHARE = 0.5
+
 
 def read_sentences(input_path: Path):
     """Stream (sentence_id, sentence_text) pairs out of sentences.txt."""
@@ -307,6 +328,9 @@ def find_verb_arguments(token):
     picked up by oa/da's dependency labels aren't nouns a learner wants
     to see - confirmed against real sample output that "wer"/"was"/
     "nichts"/"viele" are PRON while genuine argument nouns are NOUN/PROPN).
+    PROPN is still yielded here on purpose: proper nouns are removed per
+    lemma once the whole corpus has been tallied (find_proper_noun_lemmas),
+    not per token - see module docstring.
     """
     if token.pos_ != "VERB":
         return
@@ -322,7 +346,7 @@ def find_verb_arguments(token):
             continue
         if child.dep_ == "sb":
             has_own_subject = True
-        if child.pos_ not in ("NOUN", "PROPN"):
+        if child.pos_ not in NOUN_POS:
             continue
         if is_excluded_word(child.lemma_):
             continue
@@ -339,7 +363,7 @@ def find_verb_arguments(token):
 
     if (
         subject_token is not None
-        and subject_token.pos_ in ("NOUN", "PROPN")
+        and subject_token.pos_ in NOUN_POS
         and not is_excluded_word(subject_token.lemma_)
     ):
         yield ("Akkusativobjekt" if passive else "Subjekt"), subject_token
@@ -351,7 +375,7 @@ def find_verb_arguments(token):
             for grandchild in child.children:
                 if grandchild.dep_ != NP_HEAD_DEP_LABEL:
                     continue
-                if grandchild.pos_ not in ("NOUN", "PROPN"):
+                if grandchild.pos_ not in NOUN_POS:
                     continue
                 if not is_excluded_word(grandchild.lemma_):
                     yield "Subjekt", grandchild
@@ -386,6 +410,19 @@ def consider_candidate(best_by_triple: dict, key: tuple, candidate: tuple) -> No
         candidates.sort(key=cmp_to_key(compare_candidates))
 
 
+def find_proper_noun_lemmas(noun_counts: Counter, propn_counts: Counter) -> set:
+    """
+    Lemmas tagged PROPN in a strict majority of their NOUN/PROPN
+    occurrences across the whole corpus - see module docstring for why
+    this is decided per lemma rather than per token.
+    """
+    return {
+        lemma
+        for lemma, propn_count in propn_counts.items()
+        if propn_count / noun_counts[lemma] > PROPER_NOUN_MIN_SHARE
+    }
+
+
 def extract_corpus(
     input_path: Path,
     model_name: str,
@@ -397,6 +434,8 @@ def extract_corpus(
 
     counts: Counter = Counter()
     best_examples_by_triple: dict = {}
+    noun_counts: Counter = Counter()
+    propn_counts: Counter = Counter()
     sentences_processed = 0
     started_at = time.monotonic()
 
@@ -409,6 +448,11 @@ def extract_corpus(
         word_count, clause_count = score_sentence(doc)
 
         for token in doc:
+            if token.pos_ in NOUN_POS:
+                noun_counts[token.lemma_] += 1
+                if token.pos_ == "PROPN":
+                    propn_counts[token.lemma_] += 1
+
             for relation, argument_token in find_verb_arguments(token):
                 verb_lemma = token.lemma_
                 argument_lemma = argument_token.lemma_
@@ -436,10 +480,18 @@ def extract_corpus(
                 f"({rate:,.0f}/sec, {len(counts):,} distinct verb/relation/argument triples so far)"
             )
 
+    proper_noun_lemmas = find_proper_noun_lemmas(noun_counts, propn_counts)
+    triples_before = len(counts)
+    for triple in [t for t in counts if t[2] in proper_noun_lemmas]:
+        del counts[triple]
+        del best_examples_by_triple[triple]
+
     elapsed = time.monotonic() - started_at
     print(
         f"done: {sentences_processed:,} sentences, "
-        f"{len(counts):,} distinct (verb, relation, argument) triples, {elapsed:,.1f}s elapsed"
+        f"{len(counts):,} distinct (verb, relation, argument) triples "
+        f"({triples_before - len(counts):,} proper-noun triples dropped), "
+        f"{elapsed:,.1f}s elapsed"
     )
     return counts, best_examples_by_triple
 
