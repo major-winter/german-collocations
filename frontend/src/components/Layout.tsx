@@ -27,7 +27,7 @@ export function Layout({ children }: LayoutProps) {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <header className="bg-blue-900">
+            <header className="sticky top-0 z-40 bg-blue-900">
                 <div className="py-4 max-w-xl md:max-w-2xl mx-auto px-4 w-full flex items-center gap-3">
                     <Logomark />
                     <div className="flex-1">
