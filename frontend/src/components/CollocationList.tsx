@@ -97,7 +97,7 @@ export function CollocationList({ word, entries }: CollocationListProps) {
                         <div key={section} className="py-3">
                             <h3
                                 className={cn(
-                                    'text-xs font-medium uppercase tracking-wide mb-1.5',
+                                    'text-sm font-medium uppercase tracking-wide mb-1.5',
                                     PAINT_COLORS[section],
                                 )}
                             >
@@ -122,7 +122,7 @@ export function CollocationList({ word, entries }: CollocationListProps) {
                                             {/* )} */}
                                             {entry.examples.length > 0 ? (
                                                 entry.examples.map((example, i) => (
-                                                    <p key={i} className="text-xs text-muted-foreground italic">
+                                                    <p key={i} className="text-base text-muted-foreground italic">
                                                         {highlightCollocates(
                                                             example.sentence,
                                                             example.searchWord,
@@ -132,7 +132,7 @@ export function CollocationList({ word, entries }: CollocationListProps) {
                                                     </p>
                                                 ))
                                             ) : (
-                                                <p className="text-xs text-muted-foreground">
+                                                <p className="text-base text-muted-foreground">
                                                     <span className="font-semibold not-italic">{word}</span>{' '}
                                                     <span className={cn('not-italic', PAINT_COLORS[section])}>
                                                         {entry.word}
