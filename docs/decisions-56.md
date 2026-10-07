@@ -94,6 +94,34 @@ Spot checks against the regenerated `verb_argument.tsv`:
   `AfD` 460, `Putin` 450, `FC` 414 still present.
 - The documented loss is real too: `Beschluss` and `KI` have 0 triples.
 
-Not done in this session: the regenerated TSVs sit in
-`tools/pos-tagging/` only. `data/` still holds the pre-#56 files, and
-neither the local nor the production database has been reloaded.
+#### Follow-up: deployed to production (2026-10-07)
+
+Production is no longer the GCP VM that decisions #48/#51/#54/#55
+describe (`german-collocations-instance`, `gcloud compute ssh`): it now
+runs on a Linode VM, reached with plain `ssh root@139.162.13.171`. The
+live checkout is `/root/german-collocations` (confirmed via `docker
+inspect`'s compose-project-config-files label, CLAUDE.md failure class
+#5), owned by root - no `sudo -u` needed.
+
+`npx tsc -b` locally first (the lesson from #54/#55, clean) → `git push`
+→ `scp` both regenerated TSVs into the live `data/` (md5 matched the
+local files; the previous ones kept beside them as `*.pre56.tsv`) →
+`git pull` → `docker compose -f compose.prod.yml --profile manual build
+backend frontend load-verb-arguments load-verb-argument-examples` →
+`up -d backend frontend` (StartedAt matched the deploy time; this also
+shipped the unrelated `CollocationList` font-size commit `c9ee586`) →
+`TRUNCATE verb_arguments, verb_argument_examples` → both loaders.
+
+Loaded 683,834 `verb_arguments` rows and 847,788
+`verb_argument_examples` rows, 1 row skipped by each loader (no matching
+lemma); the whole truncate-and-reload took 83 seconds on this host.
+Production previously held 814,710 / 994,016.
+
+Verified against the live site: 0 `verb_arguments` rows for `Trump`,
+`Merz` or `Deutschland`; `/api/collocations/unterstützen`,
+`/brauchen`, `/sagen` and `/Regierung` return full 10-entry sections
+with examples; `/weiterfahren` (decision #55's fallback case) still
+returns its 10 low-count entries.
+
+Not done: the local dev database has not been reloaded (local `data/`
+does hold the new TSVs, with the old ones as `*.pre56.tsv`).
