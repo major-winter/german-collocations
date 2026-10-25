@@ -31,7 +31,7 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="Geben Sie ein Wort ein…"
                 aria-label="Search word"
-                className="pr-10 bg-white dark:bg-white border-transparent shadow-sm text-slate-900 placeholder:text-slate-500"
+                className="pr-10 md:text-base bg-white dark:bg-white border-transparent shadow-sm text-slate-900 placeholder:text-slate-500"
             />
             <Button
                 type="submit"

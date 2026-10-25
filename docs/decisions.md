@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #58), and add it to the index.
+(next: #59), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -34,6 +34,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#55](#55) Verb-argument noise floor: fall back to unfiltered pairs when a verb/noun has none above it
 - [#56](#56) Verb arguments: drop proper nouns, decided per lemma rather than per token
 - [#57](#57) Collocations: drop proper-noun partners, decided per lemma
+- [#58](#58) Search box stays at 16px on every screen width, so iOS doesn't zoom on focus
 
 ---
 
@@ -2342,3 +2343,19 @@ are `PROPN` below the 0.8 threshold (0.73, 0.68, 0.54), so `ldp` is NULL
 for them. `Nicolás` (dominant `NOUN`, share 1.0) stays in the noun
 section. Fixing these needs a different signal than spaCy's POS tag (the
 same open question as #56's `Russland`/`Putin` leak); not attempted here.
+
+<a id="58"></a>
+## 58. Search box stays at 16px on every screen width, so iOS doesn't zoom on focus
+
+iOS Safari zooms into any focused text field whose font is smaller than
+16px. The shared `Input` component (`components/ui/input.tsx`) is
+`text-base` (16px) but `md:text-sm` (14px) from 768px up, so tapping the
+search box zoomed the page on iPads and on iPhones in landscape.
+
+**Chosen:** `SearchBox` adds `md:text-base`; `cn()`'s `twMerge` drops the
+component's `md:text-sm`, so the field is 16px at every width. Only the
+search box changes; `Input` itself is left as shadcn ships it.
+
+Rejected: `maximum-scale=1` in the viewport meta tag. It stops the focus
+zoom too, but Android browsers honour it and block pinch-zoom entirely,
+which hurts anyone who needs to zoom.
