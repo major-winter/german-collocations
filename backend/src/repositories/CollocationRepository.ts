@@ -135,6 +135,12 @@ function buildBranchQuery(fixedSide: "left" | "right"): string {
     LEFT JOIN lemma_dominant_pos ldp
       ON ldp.lemma_id = ${partnerId} AND ldp.share >= ${DOMINANCE_THRESHOLD}
     WHERE ${fixedId} = $1
+      -- Decision #57: a proper noun is not a collocate. Before this,
+      -- SECTION_CASE's ELSE branch dropped every PROPN partner into
+      -- 'other', which for a noun like "Präsident" was nothing but names
+      -- ("Wolodymyr", "Donald", "Trump"). IS DISTINCT FROM, not <>: ldp is
+      -- NULL for a partner with no dominant POS, and that row must stay.
+      AND ldp.pos IS DISTINCT FROM 'PROPN'
   `;
 }
 
