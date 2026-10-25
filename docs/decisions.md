@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #59), and add it to the index.
+(next: #60), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -35,6 +35,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#56](#56) Verb arguments: drop proper nouns, decided per lemma rather than per token
 - [#57](#57) Collocations: drop proper-noun partners, decided per lemma
 - [#58](#58) Search box stays at 16px on every screen width, so iOS doesn't zoom on focus
+- [#59](#59) iOS only: `maximum-scale=1` stops the focus zoom #58 didn't (amends #58)
 
 ---
 
@@ -2359,3 +2360,31 @@ search box changes; `Input` itself is left as shadcn ships it.
 Rejected: `maximum-scale=1` in the viewport meta tag. It stops the focus
 zoom too, but Android browsers honour it and block pinch-zoom entirely,
 which hurts anyone who needs to zoom.
+
+<a id="59"></a>
+## 59. iOS only: `maximum-scale=1` stops the focus zoom #58 didn't (amends #58)
+
+#58 did not fix the report it was made for: Safari on an iPhone 15 Pro
+Max, portrait, still zoomed when the search box was tapped. Measured in
+Playwright WebKit with the `iPhone 15 Pro Max` profile (430px wide):
+the input's computed `font-size` is 16px, `scrollWidth` equals the
+viewport width (nothing overflows), and `visualViewport.scale` is 1. So
+the 16px rule was already met at that width, and #58 only mattered from
+768px up (iPad, iPhone landscape); it stays. The zoom on the phone
+itself is most likely a Safari page zoom below 100% (the aA menu or
+Settings), which shrinks a 16px field below the threshold; not
+confirmed on the device.
+
+**Chosen:** an inline script in `frontend/index.html`, right after the
+viewport meta tag, adds `maximum-scale=1` on iPhone/iPad only (iPadOS
+reports itself as `MacIntel` with touch points). iOS Safari ignores
+`maximum-scale` for pinch-zoom since iOS 10 but honours it for the
+focus zoom, so it removes the zoom whatever its cause, and users can
+still pinch. Android and desktop keep the plain tag, which avoids
+#58's rejected trade-off (Android blocking pinch-zoom).
+
+Verified with `vite preview` + Playwright: the tag gains
+`maximum-scale=1` for `iPhone 15 Pro Max` and `iPad Pro 11`, and stays
+`width=device-width, initial-scale=1.0` for `Desktop Safari` and
+`Pixel 7`. The focus zoom itself cannot be reproduced in emulation; it
+needs checking on the phone.
