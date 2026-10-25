@@ -13,7 +13,9 @@ Extract verb with accusative objects from a text corpus.
 
 Node.js/TypeScript monorepo (npm workspaces), Express backend,
 React/Vite frontend, PostgreSQL 18, Docker Compose, Caddy reverse
-proxy.
+proxy. Hosted on a Linode VM with 1 GB RAM, 1 CPU core and 25 GB
+storage — this constraint affects every architectural choice, keep it
+in mind before proposing anything memory-, CPU- or disk-heavy.
 
 One deliberate exception to "everything is Node": `tools/pos-tagging/`
 is a self-contained Python project (spaCy), isolated in its own venv.
@@ -32,8 +34,7 @@ of the deploy path. See `tools/pos-tagging/README.md`.
   full rewrite on `ALTER TABLE`.
 - **Empirical validation before schema decisions.** Don't assume
   directionality, performance, or data shape — query it, run
-  `EXPLAIN (ANALYZE, BUFFERS)`, then decide. See decision #4 and
-  the fuzzy-search session notes for the established pattern.
+  `EXPLAIN (ANALYZE, BUFFERS)`, then decide.
 - **Manual dependency injection**, no DI container library.
 - **Decisions are numbered and logged.** Every non-trivial choice with
   reasoning goes at the end of `docs/decisions.md` as a new numbered
@@ -44,14 +45,10 @@ of the deploy path. See `tools/pos-tagging/README.md`.
 - `docs/decisions.md` — chronological decision log (#33 onwards; #1-32
   are not in this repo) with reasoning and an index. Read before
   revisiting any past choice.
-- `architecture.md` — current schema, data pipeline, and open
-  questions.
-- `glossary.md` — corpus-linguistics and project-specific terms.
-- `milestone-N-session-notes.md`, `production-outage-session-notes.md`,
-  `fuzzy-search-session-notes.md`, `example-sentences-session-notes.md`,
-  `pos-tagging-session-notes.md`, `1M-corpus-upgrade-session-notes.md`
-  — "why is it built this way" / "hit this error before" notes, one
-  per feature/incident.
+- `docs/pos-tagging-session-notes.md`,
+  `docs/1M-corpus-upgrade-session-notes.md` — "why is it built this
+  way" / "hit this error before" notes, one per feature/incident.
+- `database/migrations/*.sql`, in order — the current schema.
 
 ## Recurring failure classes (check these first when something's broken)
 
@@ -118,11 +115,10 @@ of the deploy path. See `tools/pos-tagging/README.md`.
 
 - `docker-compose` (hyphenated) in examples, unless a file explicitly
   requires v2-only features (`depends_on: condition: service_healthy`
-  requires v2 — see decision #19).
+  requires v2).
 - Commit messages: imperative mood.
 - Migrations: plain numbered `.sql` files in `database/migrations/`,
   applied in order by the hand-rolled runner in `database/src/migrate.ts`.
 - `import type` is required (not optional) for anything imported from
   a `contracts/`-style interfaces-only file — Node's type stripper
-  can't resolve it otherwise. See decision from Milestone 2 session
-  notes.
+  can't resolve it otherwise.

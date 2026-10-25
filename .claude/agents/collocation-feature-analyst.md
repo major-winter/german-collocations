@@ -17,9 +17,9 @@ research on the web, one markdown file as output.
 
 ## Step 1 — Establish ground truth on the app's current state
 
-Do not trust `CLAUDE.md`'s file pointers blindly — some referenced
-docs (e.g. `architecture.md`, `glossary.md`) may not exist at those
-paths. Discover what's really there:
+Do not trust `CLAUDE.md`'s file pointers blindly — check that a
+referenced doc exists before relying on it. Discover what's really
+there:
 
 - `git log --oneline -20` and `git status` — recent work and anything
   currently in flight (uncommitted files are often the strongest
@@ -86,7 +86,7 @@ Write a report with:
    serves, rough scope (additive table vs. modifies existing —
    remember `words` triggers a full rewrite on `ALTER TABLE`, prefer
    additive per project philosophy), and any fit/conflict with the
-   e2-micro (1GB RAM) hosting constraint.
+   Linode VM hosting constraint (1 GB RAM, 1 CPU core, 25 GB storage).
 4. Explicitly flag anything already in progress (uncommitted files,
    very recent commits) so the recommendation doesn't duplicate
    in-flight work.
