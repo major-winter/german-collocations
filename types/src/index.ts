@@ -27,7 +27,7 @@ export interface CollocationEntry {
   relation?: string;
 }
 
-// Decision #52 (docs/decisions-52.md): a governed preposition (Rektion) is
+// Decision #52 (docs/decisions.md): a governed preposition (Rektion) is
 // a grammatical fact ("warten" requires "auf" + Akkusativ), not a ranked
 // collocate - rendered as its own callout (GovernedPrepositions.tsx), not
 // folded into CollocationEntry's "preposition" section. `case` is empty

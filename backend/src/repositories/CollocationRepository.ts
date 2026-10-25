@@ -12,7 +12,7 @@ import type {
   GovernedPreposition,
 } from "@collocations/types";
 
-// Decision #36 (docs/decisions-33-35.md), now applied at lemma
+// Decision #36 (docs/decisions.md), now applied at lemma
 // granularity (lemma_dominant_pos, decision #44): a lemma's dominant
 // POS tag is trusted for grouping only above this share; below it, the
 // lemma falls through to the "other" section rather than being
@@ -34,7 +34,7 @@ const PER_SECTION_LIMIT = 10;
 // in decision #44 - see that decision for the re-verification numbers.
 const MIN_LOG_DICE = 6.3;
 
-// Decision #52 (docs/decisions-52.md): governed prepositions are ranked
+// Decision #52 (docs/decisions.md): governed prepositions are ranked
 // by share of the verb's own total attached-PP count, not logDice - a
 // different, smaller population than lemma_collocations' raw adjacency.
 // 0.20 and MAX=2 were tuned against 8 hand-picked Rektion verbs (0.10 let
@@ -48,7 +48,7 @@ const MIN_GOVERNED_PREPOSITION_COUNT = 5;
 const MIN_GOVERNED_PREPOSITION_SHARE = 0.2;
 const MAX_GOVERNED_PREPOSITIONS = 2;
 
-// Decision #53 (docs/decisions-53.md): verb_arguments-derived noun/verb
+// Decision #53 (docs/decisions.md): verb_arguments-derived noun/verb
 // sections are a ranked list (like lemma_collocations' other sections),
 // not a single grammatical fact like governed prepositions - so this
 // uses a light noise floor, not a dominance floor. Provisional pending
@@ -56,14 +56,14 @@ const MAX_GOVERNED_PREPOSITIONS = 2;
 // section) the same way MIN_LOG_DICE/MIN_GOVERNED_PREPOSITION_SHARE were
 // tuned against real data before being finalized.
 //
-// Decision #55 (docs/decisions-55.md): this floor only applies when at
+// Decision #55 (docs/decisions.md): this floor only applies when at
 // least one of the fixed lemma's own pairs clears it - see verb_side/
 // argument_side's any_meets_floor. A verb or noun with nothing above the
 // floor (e.g. "weiterfahren", max count 2) falls back to showing its
 // best available pairs unfiltered, rather than an empty section.
 const MIN_ARGUMENT_COUNT = 3;
 
-// Decision #54 (docs/decisions-54.md): same light-noise-floor reasoning
+// Decision #54 (docs/decisions.md): same light-noise-floor reasoning
 // as MIN_ARGUMENT_COUNT, re-verified against the real full-corpus
 // adjective_attribute.tsv rather than assumed equal just because the
 // shape of the query is the same - 90.4% of its 444,470 distinct (noun,
@@ -72,7 +72,7 @@ const MIN_ARGUMENT_COUNT = 3;
 // value excludes at least as much noise here.
 const MIN_ADJECTIVE_ATTRIBUTE_COUNT = 3;
 
-// Temporarily off (see decisions-53.md's follow-up note): the user
+// Temporarily off (see decisions.md #53's follow-up note): the user
 // wants the noun/verb sections back on plain lemma_collocations
 // adjacency for now, despite the feature working correctly end-to-end.
 // Schema, loaders, and the query itself are untouched and left fully
@@ -242,7 +242,7 @@ const VERB_ARGUMENTS_QUERY = `
       -- section even though real, non-noise example sentences existed
       -- for its below-floor pairs - the floor is meant to hide noise
       -- among otherwise-plentiful data, not to blank out a verb that
-      -- simply has no high-count pair at all. See docs/decisions-55.md.
+      -- simply has no high-count pair at all. See docs/decisions.md.
       bool_or(va.count >= ${MIN_ARGUMENT_COUNT}) OVER () AS any_meets_floor
     FROM verb_arguments va
     JOIN lemmas l_arg ON l_arg.id = va.argument_lemma_id
@@ -260,7 +260,7 @@ const VERB_ARGUMENTS_QUERY = `
   -- that's the table's own primary key - making every partition a
   -- singleton and every share exactly 1.0 (caught empirically: real
   -- verbs' top "verb" section entries came back in plain alphabetical
-  -- insertion order, not ranked - see docs/decisions-53.md). The LATERAL
+  -- insertion order, not ranked - see docs/decisions.md). The LATERAL
   -- below computes each row's total from the full, unfiltered set of
   -- that verb's own rows (via idx_verb_arguments_verb - cheap, bounded
   -- by one verb's own argument count, not a full-table scan), the same
@@ -398,7 +398,7 @@ const ADJECTIVE_ATTRIBUTES_QUERY = `
   -- adjective_lemma_id is fixed to $1 for every row in this branch,
   -- though - the total is one single number for the whole query, not a
   -- per-row value - so a LATERAL was tried first and measured (EXPLAIN
-  -- ANALYZE, see docs/decisions-54.md) at 983ms / 2.2M buffer hits for
+  -- ANALYZE, see docs/decisions.md) at 983ms / 2.2M buffer hits for
   -- "groß" (1,043 qualifying rows): Postgres re-evaluated the identical
   -- correlated subquery once per outer row instead of recognizing it
   -- doesn't depend on the row, an O(n²) blowup. Replaced with a plain

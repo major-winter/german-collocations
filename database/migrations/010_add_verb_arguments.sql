@@ -7,7 +7,7 @@
 -- database/scripts/load-verb-arguments.ts. Additive: `words`,
 -- `collocations`, and `lemma_collocations` are untouched.
 --
--- This is the first step of decision #53 (docs/decisions-53.md):
+-- This is the first step of decision #53 (docs/decisions.md):
 -- replacing lemma_collocations' plain-adjacency noun/verb sections with
 -- grammar-based data, one relation at a time. It replaces, for a verb
 -- headword, the "noun" section (now sourced from this table's

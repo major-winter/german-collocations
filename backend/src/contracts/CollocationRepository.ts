@@ -12,7 +12,7 @@ export interface CollocationRow {
   section: CollocationSection;
 }
 
-// Rows from verb_arguments (decision #53, docs/decisions-53.md): unlike
+// Rows from verb_arguments (decision #53, docs/decisions.md): unlike
 // CollocationRow's symmetric left/right shape (either side can be the
 // queried lemma), a verb_arguments row always has a fixed verb side and
 // argument side - verbLemmaId/argumentLemmaId, not left/right.
@@ -29,7 +29,7 @@ export interface VerbArgumentRow {
   section: CollocationSection;
 }
 
-// Rows from adjective_attributes (decision #54, docs/decisions-54.md):
+// Rows from adjective_attributes (decision #54, docs/decisions.md):
 // same fixed-side shape as VerbArgumentRow, not CollocationRow's
 // symmetric left/right - a row always has a fixed noun side and
 // adjective side. No `relation` field, unlike VerbArgumentRow: a (noun,

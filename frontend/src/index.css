@@ -89,7 +89,7 @@
   --sidebar-ring: oklch(0.708 0 0);
   /* POS section colors: one hue-spread rule (evenly spaced, matched
      lightness/chroma) instead of eyeballed Tailwind swatches - see
-     docs/decisions-51.md. */
+     docs/decisions.md. */
   --pos-noun: oklch(0.62 0.18 250);
   --pos-verb: oklch(0.62 0.17 65);
   --pos-adjective: oklch(0.62 0.18 145);

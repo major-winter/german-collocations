@@ -39,7 +39,7 @@ Passive voice needed real hand-verification, not an assumption (12 real
 sentences checked, covering active SVO, fronted subject, subordinate
 verb-final, reflexive, perfect tense, modal stacking, simple passive,
 agentive passive, subjectless dative passive, and future tense - see
-docs/decisions-53.md):
+docs/decisions.md):
 
 - A participle (VerbForm=Part) never carries its own "sb" child, whether
   perfect ("hat ... gekauft") or passive ("wurde ... gekauft") - the

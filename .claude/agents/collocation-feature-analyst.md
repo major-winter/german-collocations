@@ -18,15 +18,13 @@ research on the web, one markdown file as output.
 ## Step 1 — Establish ground truth on the app's current state
 
 Do not trust `CLAUDE.md`'s file pointers blindly — some referenced
-docs (e.g. `architecture.md`, `glossary.md`, `decisions.md` as a
-single file) may not exist at those paths; the decision log is
-actually split across `docs/decisions-*.md`. Discover what's really
-there:
+docs (e.g. `architecture.md`, `glossary.md`) may not exist at those
+paths. Discover what's really there:
 
 - `git log --oneline -20` and `git status` — recent work and anything
   currently in flight (uncommitted files are often the strongest
   signal of what's being built *right now*).
-- `docs/decisions-*.md`, in order — read for reasoning and any
+- `docs/decisions.md` (index at the top) — read for reasoning and any
   explicitly stated open questions or roadmap hints. Note the highest
   decision number so your report can suggest the next one if useful.
 - `database/migrations/*.sql` in order — the most reliable timeline
@@ -94,7 +92,7 @@ Write a report with:
    in-flight work.
 
 This is a proposal, not a logged decision — do not create or edit a
-`docs/decisions-N.md` entry yourself; that only happens after the
+entry in `docs/decisions.md` yourself; that only happens after the
 user actually decides.
 
 Save the report to `docs/collocation-fluency-gap-report-<YYYY-MM-DD>.md`

@@ -101,7 +101,7 @@ async function loadSentenceSimplicity(dataDir: string): Promise<SimplicityMap> {
   return map;
 }
 
-// Decision #48 (docs/decisions-48.md... see the step-1 entry): ranks
+// Decision #48 (docs/decisions.md... see the step-1 entry): ranks
 // candidates instead of gating them against a fixed threshold, so a pair
 // with only awkward matches still gets its least-awkward ones instead of
 // nothing. Clause count is the primary signal (a single-clause sentence

@@ -30,7 +30,7 @@ pair can't legitimately mean two different things the way (verb, argument)
 can (Subjekt vs. Akkusativobjekt).
 
 Hand-verified against 14 real sentences before writing this (see
-docs/decisions-54.md for the full session), covering plain attributive,
+docs/decisions.md for the full session), covering plain attributive,
 predicative, stacked attributives, genitive/accusative case, comparative/
 superlative, an attributive participle, a nominalized adjective, and 2-way
 and 3-way coordination:
