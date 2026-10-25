@@ -2321,4 +2321,24 @@ No schema change, no reload: a query-only change.
 (33%) with a dominant `PROPN` partner, which this filter removes. Of the
 495,260 lemmas with a trusted dominant POS, 109,134 are `PROPN`.
 
-Not done: not deployed to production, and the live site not checked.
+### Follow-up: deployed to production (2026-10-25)
+
+Same procedure as #56, without a reload: `git push` → `ssh
+root@139.162.13.171` → `git pull` in `/root/german-collocations` (the
+live checkout per `docker inspect`) → `docker compose -f
+compose.prod.yml build backend` → `up -d backend` (StartedAt
+03:59:04 UTC, matching the deploy).
+
+Verified against the live site: `/api/collocations/Präsident`'s `other`
+section lost `Wolodymyr`, `Wladimir`, `Donald`, `Emmanuel`, `Selenskyj`,
+`Frankreich`, `Trump`, `Recep` and `Alexander`; the noun, verb,
+adjective and preposition sections are unchanged. `/Kanzler`,
+`/Regierung` and `/sagen` return 200.
+
+The known limitation is visible at once. `other` refills with names the
+filter cannot see: `Putin`, `Erdoğan` and `Russland` have a dominant
+`NOUN` tag (shares 0.61, 0.53, 0.78), and `Biden`, `Merz` and `Maduro`
+are `PROPN` below the 0.8 threshold (0.73, 0.68, 0.54), so `ldp` is NULL
+for them. `Nicolás` (dominant `NOUN`, share 1.0) stays in the noun
+section. Fixing these needs a different signal than spaCy's POS tag (the
+same open question as #56's `Russland`/`Putin` leak); not attempted here.
