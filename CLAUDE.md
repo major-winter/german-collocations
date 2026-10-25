@@ -78,11 +78,15 @@ of the deploy path. See `tools/pos-tagging/README.md`.
    numeric ID means a different word in the `100K` vs `1M` packages.
    A corpus package upgrade is always `TRUNCATE ... CASCADE` + full
    reload, never incremental — see decision #37.
-5. **The VM has two git checkouts of this repo under different
-   OS-login users; only one is live.** Confirm which one with `docker
+5. **Production moved from GCP to Linode; old deploy notes describe
+   the wrong host.** Production is a Linode VM, reached with `ssh
+   root@139.162.13.171`, with one checkout, `/root/german-collocations`,
+   owned by root (no `sudo -u`). Decisions #48-#55 describe the old GCP
+   VM (`gcloud compute ssh`, two checkouts under different OS-login
+   users); don't follow their deploy steps. Before trusting `git
+   log`/`git status` on the VM, confirm the live checkout with `docker
    inspect <container> --format '{{index .Config.Labels
-   "com.docker.compose.project.config_files"}}'` before trusting
-   `git log`/`git status` from a checkout found by guessing a path.
+   "com.docker.compose.project.config_files"}}'`.
 6. **A view that re-aggregates another `DISTINCT ON` view by a
    *different* key isn't push-down-able**, even with an index on that
    key present — Postgres has to materialize the whole underlying view
