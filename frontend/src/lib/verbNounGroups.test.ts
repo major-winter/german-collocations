@@ -59,7 +59,7 @@ test('nouns are blue on both pages, verbs orange', () => {
     chip: '',
   });
   assert.deepEqual(wordColors('verb'), {
-    searched: 'font-semibold',
+    searched: 'font-semibold text-pos-verb',
     partner: 'text-pos-noun',
     chip: 'text-pos-noun',
   });

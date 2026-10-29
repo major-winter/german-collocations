@@ -79,5 +79,5 @@ export interface WordColors {
 export function wordColors(side: VerbNounPairs['side']): WordColors {
     return side === 'noun'
         ? { searched: 'font-semibold text-pos-noun', partner: 'text-pos-verb', chip: '' }
-        : { searched: 'font-semibold', partner: 'text-pos-noun', chip: 'text-pos-noun' };
+        : { searched: 'font-semibold text-pos-verb', partner: 'text-pos-noun', chip: 'text-pos-noun' };
 }
