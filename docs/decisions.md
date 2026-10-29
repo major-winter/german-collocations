@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #61), and add it to the index.
+(next: #62), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -37,6 +37,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#58](#58) Search box stays at 16px on every screen width, so iOS doesn't zoom on focus
 - [#59](#59) iOS only: `maximum-scale=1` stops the focus zoom #58 didn't (amends #58)
 - [#60](#60) Noun/verb pages read collocation-lab's LL-ranked verb–noun pairs; `verb_arguments` dropped (supersedes #53, #55)
+- [#61](#61) Free-phrase prepositional pairs ("vor Jahren kaufen") and letterless lemmas left out of the lab export
 
 ---
 
@@ -2513,3 +2514,37 @@ For a data-only refresh with no code change, steps 1 and 2 and the
 loader run (step 5, after building `load-lab-verb-pairs` if its image
 is stale) are enough. The site keeps the old pairs until the load
 commits.
+
+<a id="61"></a>
+## 61. Free-phrase prepositional pairs left out of the lab export
+
+**Problem.** A user reported "vor Jahren kaufen" ("Wir haben vor einem
+halben Jahr ein Grundstück gekauft") as a pair on the *kaufen* page. Stanza
+labels time, place and manner phrases (*vor Jahren*, *im Rahmen*, *am
+Montag*) as `obl`, like the prepositional objects of *zur Verfügung
+stellen*, and LL ranks them high because they are frequent.
+
+**Measurement** (news-wiki-web-3M export, 49,178 obl pairs). A free phrase
+pairs with very many verbs, and no single verb takes much of it: *im Jahr*
+has 584 verbs, *vor Jahren* 142 (kaufen 1.3% of its uses). Fixed phrases
+pair with few verbs or have one verb take a large share: *zur Verfügung*
+has 5 verbs (stellen 36%), *auf den Weg* 63 (bringen 20%), *vor Gericht*
+39 (ziehen 7.1%).
+
+**Decision.** `colloc export` (collocation-lab `free_phrase_pairs`) drops
+an obl pair when its prep + noun pairs with **25 or more verbs** and the
+verb has **under 5%** of that phrase's pair_freq, both counted over the
+exported pairs (pair_freq ≥ 5, positive LL). It also drops any pair whose
+verb or noun has no letters: Stanza lemmatises some verbs as "-"
+(*einreisen*, *teilhaben*), lumping unrelated verbs into one pair (84 rows).
+
+**Effect.** 122,453 → 106,498 pairs. Dropped: *vor Jahren kaufen*, *im
+Jahr gründen*, *vor Ort machen*, dates and times of day. Kept: *vor Gericht
+ziehen*, *zu Ende bringen*, *an die Stelle treten*, *ins Krankenhaus
+einliefern*, *in die Zukunft blicken*, *auf Jahre zurückblicken*. A 10%
+cut would have lost most of those.
+
+**Known costs.** *an den Tag legen* (4%) is lost, because the lab counts
+*an den Tag* and *am Tag* as one phrase. Pairs with a number (*auf X Euro
+beziffern*, *um X Prozent wachsen*) go too; they belong to the verb's
+valency, not to the noun page.
