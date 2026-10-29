@@ -2440,8 +2440,10 @@ and the plan is `docs/superpowers/plans/2026-10-29-lab-verb-noun-pairs.md`.
   - `load-lab-verb-pairs` loads them into `lab_verb_pairs` and
     `lab_verb_pair_examples` (migration 014). It runs DELETE + INSERT in
     one transaction, so readers see the old rows until COMMIT.
-  - An empty export, or one over 1% malformed lines, rolls back and
-    leaves the live pairs untouched.
+  - The loader rolls back and leaves the live pairs untouched for an
+    empty export, one with over 1% malformed lines, or files whose line
+    counts differ from `lab_verb_pairs.manifest`. The export writes that
+    manifest last, after renaming its finished `.tmp` files.
   - Migration 015 drops `verb_arguments` and `verb_argument_examples`,
     and their loaders and compose services are deleted.
   - `tools/pos-tagging/extract_verb_arguments.py` stays in the repo but
@@ -2468,13 +2470,30 @@ and *schnell* before and after.
 **Refresh runbook (production on the Linode VM; confirm each VM step
 with the user first).**
 1. In collocation-lab: `colloc export --dataset news-wiki-web-3M --out <dir>`.
-2. Copy the two TSVs to `/root/german-collocations/data/` on the VM.
-3. On the VM, after `git pull`:
-   `docker compose -f compose.prod.yml --profile manual build migrate load-lab-verb-pairs`,
-   then `docker compose -f compose.prod.yml run --rm migrate`,
-   then `docker compose -f compose.prod.yml run --rm load-lab-verb-pairs`.
-4. `docker compose -f compose.prod.yml build backend frontend && docker compose -f compose.prod.yml up -d`
-   (failure class 1: building alone doesn't restart the running containers).
+   It writes `lab_verb_pairs.tsv`, `lab_verb_pair_examples.tsv` and
+   `lab_verb_pairs.manifest`.
+2. Copy all three files to `/root/german-collocations/data/` on the VM.
+   The loader refuses files whose line counts don't match the manifest,
+   so a copy that stopped halfway can't replace the live pairs.
+3. On the VM, after `git pull`, **build everything first**:
+   `docker compose -f compose.prod.yml --profile manual build migrate load-lab-verb-pairs backend frontend`.
+   Nothing is restarted yet, and the old backend keeps serving.
+4. `docker compose -f compose.prod.yml run --rm migrate`, then
+   **immediately** `docker compose -f compose.prod.yml up -d`.
+   - **Why this order (first deploy only).** Migration 015 drops
+     `verb_arguments`, which the old backend still queries, so every
+     lookup fails from the migration until the new backend is up.
+   - **How long it lasts.** With the images already built, that gap is
+     the few seconds `up -d` takes, not the build or the load.
+   - **What shows in the meantime.** Until step 5 finishes, the new
+     backend finds `lab_verb_pairs` empty, so noun and verb pages show
+     no verb or noun groups. They don't show errors.
 
-For a data-only refresh with no code change, steps 1, 2 and the loader
-run are enough.
+   The ordering also matters because of failure class 1: building alone
+   doesn't restart the running containers.
+5. `docker compose -f compose.prod.yml run --rm load-lab-verb-pairs`.
+
+For a data-only refresh with no code change, steps 1 and 2 and the
+loader run (step 5, after building `load-lab-verb-pairs` if its image
+is stale) are enough. The site keeps the old pairs until the load
+commits.
