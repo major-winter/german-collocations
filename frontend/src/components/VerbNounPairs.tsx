@@ -76,7 +76,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                         <div className="flex flex-wrap gap-1.5 mb-1.5">
                             {pairs.map((pair, chipIndex) => (
                                 <button
-                                    key={`${pair.partner}-${pair.chip}`}
+                                    key={pair.phrase}
                                     type="button"
                                     aria-pressed={openIndex === chipIndex}
                                     onClick={() => toggle(relation, chipIndex)}

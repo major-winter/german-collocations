@@ -37,6 +37,9 @@ export function phraseOf(
 /**
  * The chip's short label: the partner, plus the preposition for an obl
  * pair - "in der … stehen" on the noun page, "in Geduld" on the verb page.
+ * A verb page also lists the reflexive "sich X" pairs, so their chips
+ * carry the "sich" ("sich Frage", "Information (sich)") - otherwise
+ * "Frage stellen" and "sich Frage stellen" get two identical chips.
  */
 export function chipOf(
   side: PageSide,
@@ -45,7 +48,11 @@ export function chipOf(
   phraseNoun: string,
   noun: string,
 ): string {
-  if (side === "verb") return relation === "obl" ? phraseNoun : noun;
+  if (side === "verb") {
+    const partner = relation === "obl" ? phraseNoun : noun;
+    if (!verb.startsWith(REFLEXIVE_PREFIX)) return partner;
+    return relation === "nsubj" ? `${partner} (sich)` : `${REFLEXIVE_PREFIX}${partner}`;
+  }
   if (relation !== "obl") return verb;
 
   const words = phraseNoun.split(" ");

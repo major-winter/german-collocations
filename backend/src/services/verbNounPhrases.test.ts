@@ -32,3 +32,10 @@ test('prefers the searched word over the dominant lemma', () => {
   assert.deepEqual(lookupCandidates('Kritik', 'Kritik'), ['Kritik']);
   assert.deepEqual(lookupCandidates('Kritik', null), ['Kritik']);
 });
+
+test('chipOf marks reflexive pairs on the verb page, so "Frage" and "sich Frage" differ', () => {
+  assert.equal(chipOf('verb', 'obj', 'sich stellen', 'Frage', 'Frage'), 'sich Frage');
+  assert.equal(chipOf('verb', 'obl', 'sich üben', 'in Geduld', 'Geduld'), 'sich in Geduld');
+  assert.equal(chipOf('verb', 'nsubj', 'sich finden', 'Information', 'Information'), 'Information (sich)');
+  assert.equal(chipOf('verb', 'obj', 'stellen', 'Frage', 'Frage'), 'Frage');
+});
