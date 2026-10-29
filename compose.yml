@@ -140,6 +140,20 @@ services:
     command: ['node', 'scripts/load-verb-prepositions.ts']
     profiles: ['manual']       # keeps it from running on every `up`
 
+  load-lab-verb-pairs:
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgres://app:${DB_PASSWORD}@db:5432/collocations
+    volumes:
+      - ./data:/data:ro        # bind-mount your raw Leipzig files here
+    command: ['node', 'scripts/load-lab-verb-pairs.ts']
+    profiles: ['manual']       # keeps it from running on every `up`
+
   load-verb-arguments:
     build:
       context: .

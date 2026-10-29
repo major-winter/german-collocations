@@ -12,7 +12,8 @@
   "scripts": {
     "migrate": "npm run migrate -w database",
     "load-data": "npm run load-data -w database",
-    "typecheck": "npm run typecheck --worksspaces --if-present"
+    "typecheck": "npm run typecheck --worksspaces --if-present",
+    "test": "node --test \"database/src/**/*.test.ts\" \"backend/src/**/*.test.ts\" \"frontend/src/**/*.test.ts\""
   },
   "keywords": [],
   "author": "",
