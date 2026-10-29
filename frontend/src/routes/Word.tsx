@@ -4,6 +4,8 @@ import type { CollocationResponse, WordSuggestion } from "@collocations/types";
 import { fetchCollocations } from "../api/collocations.ts";
 import { fetchSearch } from "../api/search.ts";
 import { CollocationList } from "../components/CollocationList.tsx";
+import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
+import { hasAnyResults } from "../lib/verbNounGroups.ts";
 
 import { API_BASE_URL } from "../config.ts";
 
@@ -100,7 +102,15 @@ export function Word() {
     return (
         <div>
             {/* <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} /> */}
-            <CollocationList word={state.data.word} entries={state.data.collocations} />
+            {/* Decision #60: verbs (or nouns) first - what the user came for. */}
+            {state.data.verbNounPairs && (
+                <VerbNounPairs key={state.data.word} data={state.data.verbNounPairs} />
+            )}
+            <CollocationList
+                word={state.data.word}
+                entries={state.data.collocations}
+                showEmptyMessage={!hasAnyResults(state.data)}
+            />
         </div>
     );
 }

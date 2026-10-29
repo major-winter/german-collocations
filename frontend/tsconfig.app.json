@@ -32,5 +32,9 @@
   },
   "include": [
     "src"
+  ],
+  // Unit tests run under `node --test` (root package.json), not Vite.
+  "exclude": [
+    "src/**/*.test.ts"
   ]
 }
