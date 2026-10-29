@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationResponse, VerbNounPair, VerbNounRelation } from '@collocations/types';
-import { groupHeadings, groupPairs, hasAnyResults, initialOpen, wordColors } from './verbNounGroups.ts';
+import { groupHeadings, groupPairs, hasAnyResults, headingParts, initialOpen, wordColors } from './verbNounGroups.ts';
 
 function pair(relation: VerbNounRelation, partner: string): VerbNounPair {
   return { relation, partner, chip: partner, phrase: partner, score: 1, frequency: 5, examples: [] };
@@ -63,4 +63,16 @@ test('nouns are blue on both pages, verbs orange', () => {
     partner: 'text-pos-noun',
     chip: 'text-pos-noun',
   });
+});
+
+test('heading parts mark the noun, so it can be blue', () => {
+  assert.deepEqual(headingParts('noun', 'Kritik').obl, [
+    { text: 'Präposition + ', noun: false },
+    { text: 'Kritik', noun: true },
+    { text: ' + Verb', noun: false },
+  ]);
+  assert.deepEqual(headingParts('verb', 'üben').nsubj, [
+    { text: 'Substantiv', noun: true },
+    { text: ' als Subjekt', noun: false },
+  ]);
 });

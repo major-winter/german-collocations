@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { highlightCollocates } from '@/lib/highlight.tsx';
-import { groupHeadings, groupPairs, initialOpen, wordColors, type WordColors } from '@/lib/verbNounGroups.ts';
+import { groupPairs, headingParts, initialOpen, wordColors, type WordColors } from '@/lib/verbNounGroups.ts';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
 
 interface VerbNounPairsProps {
@@ -54,7 +54,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
 
     if (groups.length === 0) return null;
 
-    const headings = groupHeadings(data.side, data.lemma);
+    const headings = headingParts(data.side, data.lemma);
     const colors = wordColors(data.side);
 
     function toggle(relation: VerbNounRelation, chipIndex: number) {
@@ -70,8 +70,12 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                 const openIndex = openChip[relation];
                 return (
                     <div key={relation} className="py-3">
-                        <h3 className={cn('text-sm font-medium uppercase tracking-wide mb-1.5', colors.partner)}>
-                            {headings[relation]}
+                        <h3 className="text-sm font-medium uppercase tracking-wide mb-1.5 text-pos-verb">
+                            {headings[relation].map((part) => (
+                                <span key={part.text} className={cn(part.noun && 'text-pos-noun')}>
+                                    {part.text}
+                                </span>
+                            ))}
                         </h3>
                         <div className="flex flex-wrap gap-1.5 mb-1.5">
                             {pairs.map((pair, chipIndex) => (

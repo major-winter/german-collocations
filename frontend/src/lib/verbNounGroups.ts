@@ -14,21 +14,40 @@ export interface VerbNounGroup {
     pairs: VerbNounPair[];
 }
 
+export interface HeadingPart {
+    text: string;
+    noun: boolean; // the noun part is blue, the rest in the verb colour
+}
+
+export function headingParts(
+    side: VerbNounPairs['side'],
+    lemma: string,
+): Record<VerbNounRelation, HeadingPart[]> {
+    const noun = (text: string): HeadingPart => ({ text, noun: true });
+    const other = (text: string): HeadingPart => ({ text, noun: false });
+    return side === 'noun'
+        ? {
+              obj: [noun(lemma), other(' + Verb')],
+              obl: [other('Präposition + '), noun(lemma), other(' + Verb')],
+              nsubj: [noun(lemma), other(' als Subjekt')],
+          }
+        : {
+              obj: [noun('Substantiv'), other(` + ${lemma}`)],
+              obl: [other('Präposition + '), noun('Substantiv'), other(` + ${lemma}`)],
+              nsubj: [noun('Substantiv'), other(' als Subjekt')],
+          };
+}
+
 export function groupHeadings(
     side: VerbNounPairs['side'],
     lemma: string,
 ): Record<VerbNounRelation, string> {
-    return side === 'noun'
-        ? {
-              obj: `${lemma} + Verb`,
-              obl: `Präposition + ${lemma} + Verb`,
-              nsubj: `${lemma} als Subjekt`,
-          }
-        : {
-              obj: `Substantiv + ${lemma}`,
-              obl: `Präposition + Substantiv + ${lemma}`,
-              nsubj: 'Substantiv als Subjekt',
-          };
+    const parts = headingParts(side, lemma);
+    return {
+        obj: parts.obj.map((part) => part.text).join(''),
+        obl: parts.obl.map((part) => part.text).join(''),
+        nsubj: parts.nsubj.map((part) => part.text).join(''),
+    };
 }
 
 /** The pairs split by relation, in RELATION_ORDER; empty groups are left out. */

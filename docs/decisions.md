@@ -2423,7 +2423,8 @@ and the plan is `docs/superpowers/plans/2026-10-29-lab-verb-noun-pairs.md`.
   reflexive pairs are marked ("sich Frage", "Information (sich)") so
   they don't duplicate the plain verb's chips.
 - **Colours.** Nouns are blue (`pos-noun`) and verbs orange (`pos-verb`)
-  in this block on both pages: the phrase, the example sentences and the
+  in this block on both pages: the group headings ("**Kritik** + Verb",
+  "**Substantiv** + üben"), the phrase, the example sentences and the
   noun chips on a verb page (the user's call).
 - **Cut-off lemmas respelled in the export.** Stanza drops the -e of
   nominalised adjectives and of some nouns ("Beamt", "Vorsitzend",
