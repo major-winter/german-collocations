@@ -1,4 +1,10 @@
-import { CollocationEntry, CollocationSection, GovernedPreposition } from "@collocations/types";
+import type {
+  CollocationEntry,
+  CollocationSection,
+  GovernedPreposition,
+  VerbNounPairs,
+  VerbNounRelation,
+} from "@collocations/types";
 
 export interface CollocationRow {
   leftLemmaId: number;
@@ -47,10 +53,27 @@ export interface AdjectiveAttributeRow {
   section: CollocationSection;
 }
 
+// Rows from lab_verb_pairs joined with lab_verb_pair_examples (decision
+// #60, docs/decisions.md): one row per example, or one row with null
+// example fields for a pair without examples. Keyed by lemma text.
+export interface LabVerbPairRow {
+  relation: VerbNounRelation;
+  verb: string;
+  prep: string;
+  noun: string;
+  phraseNoun: string;
+  score: number;
+  pairFreq: number;
+  sentence: string | null;
+  verbSurface: string | null;
+  nounSurface: string | null;
+}
+
 export interface CollocationLookup {
   wordId: number;
   collocations: CollocationEntry[];
   governedPrepositions: GovernedPreposition[];
+  verbNounPairs: VerbNounPairs | null;
 }
 
 export interface CollocationRepository {

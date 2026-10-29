@@ -15,6 +15,7 @@ export class CollocationServiceImpl implements CollocationService {
       word: word,
       collocations: collocations.collocations,
       governedPrepositions: collocations.governedPrepositions,
+      verbNounPairs: collocations.verbNounPairs,
     };
   }
 }

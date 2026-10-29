@@ -4,13 +4,22 @@ import type {
   CollocationLookup,
   CollocationRepository,
   CollocationRow,
-  VerbArgumentRow,
+  LabVerbPairRow,
 } from "../contracts/CollocationRepository.ts";
 import type {
   CollocationEntry,
   CollocationSection,
   GovernedPreposition,
+  VerbNounPair,
+  VerbNounPairs,
 } from "@collocations/types";
+import {
+  chipOf,
+  lookupCandidates,
+  pageSide,
+  phraseOf,
+  type PageSide,
+} from "../services/verbNounPhrases.ts";
 
 // Decision #36 (docs/decisions.md), now applied at lemma
 // granularity (lemma_dominant_pos, decision #44): a lemma's dominant
@@ -48,21 +57,6 @@ const MIN_GOVERNED_PREPOSITION_COUNT = 5;
 const MIN_GOVERNED_PREPOSITION_SHARE = 0.2;
 const MAX_GOVERNED_PREPOSITIONS = 2;
 
-// Decision #53 (docs/decisions.md): verb_arguments-derived noun/verb
-// sections are a ranked list (like lemma_collocations' other sections),
-// not a single grammatical fact like governed prepositions - so this
-// uses a light noise floor, not a dominance floor. Provisional pending
-// inspection of the full-corpus load (see decision #53's threshold
-// section) the same way MIN_LOG_DICE/MIN_GOVERNED_PREPOSITION_SHARE were
-// tuned against real data before being finalized.
-//
-// Decision #55 (docs/decisions.md): this floor only applies when at
-// least one of the fixed lemma's own pairs clears it - see verb_side/
-// argument_side's any_meets_floor. A verb or noun with nothing above the
-// floor (e.g. "weiterfahren", max count 2) falls back to showing its
-// best available pairs unfiltered, rather than an empty section.
-const MIN_ARGUMENT_COUNT = 3;
-
 // Decision #54 (docs/decisions.md): same light-noise-floor reasoning
 // as MIN_ARGUMENT_COUNT, re-verified against the real full-corpus
 // adjective_attribute.tsv rather than assumed equal just because the
@@ -71,16 +65,6 @@ const MIN_ARGUMENT_COUNT = 3;
 // the same floor), an even steeper long tail, so the same threshold
 // value excludes at least as much noise here.
 const MIN_ADJECTIVE_ATTRIBUTE_COUNT = 3;
-
-// Temporarily off (see decisions.md #53's follow-up note): the user
-// wants the noun/verb sections back on plain lemma_collocations
-// adjacency for now, despite the feature working correctly end-to-end.
-// Schema, loaders, and the query itself are untouched and left fully
-// functional - this only skips running VERB_ARGUMENTS_QUERY and
-// merging its results, so re-enabling later is this one flag.
-// GovernedPrepositions (decision #52) is unaffected - explicitly kept
-// on by the user.
-const VERB_ARGUMENTS_ENABLED = true;
 
 // Repeated verbatim inside the same query (Postgres window functions
 // can't reference a SELECT-list alias in PARTITION BY), so it's kept as
@@ -211,118 +195,37 @@ const COLLOCATIONS_QUERY = `
   ORDER BY r.log_dice DESC
 `;
 
-// Decision #53: replaces, for a verb headword, the "noun" section
-// (verb_lemma_id = $1 - which nouns are genuinely this verb's subject/
-// object) and, for a noun headword, the "verb" section (argument_lemma_id
-// = $1 - which verbs genuinely govern this noun as subject/object). A
-// real lemma only ever matches one side (a noun lemma is never itself a
-// verb_lemma_id), so both branches run unconditionally and whichever is
-// empty costs one cheap indexed lookup.
-//
-// DISTINCT ON (verb_lemma_id, argument_lemma_id, section) collapses the
-// rare case of the same (verb, argument) pair qualifying under more than
-// one relation (e.g. "die Regierung unterstuetzt" vs. "man unterstuetzt
-// die Regierung" - "Regierung" as both Subjekt and Akkusativobjekt of
-// "unterstuetzen") down to one row, keeping the higher-share relation -
-// CollocationEntry has no field to show two relations for the same word
-// as visually distinct facts, so showing both would just look like a
-// duplicate.
-const VERB_ARGUMENTS_QUERY = `
-  WITH verb_side_all AS (
-    SELECT
-      va.verb_lemma_id, va.argument_lemma_id, va.grammatical_relation,
-      l_arg.lemma AS word,
-      va.count AS cooccurrence,
-      (va.count::real / SUM(va.count) OVER (PARTITION BY va.grammatical_relation))::real AS share,
-      'noun'::text AS section,
-      -- bool_or() OVER () with no PARTITION BY, over rows already
-      -- filtered to this one verb_lemma_id: does *any* of this verb's
-      -- own argument pairs clear the noise floor? Decision #55: a verb
-      -- with none (e.g. "weiterfahren", max count 2) showed an empty
-      -- section even though real, non-noise example sentences existed
-      -- for its below-floor pairs - the floor is meant to hide noise
-      -- among otherwise-plentiful data, not to blank out a verb that
-      -- simply has no high-count pair at all. See docs/decisions.md.
-      bool_or(va.count >= ${MIN_ARGUMENT_COUNT}) OVER () AS any_meets_floor
-    FROM verb_arguments va
-    JOIN lemmas l_arg ON l_arg.id = va.argument_lemma_id
-    WHERE va.verb_lemma_id = $1
-  ),
-  verb_side AS (
-    SELECT verb_lemma_id, argument_lemma_id, grammatical_relation, word, cooccurrence, share, section
-    FROM verb_side_all
-    WHERE cooccurrence >= ${MIN_ARGUMENT_COUNT} OR NOT any_meets_floor
-  ),
-  -- share can't be a window function over va here, unlike verb_side:
-  -- WHERE runs before the window function, so partitioning by
-  -- verb_lemma_id while already filtered to one fixed argument_lemma_id
-  -- leaves at most one row per (verb_lemma_id, grammatical_relation) -
-  -- that's the table's own primary key - making every partition a
-  -- singleton and every share exactly 1.0 (caught empirically: real
-  -- verbs' top "verb" section entries came back in plain alphabetical
-  -- insertion order, not ranked - see docs/decisions.md). The LATERAL
-  -- below computes each row's total from the full, unfiltered set of
-  -- that verb's own rows (via idx_verb_arguments_verb - cheap, bounded
-  -- by one verb's own argument count, not a full-table scan), the same
-  -- quantity verb_side's window function gets for free by filtering to
-  -- one verb first.
-  argument_side_all AS (
-    SELECT
-      va.verb_lemma_id, va.argument_lemma_id, va.grammatical_relation,
-      l_verb.lemma AS word,
-      va.count AS cooccurrence,
-      (va.count::real / totals.total)::real AS share,
-      'verb'::text AS section,
-      -- Same fallback signal as verb_side_all's any_meets_floor, but
-      -- over this noun's own full set of governing-verb pairs (fixed by
-      -- argument_lemma_id = $1 below) instead of a verb's arguments.
-      bool_or(va.count >= ${MIN_ARGUMENT_COUNT}) OVER () AS any_meets_floor
-    FROM verb_arguments va
-    JOIN lemmas l_verb ON l_verb.id = va.verb_lemma_id
-    JOIN LATERAL (
-      SELECT SUM(va2.count) AS total
-      FROM verb_arguments va2
-      WHERE va2.verb_lemma_id = va.verb_lemma_id
-        AND va2.grammatical_relation = va.grammatical_relation
-    ) totals ON true
-    WHERE va.argument_lemma_id = $1
-  ),
-  argument_side AS (
-    SELECT verb_lemma_id, argument_lemma_id, grammatical_relation, word, cooccurrence, share, section
-    FROM argument_side_all
-    WHERE cooccurrence >= ${MIN_ARGUMENT_COUNT} OR NOT any_meets_floor
-  ),
-  combined AS (
-    SELECT DISTINCT ON (verb_lemma_id, argument_lemma_id, section)
-      verb_lemma_id, argument_lemma_id, grammatical_relation, word, cooccurrence, share, section
-    FROM (
-      SELECT * FROM verb_side
-      UNION ALL
-      SELECT * FROM argument_side
-    ) u
-    ORDER BY verb_lemma_id, argument_lemma_id, section, share DESC
-  ),
-  ranked AS (
-    SELECT *,
-      ROW_NUMBER() OVER (PARTITION BY section ORDER BY share DESC) AS rn
-    FROM combined
-  )
-  SELECT r.verb_lemma_id AS "verbLemmaId", r.argument_lemma_id AS "argumentLemmaId",
-    r.word, r.cooccurrence, r.share AS significance, r.section,
-    r.grammatical_relation AS "relation",
-    ex.sentence, ex."verbSurface", ex."argumentSurface"
-  FROM ranked r
-  LEFT JOIN LATERAL (
-    SELECT sentence, verb_surface AS "verbSurface", argument_surface AS "argumentSurface"
-    FROM verb_argument_examples vae
-    WHERE vae.verb_lemma_id = r.verb_lemma_id
-      AND vae.argument_lemma_id = r.argument_lemma_id
-      AND vae.grammatical_relation = r.grammatical_relation
-    LIMIT 3
-  ) ex ON true
-  WHERE r.rn <= ${PER_SECTION_LIMIT}
-  ORDER BY r.share DESC
-`;
+// Decision #60 (docs/decisions.md): collocation-lab pairs for one noun
+// ($1 matched against `noun`) or one verb ($1 against `verb`, plus its
+// reflexive "sich $1"). Best PER_SECTION_LIMIT per relation by LL score,
+// ranked before the examples join so it can't skew ROW_NUMBER(), then
+// up to 3 examples each, rank 1 first.
+function buildLabVerbPairsQuery(side: PageSide): string {
+  const match =
+    side === "noun" ? "noun = $1" : "(verb = $1 OR verb = 'sich ' || $1)";
+  return `
+    WITH ranked AS (
+      SELECT relation, verb, prep, noun, phrase_noun, score, pair_freq,
+        ROW_NUMBER() OVER (PARTITION BY relation ORDER BY score DESC, verb, noun) AS rn
+      FROM lab_verb_pairs
+      WHERE ${match}
+    )
+    SELECT r.relation, r.verb, r.prep, r.noun, r.phrase_noun AS "phraseNoun",
+      r.score, r.pair_freq AS "pairFreq",
+      ex.sentence, ex.verb_surface AS "verbSurface", ex.noun_surface AS "nounSurface"
+    FROM ranked r
+    LEFT JOIN lab_verb_pair_examples ex
+      ON (ex.relation, ex.verb, ex.prep, ex.noun) = (r.relation, r.verb, r.prep, r.noun)
+      AND ex.rank <= 3
+    WHERE r.rn <= ${PER_SECTION_LIMIT}
+    ORDER BY r.relation, r.score DESC, r.verb, r.noun, ex.rank
+  `;
+}
+
+const LAB_VERB_PAIRS_QUERY: Record<PageSide, string> = {
+  noun: buildLabVerbPairsQuery("noun"),
+  verb: buildLabVerbPairsQuery("verb"),
+};
 
 // Decision #52: a governed preposition is a grammatical fact ("warten"
 // requires "auf" + Akkusativ), ranked by share of the verb's own total
@@ -497,53 +400,6 @@ function groupRows(
   return Array.from(entries.values());
 }
 
-// Same shape as groupRows, but keyed by (verbLemmaId, argumentLemmaId,
-// section) - section is part of the key here (unlike groupRows) because,
-// unlike the symmetric lemma_collocations pairing, a verb_arguments row
-// already has a fixed verb/argument role per section (see
-// VERB_ARGUMENTS_QUERY's DISTINCT ON), so section is never ambiguous for
-// a given pair and including it just guards against a hypothetical
-// collision rather than resolving a real one.
-function groupVerbArgumentRows(
-  rows: VerbArgumentRow[],
-  queryLemmaId: number,
-): CollocationEntry[] {
-  const entries = new Map<string, CollocationEntry>();
-
-  for (const row of rows) {
-    const key = `${row.verbLemmaId}-${row.argumentLemmaId}-${row.section}`;
-    const isQueryVerbSide = row.verbLemmaId === queryLemmaId;
-    const example =
-      row.sentence && row.verbSurface && row.argumentSurface
-        ? {
-            sentence: row.sentence,
-            searchWord: isQueryVerbSide ? row.verbSurface : row.argumentSurface,
-            collocateWord: isQueryVerbSide
-              ? row.argumentSurface
-              : row.verbSurface,
-          }
-        : null;
-    const existing = entries.get(key);
-
-    if (existing) {
-      if (example) {
-        existing.examples.push(example);
-      }
-    } else {
-      entries.set(key, {
-        word: row.word,
-        cooccurrence: row.cooccurrence,
-        significance: row.significance,
-        section: row.section,
-        relation: row.relation,
-        examples: example ? [example] : [],
-      });
-    }
-  }
-
-  return Array.from(entries.values());
-}
-
 // Same shape as groupVerbArgumentRows, but keyed by (nounLemmaId,
 // adjectiveLemmaId) with no section suffix needed: adjective_attributes'
 // primary key already guarantees a (noun, adjective) pair is never
@@ -592,6 +448,39 @@ function groupAdjectiveAttributeRows(
   return Array.from(entries.values());
 }
 
+// One VerbNounPair per (relation, verb, prep, noun), its example rows
+// folded in - rows arrive in display order from buildLabVerbPairsQuery.
+// The searched side's surface is the example's searchWord.
+function groupLabVerbPairRows(rows: LabVerbPairRow[], side: PageSide): VerbNounPair[] {
+  const pairs = new Map<string, VerbNounPair>();
+
+  for (const row of rows) {
+    const key = `${row.relation}\t${row.verb}\t${row.prep}\t${row.noun}`;
+    let pair = pairs.get(key);
+    if (!pair) {
+      pair = {
+        relation: row.relation,
+        partner: side === "noun" ? row.verb : row.noun,
+        chip: chipOf(side, row.relation, row.verb, row.phraseNoun, row.noun),
+        phrase: phraseOf(row.relation, row.verb, row.phraseNoun, row.noun),
+        score: row.score,
+        frequency: row.pairFreq,
+        examples: [],
+      };
+      pairs.set(key, pair);
+    }
+    if (row.sentence && row.verbSurface !== null && row.nounSurface !== null) {
+      pair.examples.push({
+        sentence: row.sentence,
+        searchWord: side === "noun" ? row.nounSurface : row.verbSurface,
+        collocateWord: side === "noun" ? row.verbSurface : row.nounSurface,
+      });
+    }
+  }
+
+  return Array.from(pairs.values());
+}
+
 export class PgCollocationRepository implements CollocationRepository {
   #pool: Pool;
   constructor(pool: Pool) {
@@ -611,28 +500,38 @@ export class PgCollocationRepository implements CollocationRepository {
     // as punctuation-adjacent noise) - degrade to an empty result
     // rather than erroring, same tolerant-of-gaps spirit as the rest of
     // this pipeline (load-lemmas.ts skips unmatched rows instead of
-    // failing).
-    const lemmaResult = await this.#pool.query<{ lemma_id: number }>(
-      "SELECT lemma_id FROM word_dominant_lemma WHERE word_id = $1",
-      [wordRow.id],
-    );
+    // failing). The lab pairs below still get looked up by the word
+    // itself.
+    const [lemmaResult, posResult] = await Promise.all([
+      this.#pool.query<{ lemma_id: number; lemma: string }>(
+        `SELECT wdl.lemma_id, l.lemma
+         FROM word_dominant_lemma wdl JOIN lemmas l ON l.id = wdl.lemma_id
+         WHERE wdl.word_id = $1`,
+        [wordRow.id],
+      ),
+      this.#pool.query<{ pos: string }>(
+        "SELECT pos FROM word_dominant_pos WHERE word_id = $1",
+        [wordRow.id],
+      ),
+    ]);
 
     const lemmaRow = lemmaResult.rows[0];
+    const side = pageSide(posResult.rows[0]?.pos ?? null);
+    const verbNounPairs = side
+      ? await this.#findLabVerbPairs(side, word, lemmaRow?.lemma ?? null)
+      : null;
+
     if (!lemmaRow)
-      return { wordId: wordRow.id, collocations: [], governedPrepositions: [] };
+      return { wordId: wordRow.id, collocations: [], governedPrepositions: [], verbNounPairs };
 
     const lemmaId = lemmaRow.lemma_id;
 
     const [
       collocationsResult,
-      verbArgumentsResult,
       adjectiveAttributesResult,
       governedPrepositionsResult,
     ] = await Promise.all([
       this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [lemmaId]),
-      VERB_ARGUMENTS_ENABLED
-        ? this.#pool.query<VerbArgumentRow>(VERB_ARGUMENTS_QUERY, [lemmaId])
-        : Promise.resolve({ rows: [] as VerbArgumentRow[] }),
       this.#pool.query<AdjectiveAttributeRow>(ADJECTIVE_ATTRIBUTES_QUERY, [
         lemmaId,
       ]),
@@ -642,33 +541,49 @@ export class PgCollocationRepository implements CollocationRepository {
       ),
     ]);
 
-    const argumentEntries = groupVerbArgumentRows(
-      verbArgumentsResult.rows,
-      lemmaId,
-    );
     const attributeEntries = groupAdjectiveAttributeRows(
       adjectiveAttributesResult.rows,
       lemmaId,
     );
-    // Sections verb_arguments/adjective_attributes actually produced
-    // data for, for this lemma, replace the corresponding
-    // lemma_collocations-sourced section entirely (decision #53's
-    // "replace section-by-section" scope, extended by decision #54)
-    // rather than sitting alongside it - a lemma only ever qualifies on
-    // one side per table (noun or verb; noun or adjective), so each
-    // contributes at most one or two sections in practice.
-    const supersededSections = new Set<CollocationSection>([
-      ...argumentEntries.map((e) => e.section),
-      ...attributeEntries.map((e) => e.section),
-    ]);
+    // Sections adjective_attributes actually produced data for replace
+    // the lemma_collocations-sourced section entirely (decision #54).
+    // Decision #60: on a noun page the "verb" section, and on a verb
+    // page the "noun" section, is the lab pairs' alone - the adjacency
+    // one never shows, even when the lab has nothing for this word.
+    const supersededSections = new Set<CollocationSection>(
+      attributeEntries.map((e) => e.section),
+    );
+    if (side === "noun") supersededSections.add("verb");
+    if (side === "verb") supersededSections.add("noun");
     const adjacencyEntries = groupRows(collocationsResult.rows, lemmaId).filter(
       (entry) => !supersededSections.has(entry.section),
     );
 
     return {
       wordId: wordRow.id,
-      collocations: [...adjacencyEntries, ...argumentEntries, ...attributeEntries],
+      collocations: [...adjacencyEntries, ...attributeEntries],
       governedPrepositions: governedPrepositionsResult.rows,
+      verbNounPairs,
     };
+  }
+
+  // Decision #60: the searched word first, then its dominant lemma's
+  // text; the first that has any lab pairs on this side wins.
+  async #findLabVerbPairs(
+    side: PageSide,
+    word: string,
+    lemmaText: string | null,
+  ): Promise<VerbNounPairs> {
+    const candidates = lookupCandidates(word, lemmaText);
+    for (const candidate of candidates) {
+      const result = await this.#pool.query<LabVerbPairRow>(
+        LAB_VERB_PAIRS_QUERY[side],
+        [candidate],
+      );
+      if (result.rows.length > 0) {
+        return { side, lemma: candidate, pairs: groupLabVerbPairRows(result.rows, side) };
+      }
+    }
+    return { side, lemma: candidates[candidates.length - 1], pairs: [] };
   }
 }

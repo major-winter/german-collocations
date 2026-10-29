@@ -37,10 +37,33 @@ export interface GovernedPreposition {
   case: string;
 }
 
+// Decision #60 (docs/decisions.md): verb-noun pairs from collocation-lab
+// (LL-ranked, Stanza-parsed). obj = "Kritik üben", obl = "in der Kritik
+// stehen", nsubj = "die Kritik kommt".
+export type VerbNounRelation = 'obj' | 'obl' | 'nsubj';
+
+export interface VerbNounPair {
+  relation: VerbNounRelation;
+  partner: string;      // the other side's lemma
+  chip: string;         // short label on the chip
+  phrase: string;       // shown when the chip is open
+  score: number;
+  frequency: number;
+  examples: CollocationExample[];
+}
+
+export interface VerbNounPairs {
+  side: 'noun' | 'verb'; // the searched word's side
+  lemma: string;         // the lab lemma that matched, or the dominant lemma text when none did
+  pairs: VerbNounPair[]; // up to 10 per relation, each relation best-first
+}
+
 export interface CollocationResponse {
   word: string;
   collocations: CollocationEntry[];
   governedPrepositions: GovernedPreposition[];
+  // null when the searched word is neither a noun nor a verb.
+  verbNounPairs: VerbNounPairs | null;
 }
 
 export type WordSuggestion = { word: string; frequency: number; score: number };
