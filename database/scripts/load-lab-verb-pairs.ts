@@ -1,10 +1,13 @@
 import { createReadStream } from 'node:fs';
+import { readFile } from 'node:fs/promises';
 import { createInterface } from 'node:readline';
 import path from 'node:path';
 import { Client } from 'pg';
 import {
   assertLoadable,
+  assertMatchesManifest,
   parseExampleLine,
+  parseManifest,
   parsePairLine,
   type LabVerbPairExampleRow,
   type LabVerbPairRow,
@@ -52,25 +55,27 @@ async function insertBatch<Row>(
 
 /**
  * Streams one export file, parses each non-empty line with parseLine, and
- * hands accepted rows to insertRows in batches. Returns how many lines were
- * malformed.
+ * hands accepted rows to insertRows in batches. Returns how many non-empty
+ * lines it read and how many of them were malformed.
  */
 async function streamFile<Row>(
   filePath: string,
   parseLine: (line: string) => Row | null,
   accept: (row: Row) => boolean,
   insertRows: (rows: Row[]) => Promise<void>,
-): Promise<number> {
+): Promise<{ lines: number; malformed: number }> {
   const lines = createInterface({
     input: createReadStream(filePath, 'utf8'),
     crlfDelay: Infinity,
   });
 
   let batch: Row[] = [];
+  let lineCount = 0;
   let malformed = 0;
 
   for await (const line of lines) {
     if (!line.trim()) continue;
+    lineCount += 1;
 
     const row = parseLine(line);
     if (row === null) {
@@ -87,7 +92,7 @@ async function streamFile<Row>(
   }
   await insertRows(batch);
 
-  return malformed;
+  return { lines: lineCount, malformed };
 }
 
 /**
@@ -96,8 +101,10 @@ async function streamFile<Row>(
  *
  * Everything happens in one transaction: DELETE (not TRUNCATE, which would
  * lock readers out for the whole load) and the inserts. The site keeps
- * reading the old pairs until COMMIT, and an empty or broken export
- * (assertLoadable) rolls back with the old pairs untouched.
+ * reading the old pairs until COMMIT, and an empty, broken or incomplete
+ * export (assertLoadable, assertMatchesManifest) rolls back with the old
+ * pairs untouched. A missing or unreadable manifest stops the load before
+ * anything is touched.
  */
 async function run(): Promise<void> {
   const client = new Client({ connectionString: getDatabaseUrl() });
@@ -105,6 +112,13 @@ async function run(): Promise<void> {
 
   const pairsPath = path.join(getDataDir(), 'lab_verb_pairs.tsv');
   const examplesPath = path.join(getDataDir(), 'lab_verb_pair_examples.tsv');
+  const manifestPath = path.join(getDataDir(), 'lab_verb_pairs.manifest');
+
+  const manifest = parseManifest(await readFile(manifestPath, 'utf8').catch(() => ''));
+  if (!manifest) {
+    await client.end();
+    throw new Error(`no readable manifest at ${manifestPath} - copy all three files from \`colloc export\``);
+  }
 
   try {
     await client.query('BEGIN');
@@ -113,7 +127,7 @@ async function run(): Promise<void> {
 
     console.log(`loading lab verb pairs from ${pairsPath}`);
     const loadedPairKeys = new Set<string>();
-    const malformedPairs = await streamFile<LabVerbPairRow>(
+    const pairsRead = await streamFile<LabVerbPairRow>(
       pairsPath,
       parsePairLine,
       (row) => !loadedPairKeys.has(pairKey(row)),
@@ -132,7 +146,7 @@ async function run(): Promise<void> {
     console.log(`loading their examples from ${examplesPath}`);
     let examplesLoaded = 0;
     let examplesWithoutPair = 0;
-    const malformedExamples = await streamFile<LabVerbPairExampleRow>(
+    const examplesRead = await streamFile<LabVerbPairExampleRow>(
       examplesPath,
       parseExampleLine,
       (row) => {
@@ -155,13 +169,14 @@ async function run(): Promise<void> {
       },
     );
 
-    assertLoadable(loadedPairKeys.size, malformedPairs + malformedExamples);
+    assertMatchesManifest(manifest, pairsRead.lines, examplesRead.lines);
+    assertLoadable(loadedPairKeys.size, pairsRead.malformed + examplesRead.malformed);
     await client.query('COMMIT');
 
     console.log(
       `done: ${loadedPairKeys.size.toLocaleString()} pairs and ${examplesLoaded.toLocaleString()} examples loaded, ` +
         `${examplesWithoutPair.toLocaleString()} examples skipped (pair not in the export), ` +
-        `${malformedPairs.toLocaleString()} + ${malformedExamples.toLocaleString()} malformed lines`,
+        `${pairsRead.malformed.toLocaleString()} + ${examplesRead.malformed.toLocaleString()} malformed lines`,
     );
 
     await client.query('VACUUM ANALYZE lab_verb_pairs');

@@ -8,6 +8,11 @@
 // null; load-lab-verb-pairs.ts counts those and refuses the whole load
 // when there are too many (assertLoadable), rather than half-replacing
 // the live pairs with a truncated or garbled export.
+//
+// lab_verb_pairs.manifest, written last by the export, holds both files'
+// line counts ("pairs\t<n>\nexamples\t<n>\n"). A file cut short at a
+// line boundary (an interrupted copy) has no malformed lines, so only
+// the manifest catches it (assertMatchesManifest).
 
 export const RELATIONS = ['obj', 'obl', 'nsubj'] as const;
 export type Relation = (typeof RELATIONS)[number];
@@ -81,6 +86,44 @@ export function assertLoadable(pairCount: number, malformedCount: number): void 
     throw new Error(
       `${malformedCount.toLocaleString()} malformed lines against ${pairCount.toLocaleString()} pairs ` +
         `(over ${MAX_MALFORMED_SHARE * 100}%) - refusing to load a broken export`,
+    );
+  }
+}
+
+export interface LabVerbPairsManifest {
+  pairs: number;
+  examples: number;
+}
+
+export function parseManifest(text: string): LabVerbPairsManifest | null {
+  const counts = new Map<string, number | null>();
+  for (const line of text.split('\n')) {
+    if (!line.trim()) continue;
+    const [name, countText] = line.split('\t');
+    counts.set(name, countText === undefined ? null : parseInteger(countText));
+  }
+  const pairs = counts.get('pairs');
+  const examples = counts.get('examples');
+  if (pairs === undefined || pairs === null || examples === undefined || examples === null) return null;
+  return { pairs, examples };
+}
+
+/** Throws unless both files have exactly the line counts the manifest records. */
+export function assertMatchesManifest(
+  manifest: LabVerbPairsManifest,
+  pairLines: number,
+  exampleLines: number,
+): void {
+  const mismatches = [
+    ['pairs', pairLines, manifest.pairs],
+    ['examples', exampleLines, manifest.examples],
+  ].filter(([, read, expected]) => read !== expected);
+  if (mismatches.length > 0) {
+    throw new Error(
+      mismatches
+        .map(([name, read, expected]) =>
+          `${name}: read ${read.toLocaleString('en-US')} lines, manifest says ${expected.toLocaleString('en-US')}`)
+        .join('; ') + ' - refusing to load an incomplete export',
     );
   }
 }
