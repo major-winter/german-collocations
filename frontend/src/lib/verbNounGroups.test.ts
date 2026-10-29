@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationResponse, VerbNounPair, VerbNounRelation } from '@collocations/types';
-import { groupHeadings, groupPairs, hasAnyResults, headingParts, initialOpen, wordColors } from './verbNounGroups.ts';
+import { groupHeadings, groupPairs, hasAnyResults, headingParts, initialOpen, openAfterClick, wordColors } from './verbNounGroups.ts';
 
 function pair(relation: VerbNounRelation, partner: string): VerbNounPair {
   return { relation, partner, chip: partner, phrase: partner, score: 1, frequency: 5, examples: [] };
@@ -75,4 +75,11 @@ test('heading parts mark the noun, so it can be blue', () => {
     { text: 'Substantiv', noun: true },
     { text: ' als Subjekt', noun: false },
   ]);
+});
+
+test('clicking the open chip keeps it open; clicking another opens that one', () => {
+  const open = { obj: 2, obl: 0, nsubj: null };
+  assert.deepEqual(openAfterClick(open, 'obj', 2), { obj: 2, obl: 0, nsubj: null });
+  assert.deepEqual(openAfterClick(open, 'obj', 4), { obj: 4, obl: 0, nsubj: null });
+  assert.deepEqual(openAfterClick(open, 'nsubj', 1), { obj: 2, obl: 0, nsubj: 1 });
 });

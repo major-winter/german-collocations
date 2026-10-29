@@ -65,6 +65,15 @@ export function initialOpen(groups: VerbNounGroup[]): Record<VerbNounRelation, n
     return open;
 }
 
+/** Clicking a chip opens it; clicking the open chip again keeps it open. */
+export function openAfterClick(
+    open: Record<VerbNounRelation, number | null>,
+    relation: VerbNounRelation,
+    chipIndex: number,
+): Record<VerbNounRelation, number | null> {
+    return { ...open, [relation]: chipIndex };
+}
+
 export function hasAnyResults(response: CollocationResponse): boolean {
     return response.collocations.length > 0 || (response.verbNounPairs?.pairs.length ?? 0) > 0;
 }

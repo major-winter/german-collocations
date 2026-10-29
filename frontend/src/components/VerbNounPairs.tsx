@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { highlightCollocates } from '@/lib/highlight.tsx';
-import { groupPairs, headingParts, initialOpen, wordColors, type WordColors } from '@/lib/verbNounGroups.ts';
+import { groupPairs, headingParts, initialOpen, openAfterClick, wordColors, type WordColors } from '@/lib/verbNounGroups.ts';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
 
 interface VerbNounPairsProps {
@@ -46,7 +46,8 @@ function OpenPair({ pair, side, lemma, colors }: {
 /**
  * Decision #60: the lab's verb-noun pairs as layout "C" - per group a
  * row of chips ranked by LL score; tapping a chip opens its phrase and
- * example sentences below the row, one open chip per group.
+ * example sentences below the row, one open chip per group; tapping
+ * the open chip again keeps it open.
  */
 export function VerbNounPairs({ data }: VerbNounPairsProps) {
     const groups = groupPairs(data.pairs);
@@ -57,11 +58,8 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
     const headings = headingParts(data.side, data.lemma);
     const colors = wordColors(data.side);
 
-    function toggle(relation: VerbNounRelation, chipIndex: number) {
-        setOpenChip((current) => ({
-            ...current,
-            [relation]: current[relation] === chipIndex ? null : chipIndex,
-        }));
+    function open(relation: VerbNounRelation, chipIndex: number) {
+        setOpenChip((current) => openAfterClick(current, relation, chipIndex));
     }
 
     return (
@@ -83,7 +81,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                     key={pair.phrase}
                                     type="button"
                                     aria-pressed={openIndex === chipIndex}
-                                    onClick={() => toggle(relation, chipIndex)}
+                                    onClick={() => open(relation, chipIndex)}
                                     className={cn(
                                         'rounded-full border px-3 py-1 text-sm transition-colors hover:bg-accent/50',
                                         openIndex === chipIndex && 'bg-accent text-accent-foreground',
