@@ -14,6 +14,7 @@ export function highlightCollocates(
     searchWord: string,
     collocateWord: string,
     paintClassName: string,
+    searchClassName = 'font-semibold',
 ): ReactNode[] {
     const boldFor = new Map([
         [searchWord.toLowerCase(), true],
@@ -34,7 +35,7 @@ export function highlightCollocates(
                 nodes.push(sentence.slice(lastIndex, match.index));
             }
             nodes.push(
-                <span key={key++} className={cn('not-italic', isBold ? 'font-semibold' : paintClassName)}>
+                <span key={key++} className={cn('not-italic', isBold ? searchClassName : paintClassName)}>
                     {word}
                 </span>,
             );

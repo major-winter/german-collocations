@@ -2419,7 +2419,22 @@ and the plan is `docs/superpowers/plans/2026-10-29-lab-verb-noun-pairs.md`.
   the phrase and up to 3 example sentences. Pairs need freq ≥ 5 and a
   positive (attracted) LL score, with up to 10 per group.
 - **Lemmas on chips.** The app has no gender or conjugation data, so
-  chips read *sich richten*, not "richtet sich".
+  chips read *sich richten*, not "richtet sich". On a verb page,
+  reflexive pairs are marked ("sich Frage", "Information (sich)") so
+  they don't duplicate the plain verb's chips.
+- **Colours.** Nouns are blue (`pos-noun`) and verbs orange (`pos-verb`)
+  in this block on both pages: the phrase, the example sentences and the
+  noun chips on a verb page (the user's call).
+- **Cut-off lemmas respelled in the export.** Stanza drops the -e of
+  nominalised adjectives and of some nouns ("Beamt", "Vorsitzend",
+  "Matratz"). `colloc export` respells a noun lemma that is its own
+  written form in under 5% of its uses:
+  - to lemma + "e" when the corpus writes that;
+  - otherwise to its most frequent written form, but only when the lemma
+    appears nowhere in the corpus.
+
+  This fixed 428 lemmas. Without it, *Beamte* would have had no verb
+  section and verb pages would show "Beamt" chips.
 - **Which page a word gets.** The searched word's `word_dominant_pos`
   decides:
   - NOUN: the "Verben" section is the lab's alone;

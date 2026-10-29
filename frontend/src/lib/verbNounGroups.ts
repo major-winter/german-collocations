@@ -49,3 +49,16 @@ export function initialOpen(groups: VerbNounGroup[]): Record<VerbNounRelation, n
 export function hasAnyResults(response: CollocationResponse): boolean {
     return response.collocations.length > 0 || (response.verbNounPairs?.pairs.length ?? 0) > 0;
 }
+
+export interface WordColors {
+    searched: string; // the looked-up word in phrases and sentences
+    partner: string;  // the other side of the pair
+    chip: string;     // chip text
+}
+
+/** Nouns are blue and verbs orange (the pos-noun/pos-verb section colours), whichever side was searched. */
+export function wordColors(side: VerbNounPairs['side']): WordColors {
+    return side === 'noun'
+        ? { searched: 'font-semibold text-pos-noun', partner: 'text-pos-verb', chip: '' }
+        : { searched: 'font-semibold', partner: 'text-pos-noun', chip: 'text-pos-noun' };
+}

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationResponse, VerbNounPair, VerbNounRelation } from '@collocations/types';
-import { groupHeadings, groupPairs, hasAnyResults, initialOpen } from './verbNounGroups.ts';
+import { groupHeadings, groupPairs, hasAnyResults, initialOpen, wordColors } from './verbNounGroups.ts';
 
 function pair(relation: VerbNounRelation, partner: string): VerbNounPair {
   return { relation, partner, chip: partner, phrase: partner, score: 1, frequency: 5, examples: [] };
@@ -50,4 +50,17 @@ test('hasAnyResults counts lab pairs as results', () => {
     true,
   );
   assert.equal(hasAnyResults({ ...empty, verbNounPairs: { side: 'noun', lemma: 'x', pairs: [] } }), false);
+});
+
+test('nouns are blue on both pages, verbs orange', () => {
+  assert.deepEqual(wordColors('noun'), {
+    searched: 'font-semibold text-pos-noun',
+    partner: 'text-pos-verb',
+    chip: '',
+  });
+  assert.deepEqual(wordColors('verb'), {
+    searched: 'font-semibold',
+    partner: 'text-pos-noun',
+    chip: 'text-pos-noun',
+  });
 });

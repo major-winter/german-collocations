@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { highlightCollocates } from '@/lib/highlight.tsx';
-import { groupHeadings, groupPairs, initialOpen } from '@/lib/verbNounGroups.ts';
+import { groupHeadings, groupPairs, initialOpen, wordColors, type WordColors } from '@/lib/verbNounGroups.ts';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
 
 interface VerbNounPairsProps {
@@ -14,11 +14,11 @@ function lastWord(lemma: string): string {
     return lemma.split(' ').at(-1) ?? lemma;
 }
 
-function OpenPair({ pair, side, lemma, paintClassName }: {
+function OpenPair({ pair, side, lemma, colors }: {
     pair: VerbNounPair;
     side: VerbNounPairsData['side'];
     lemma: string;
-    paintClassName: string;
+    colors: WordColors;
 }) {
     const searchedWord = side === 'noun' ? lemma : lastWord(lemma);
     const partnerWord = side === 'noun' ? lastWord(pair.partner) : pair.partner;
@@ -26,7 +26,7 @@ function OpenPair({ pair, side, lemma, paintClassName }: {
     return (
         <div className="rounded-lg px-2 py-1.5 space-y-1">
             <p className="text-base">
-                {highlightCollocates(pair.phrase, searchedWord, partnerWord, paintClassName)}
+                {highlightCollocates(pair.phrase, searchedWord, partnerWord, colors.partner, colors.searched)}
             </p>
             {pair.examples.map((example, exampleIndex) => (
                 <p key={exampleIndex} className="text-base text-muted-foreground italic">
@@ -34,7 +34,8 @@ function OpenPair({ pair, side, lemma, paintClassName }: {
                         example.sentence,
                         example.searchWord,
                         example.collocateWord,
-                        paintClassName,
+                        colors.partner,
+                        colors.searched,
                     )}
                 </p>
             ))}
@@ -54,8 +55,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
     if (groups.length === 0) return null;
 
     const headings = groupHeadings(data.side, data.lemma);
-    // Coloured by the partner's part of speech, like CollocationList's sections.
-    const paintClassName = data.side === 'noun' ? 'text-pos-verb' : 'text-pos-noun';
+    const colors = wordColors(data.side);
 
     function toggle(relation: VerbNounRelation, chipIndex: number) {
         setOpenChip((current) => ({
@@ -70,7 +70,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                 const openIndex = openChip[relation];
                 return (
                     <div key={relation} className="py-3">
-                        <h3 className={cn('text-sm font-medium uppercase tracking-wide mb-1.5', paintClassName)}>
+                        <h3 className={cn('text-sm font-medium uppercase tracking-wide mb-1.5', colors.partner)}>
                             {headings[relation]}
                         </h3>
                         <div className="flex flex-wrap gap-1.5 mb-1.5">
@@ -83,6 +83,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                     className={cn(
                                         'rounded-full border px-3 py-1 text-sm transition-colors hover:bg-accent/50',
                                         openIndex === chipIndex && 'bg-accent text-accent-foreground',
+                                        colors.chip,
                                     )}
                                 >
                                     {pair.chip}
@@ -94,7 +95,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                 pair={pairs[openIndex]}
                                 side={data.side}
                                 lemma={data.lemma}
-                                paintClassName={paintClassName}
+                                colors={colors}
                             />
                         )}
                     </div>
