@@ -14,17 +14,12 @@ export interface CollocationExample {
   collocateWord: string;
 }
 
-// relation is only set for entries sourced from verb_arguments (decision
-// #53's noun/verb section replacement) - 'Subjekt' | 'Akkusativobjekt' |
-// 'Dativobjekt' | 'Genitivobjekt'. Undefined for lemma_collocations-
-// sourced entries, which have no single grammatical relation to name.
 export interface CollocationEntry {
   word: string;
   cooccurrence: number;
   significance: number;
   examples: CollocationExample[];
   section: CollocationSection;
-  relation?: string;
 }
 
 // Decision #52 (docs/decisions.md): a governed preposition (Rektion) is

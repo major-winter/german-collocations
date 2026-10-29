@@ -67,15 +67,6 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                                             key={`${entry.word}-${i}`}
                                             className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors space-y-1"
                                         >
-                                            {/* {entry.relation && ( <span */}
-                                            {/*         className={cn( */}
-                                            {/*             'block text-[10px] font-semibold uppercase tracking-wide', */}
-                                            {/*             caseColorClass(entry.relation), */}
-                                            {/*         )} */}
-                                            {/*     > */}
-                                            {/*         {relationAbbreviation(entry.relation)} */}
-                                            {/*     </span> */}
-                                            {/* )} */}
                                             {entry.examples.length > 0 ? (
                                                 entry.examples.map((example, i) => (
                                                     <p key={i} className="text-base text-muted-foreground italic">

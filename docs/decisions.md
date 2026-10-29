@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #60), and add it to the index.
+(next: #61), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -36,6 +36,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#57](#57) Collocations: drop proper-noun partners, decided per lemma
 - [#58](#58) Search box stays at 16px on every screen width, so iOS doesn't zoom on focus
 - [#59](#59) iOS only: `maximum-scale=1` stops the focus zoom #58 didn't (amends #58)
+- [#60](#60) Noun/verb pages read collocation-lab's LL-ranked verb–noun pairs; `verb_arguments` dropped (supersedes #53, #55)
 
 ---
 
@@ -2388,3 +2389,92 @@ Verified with `vite preview` + Playwright: the tag gains
 `width=device-width, initial-scale=1.0` for `Desktop Safari` and
 `Pixel 7`. The focus zoom itself cannot be reproduced in emulation; it
 needs checking on the phone.
+
+<a id="60"></a>
+## 60. Noun/verb pages read collocation-lab's verb–noun pairs; `verb_arguments` dropped (supersedes #53, #55)
+
+**Problem.** The user looks a noun up to find which verbs go with it,
+and found the spaCy-based `verb_arguments` results (#53) "sometimes
+return trivial combinations, sometimes incorrectly label verb noun".
+A side-by-side on 22 nouns against the sister repo `collocation-lab`
+(Stanza `hdt` parser, Leipzig news + wiki + web 2021/2025, 3M
+sentences) confirmed three causes:
+- broken spaCy lemmas (*Spielt*, *leistn*, *birgen*);
+- ranking by share of count, which favours trivial verbs;
+- missing core pairs (*Frage stellen*, *Hilfe brauchen*).
+
+The lab put the main verb in its top two for all 22 nouns.
+
+**Chosen.** The noun and verb pages read the lab's pairs. The design
+is `docs/superpowers/specs/2026-10-29-lab-verb-noun-pairs-design.md`
+and the plan is `docs/superpowers/plans/2026-10-29-lab-verb-noun-pairs.md`.
+
+- **Three relations, three groups** (layout "C", chosen by the user):
+  - object: "Kritik + Verb"
+  - prepositional: "Präposition + Kritik + Verb", e.g. *in der … stehen*
+  - subject: "Kritik als Subjekt"
+
+  On a verb page the groups mirror these ("Substantiv + üben" …). Each
+  group is a row of chips ranked by log-likelihood. Tapping one shows
+  the phrase and up to 3 example sentences. Pairs need freq ≥ 5 and a
+  positive (attracted) LL score, with up to 10 per group.
+- **Lemmas on chips.** The app has no gender or conjugation data, so
+  chips read *sich richten*, not "richtet sich".
+- **Which page a word gets.** The searched word's `word_dominant_pos`
+  decides:
+  - NOUN: the "Verben" section is the lab's alone;
+  - VERB/AUX: the "Substantive" section is the lab's alone;
+  - anything else is unchanged.
+
+  **A word with no lab pairs shows nothing in that section** (the
+  user's decision). It does not fall back to `lemma_collocations`
+  adjacency or `verb_arguments`, which supersedes #55's fallback for
+  these sections.
+- **Lookup by lemma text, not `lemmas.id`.** It tries the searched word
+  first, then its dominant lemma's text. A verb X also matches the
+  lab's reflexive "sich X". Mapping onto `lemmas` would have brought the
+  broken lemmas back.
+- **Data path.**
+  - `colloc export` (collocation-lab) writes `lab_verb_pairs.tsv` and
+    `lab_verb_pair_examples.tsv`.
+  - `load-lab-verb-pairs` loads them into `lab_verb_pairs` and
+    `lab_verb_pair_examples` (migration 014). It runs DELETE + INSERT in
+    one transaction, so readers see the old rows until COMMIT.
+  - An empty export, or one over 1% malformed lines, rolls back and
+    leaves the live pairs untouched.
+  - Migration 015 drops `verb_arguments` and `verb_argument_examples`,
+    and their loaders and compose services are deleted.
+  - `tools/pos-tagging/extract_verb_arguments.py` stays in the repo but
+    is no longer loaded.
+
+**Side effect on other pages.** Some adjective pages had `verb_arguments`
+rows from misparses, such as "Treffen" as the subject of *groß*. Those
+rows replaced the adjacency noun/verb section, so the adjacency section
+now shows there instead. No other section changed. This was verified by
+diffing the API for *Kritik*, *Problem*, *Verfügung*, *üben*, *groß*
+and *schnell* before and after.
+
+**Measured (local, 2026-10-29, dataset `news-wiki-web-3M`).**
+- **Export:** 122,454 pairs (obj 43,642, obl 49,178, nsubj 29,634) and
+  364,370 examples. The TSV is 5.5 MB + 50.8 MB, and the export takes
+  about 2 minutes.
+- **Postgres:** 96 MB after the first load. After a reload it is 186 MB
+  (33 MB + 153 MB), because DELETE leaves dead space that the next load
+  reuses, so expect about 2× in steady state. A reload takes 5.4 s.
+- **Query:** `EXPLAIN (ANALYZE, BUFFERS)` gives 0.9 ms for *Kritik*
+  (bitmap scan on `idx_lab_verb_pairs_noun`) and 2.8 ms for *machen*
+  (1,209 pairs, pkey index scan).
+
+**Refresh runbook (production on the Linode VM; confirm each VM step
+with the user first).**
+1. In collocation-lab: `colloc export --dataset news-wiki-web-3M --out <dir>`.
+2. Copy the two TSVs to `/root/german-collocations/data/` on the VM.
+3. On the VM, after `git pull`:
+   `docker compose -f compose.prod.yml --profile manual build migrate load-lab-verb-pairs`,
+   then `docker compose -f compose.prod.yml run --rm migrate`,
+   then `docker compose -f compose.prod.yml run --rm load-lab-verb-pairs`.
+4. `docker compose -f compose.prod.yml build backend frontend && docker compose -f compose.prod.yml up -d`
+   (failure class 1: building alone doesn't restart the running containers).
+
+For a data-only refresh with no code change, steps 1, 2 and the loader
+run are enough.

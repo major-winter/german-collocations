@@ -17,7 +17,7 @@ const CASE_COLOR_CLASS: Record<string, string> = {
 
 // Short form for the relation badge - GovernedPrepositions already shows
 // the case's own full name in the pill ("(Akkusativ)"), so only
-// CollocationEntry.relation (verb-argument entries) needs an
+// CollocationEntry.relation (verb-argument entries, removed by decision #60) needed an
 // abbreviation, kept short since it sits inline next to a word chip.
 const RELATION_ABBREVIATION: Record<string, string> = {
     Subjekt: 'Subj.',

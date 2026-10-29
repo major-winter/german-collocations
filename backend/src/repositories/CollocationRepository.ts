@@ -58,7 +58,7 @@ const MIN_GOVERNED_PREPOSITION_SHARE = 0.2;
 const MAX_GOVERNED_PREPOSITIONS = 2;
 
 // Decision #54 (docs/decisions.md): same light-noise-floor reasoning
-// as MIN_ARGUMENT_COUNT, re-verified against the real full-corpus
+// as decision #53's MIN_ARGUMENT_COUNT (removed by #60), re-verified against the real full-corpus
 // adjective_attribute.tsv rather than assumed equal just because the
 // shape of the query is the same - 90.4% of its 444,470 distinct (noun,
 // adjective) pairs have a count under 3 (vs. verb_arguments' 85% under
@@ -253,12 +253,11 @@ const GOVERNED_PREPOSITIONS_QUERY = `
 // (noun_lemma_id = $1 - which adjectives genuinely modify this noun
 // attributively) and, for an adjective headword, the "noun" section
 // (adjective_lemma_id = $1 - which nouns this adjective genuinely
-// modifies). Same fixed-side/unconditional-both-branches shape as
-// VERB_ARGUMENTS_QUERY - see that query's comment for why running both
-// branches unconditionally is cheap (one indexed lookup) even though a
-// real lemma only ever matches one side.
+// modifies). Both branches run unconditionally: each is one indexed
+// lookup, and a real lemma only ever matches one side (the shape
+// decision #53's since-removed verb_arguments query had).
 //
-// No DISTINCT ON needed here, unlike VERB_ARGUMENTS_QUERY: with no
+// No DISTINCT ON needed here: with no
 // grammatical_relation column, adjective_attributes' primary key is
 // already exactly (noun_lemma_id, adjective_lemma_id) - there's no
 // second relation a pair could qualify under, so noun_side and
@@ -294,7 +293,8 @@ const ADJECTIVE_ATTRIBUTES_QUERY = `
   -- table's own primary key), making every share exactly 1.0 - the
   -- same shape of bug decision #53 hit.
   --
-  -- Unlike VERB_ARGUMENTS_QUERY's argument_side, though, a LATERAL join
+  -- Unlike decision #53's verb_arguments query (removed by #60), whose
+  -- argument_side used a LATERAL join, a LATERAL join
   -- is the wrong fix here, not the right one: argument_side's total
   -- genuinely varies per row (grouped by verb_lemma_id, which differs
   -- row to row), so a correlated subquery is required there.
@@ -400,15 +400,11 @@ function groupRows(
   return Array.from(entries.values());
 }
 
-// Same shape as groupVerbArgumentRows, but keyed by (nounLemmaId,
+// Same shape as groupRows, but keyed by (nounLemmaId,
 // adjectiveLemmaId) with no section suffix needed: adjective_attributes'
 // primary key already guarantees a (noun, adjective) pair is never
 // ambiguous between the two query branches (see ADJECTIVE_ATTRIBUTES
-// _QUERY's comment on why no DISTINCT ON is needed), unlike
-// groupVerbArgumentRows where the same pair genuinely can qualify under
-// two different relations. No `relation` field set on the resulting
-// CollocationEntry - undefined, same as any lemma_collocations-sourced
-// entry, since there's only one relation this table can mean.
+// _QUERY's comment on why no DISTINCT ON is needed).
 function groupAdjectiveAttributeRows(
   rows: AdjectiveAttributeRow[],
   queryLemmaId: number,

@@ -26,7 +26,7 @@ function getDatabaseUrl(): string {
 /**
  * Must run after load-lemmas.ts: this resolves adjective_attribute.tsv's
  * noun/adjective text against `lemmas`, which load-lemmas.ts is what
- * populates. Mirrors load-verb-arguments.ts's loadLemmaIdMap exactly.
+ * populates. Mirrors load-verb-prepositions.ts's loadLemmaIdMap exactly.
  */
 async function loadLemmaIdMap(client: Client): Promise<Map<string, number>> {
   const result = await client.query<{ id: number; lemma: string }>('SELECT id, lemma FROM lemmas');
@@ -60,7 +60,7 @@ async function insertBatch(client: Client, batch: AdjectiveAttributeRow[]): Prom
  * see extract_adjective_attributes.py), resolves the noun and adjective
  * sides via the in-memory lemma map, and loads matched rows in batches.
  * A row whose lemma text has no match in `lemmas` is skipped, not
- * errored - same tolerant-of-gaps pattern as load-verb-arguments.ts.
+ * errored - same tolerant-of-gaps pattern as load-verb-prepositions.ts.
  */
 async function processFile(
   client: Client,
