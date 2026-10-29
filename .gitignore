@@ -6,3 +6,4 @@ data/
 tools/pos-tagging/.venv/
 tools/pos-tagging/*.tsv
 
+.superpowers/
