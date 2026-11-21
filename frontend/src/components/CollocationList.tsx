@@ -9,9 +9,9 @@ interface CollocationListProps {
     showEmptyMessage: boolean;
 }
 
-const SECTION_ORDER: CollocationSection[] = ['noun', 'verb', 'adjective', 'preposition', 'other'];
+export const SECTION_ORDER: CollocationSection[] = ['noun', 'verb', 'adjective', 'preposition', 'other'];
 
-const SECTION_LABELS: Record<CollocationSection, string> = {
+export const SECTION_LABELS: Record<CollocationSection, string> = {
     noun: 'Substantive',
     verb: 'Verben',
     adjective: 'Adjektive',
