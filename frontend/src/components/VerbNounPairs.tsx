@@ -25,11 +25,11 @@ function OpenPair({ pair, side, lemma, colors }: {
 
     return (
         <div className="rounded-lg px-2 py-1.5 space-y-1">
-            <p className="text-base">
+            <p className="font-serif text-xl">
                 {highlightCollocates(pair.phrase, searchedWord, partnerWord, colors.partner, colors.searched)}
             </p>
             {pair.examples.map((example, exampleIndex) => (
-                <p key={exampleIndex} className="text-base text-muted-foreground italic">
+                <p key={exampleIndex} className="text-base text-muted-foreground italic border-l-2 pl-3">
                     {highlightCollocates(
                         example.sentence,
                         example.searchWord,

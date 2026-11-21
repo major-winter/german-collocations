@@ -112,6 +112,14 @@ export function Word() {
 
     return (
         <div>
+            <div className="mt-6 flex items-baseline gap-3">
+                <h2 className="font-serif text-4xl font-semibold">{state.data.word}</h2>
+                {state.data.verbNounPairs && (
+                    <span className="text-sm text-muted-foreground">
+                        {state.data.verbNounPairs.side === "noun" ? "Substantiv" : "Verb"}
+                    </span>
+                )}
+            </div>
             <PosLegend sections={legendSections} />
             {/* <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} /> */}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
