@@ -39,6 +39,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#60](#60) Noun/verb pages read collocation-lab's LL-ranked verb–noun pairs; `verb_arguments` dropped (supersedes #53, #55)
 - [#61](#61) Free-phrase prepositional pairs ("vor Jahren kaufen") and letterless lemmas left out of the lab export
 - [#62](#62) German-only interface, dark mode follows the system, home page with example words
+- [#63](#63) Quiet colour coding: AA-contrast word-class colours, colour only inside phrases and sentences, neutral header
 
 ---
 
@@ -2566,3 +2567,27 @@ is no manual toggle. The home page explains the tool in two sentences and
 links eight example words, each checked to return verb-noun pairs. The logo
 links home. The unused Vite starter files (`App.tsx`, `App.css`, logos,
 `public/icons.svg`) are deleted.
+
+<a id="63"></a>
+## 63. Quiet colour coding: AA-contrast word-class colours, colour only where it teaches
+
+**Problem.** The noun/verb colours (`oklch(0.62 ...)`) were too light for small
+text on white (below WCAG AA, 4.5:1). Colour was also spent where it carried no
+information: on a noun page every chip is a verb, so colouring the chips and
+the headings told the learner nothing. The `blue-900` header shared a hue with
+the noun blue, so "blue" meant both site chrome and "noun".
+
+**Decision.** Chosen from four prototype variants (A today, B deeper colours,
+C quiet, D tinted pills): C's structure with B's darker shades. Light-mode
+`--pos-noun/verb/adjective/preposition` are lowered to `oklch(0.50 0.16 250)`,
+`(0.55 0.14 58)`, `(0.52 0.14 145)`, `(0.50 0.16 300)`; dark mode is unchanged.
+Group headings are grey, normal case, with only the noun in blue. Chips are
+neutral (the open chip is solid foreground), and colour appears only on the
+verb and noun inside the phrase and example sentences, where both sit side by
+side. The header and search button are neutral grey. A legend (`PosLegend`)
+names the colours in use. The prototype folder and its switcher are deleted.
+
+**Not done.** The grammatical-case colours (#51) were left as they are; they
+are a second colour system and should be shown on request, not by default.
+Adjective and preposition shades were darkened by the same rule without a
+visual check.

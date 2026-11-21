@@ -68,9 +68,9 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                 const openIndex = openChip[relation];
                 return (
                     <div key={relation} className="py-3">
-                        <h3 className="text-sm font-medium uppercase tracking-wide mb-1.5 text-pos-verb">
+                        <h3 className="text-[0.95rem] font-medium mb-1.5 text-muted-foreground">
                             {headings[relation].map((part) => (
-                                <span key={part.text} className={cn(part.noun && 'text-pos-noun')}>
+                                <span key={part.text} className={cn(part.noun && 'font-semibold text-pos-noun')}>
                                     {part.text}
                                 </span>
                             ))}
@@ -84,8 +84,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                     onClick={() => open(relation, chipIndex)}
                                     className={cn(
                                         'rounded-full border px-3 py-1 text-sm transition-colors hover:bg-accent/50',
-                                        openIndex === chipIndex && 'bg-accent text-accent-foreground',
-                                        colors.chip,
+                                        openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
                                     )}
                                 >
                                     {pair.chip}
