@@ -75,7 +75,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                 </span>
                             ))}
                         </h3>
-                        <div className="flex flex-wrap gap-1.5 mb-1.5">
+                        <div className="flex flex-wrap gap-2 md:gap-1.5 mb-1.5">
                             {pairs.map((pair, chipIndex) => (
                                 <button
                                     key={pair.phrase}
@@ -83,7 +83,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                     aria-pressed={openIndex === chipIndex}
                                     onClick={() => open(relation, chipIndex)}
                                     className={cn(
-                                        'rounded-full border px-3 py-1 text-sm transition-colors hover:bg-accent/50',
+                                        'inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm transition-colors hover:bg-accent/50',
                                         openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
                                     )}
                                 >

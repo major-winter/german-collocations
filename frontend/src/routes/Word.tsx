@@ -88,7 +88,7 @@ export function Word() {
                             {state.suggestions.map((s) => (
                                 <li key={s.word}>
                                     <Link to={`/wort/${encodeURIComponent(s.word)}`}
-                                        className="inline-flex items-center rounded-md border px-3 py-1 text-sm
+                                        className="inline-flex min-h-11 md:min-h-8 items-center rounded-md border px-3 py-1 text-sm
                                         hover:bg-accent hover:text-accent-foreground
                                         transition-colors">
                                         {s.word}

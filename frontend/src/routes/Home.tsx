@@ -25,7 +25,7 @@ export function Home() {
                         <li key={exampleWord}>
                             <Link
                                 to={`/wort/${encodeURIComponent(exampleWord)}`}
-                                className="inline-flex items-center rounded-full border px-3 py-1 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
+                                className="inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm hover:bg-accent hover:text-accent-foreground transition-colors"
                             >
                                 {exampleWord}
                             </Link>
