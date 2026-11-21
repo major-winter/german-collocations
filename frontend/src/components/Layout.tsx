@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
-import { matchPath, useLocation } from 'react-router';
+import { Link, matchPath, useLocation } from 'react-router';
 import { SearchBox } from './SearchBox';
+import { PrototypeSwitcher } from '../prototype/PrototypeSwitcher';
 
 interface LayoutProps {
     children: ReactNode;
@@ -8,14 +9,14 @@ interface LayoutProps {
 
 function Logomark() {
     return (
-        <div className="flex items-center gap-2 shrink-0">
+        <Link to="/" className="flex items-center gap-2 shrink-0">
             <span className="flex items-center justify-center w-7 h-7 rounded-md bg-white text-blue-900 text-xs font-semibold">
                 WN
             </span>
             <h1 className="text-lg font-semibold text-white">
                 Wortnetz
             </h1>
-        </div>
+        </Link>
     );
 }
 
@@ -42,9 +43,10 @@ export function Layout({ children }: LayoutProps) {
 
             <footer className="py-6 text-center">
                 <p className="text-xs text-muted-foreground">
-                    Data from Leipzig Corpora Collection · Ranked by collocation strength
+                    Daten: Leipzig Corpora Collection · sortiert nach Kollokationsstärke
                 </p>
             </footer>
+            {import.meta.env.DEV && <PrototypeSwitcher />}
         </div>
     );
 }

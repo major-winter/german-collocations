@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router";
-import type { CollocationResponse, WordSuggestion } from "@collocations/types";
+import type { CollocationResponse, CollocationSection, WordSuggestion } from "@collocations/types";
 import { fetchCollocations } from "../api/collocations.ts";
 import { fetchSearch } from "../api/search.ts";
 import { CollocationList } from "../components/CollocationList.tsx";
+import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { hasAnyResults } from "../lib/verbNounGroups.ts";
 
@@ -22,6 +23,10 @@ function isAbortError(err: unknown): boolean {
 export function Word() {
     const { word } = useParams<{ word: string }>();
     const [state, setState] = useState<LookupState>({ status: "loading" });
+
+    useEffect(() => {
+        document.title = word ? `${word} – Wortnetz` : 'Wortnetz';
+    }, [word]);
 
     useEffect(() => {
         if (!word) return;
@@ -54,7 +59,7 @@ export function Word() {
                 }
                 setState({
                     status: "error",
-                    message: "Something went wrong. Please try again.",
+                    message: "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
                 });
             }
         }
@@ -65,7 +70,7 @@ export function Word() {
     }, [word]);
 
     if (state.status === "loading") {
-        return <p className="text-sm text-muted-foreground text-center">Loading…</p>;
+        return <p className="text-sm text-muted-foreground text-center">Wird geladen …</p>;
     }
 
     if (state.status === "error") {
@@ -78,12 +83,12 @@ export function Word() {
                 <p>Keine Ergebnisse für „{word}“.</p>
                 {state.suggestions.length > 0 ? (
                     <div>
-                        <p>Did you mean:</p>
+                        <p>Meinten Sie:</p>
                         <ul className="flex flex-wrap justify-center gap-2 list-none">
                             {state.suggestions.map((s) => (
                                 <li key={s.word}>
                                     <Link to={`/wort/${encodeURIComponent(s.word)}`}
-                                        className="inline-flex item-center rounded-md border px-3 py-1 text-sm
+                                        className="inline-flex items-center rounded-md border px-3 py-1 text-sm
                                         hover:bg-accent hover:text-accent-foreground
                                         transition-colors">
                                         {s.word}
@@ -93,14 +98,21 @@ export function Word() {
                         </ul>
                     </div>
                 ) : (
-                    <p>No suggestions found either.</p>
+                    <p>Auch keine ähnlichen Wörter gefunden.</p>
                 )}
             </div>
         );
     }
 
+    const legendSections = new Set<CollocationSection>(state.data.collocations.map((entry) => entry.section));
+    if (state.data.verbNounPairs?.pairs.length) {
+        legendSections.add("noun");
+        legendSections.add("verb");
+    }
+
     return (
         <div>
+            <PosLegend sections={legendSections} />
             {/* <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} /> */}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
             {state.data.verbNounPairs && (
