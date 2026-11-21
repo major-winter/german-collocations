@@ -12,10 +12,14 @@ export function Home() {
     return (
         <div className="py-10 text-center space-y-6">
             <div className="space-y-2">
-                <h2 className="text-2xl font-semibold">Welche Wörter passen zusammen?</h2>
+                <h2 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h2>
+                <Link to="/wort/Rolle" className="block font-serif text-2xl py-2 hover:underline">
+                    eine <span className="font-semibold text-pos-noun">Rolle</span>{' '}
+                    <span className="text-pos-verb">spielen</span>
+                </Link>
                 <p className="text-muted-foreground">
-                    Geben Sie ein Substantiv ein und sehen Sie, welche Verben dazu passen –
-                    mit Beispielsätzen aus echten Texten. Oder umgekehrt: ein Verb und seine Substantive.
+                    Blau das Substantiv, orange das Verb. Geben Sie eins von beiden ein und sehen Sie,
+                    welche Partner dazu passen – mit Beispielsätzen aus echten Texten.
                 </p>
             </div>
             <div className="space-y-2">

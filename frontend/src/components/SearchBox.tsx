@@ -31,13 +31,13 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="Geben Sie ein Wort ein…"
                 aria-label="Wort suchen"
-                className="h-11 md:h-8 pr-12 md:pr-10 md:text-base bg-white dark:bg-white border-transparent shadow-sm text-slate-900 placeholder:text-slate-500"
+                className="h-11 md:h-8 pr-12 md:pr-10 md:text-base shadow-sm"
             />
             <Button
                 type="submit"
                 size="icon"
                 variant="ghost"
-                className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 md:h-8 md:w-8 text-neutral-900 hover:bg-neutral-100 hover:text-neutral-900"
+                className="absolute right-1 top-1/2 -translate-y-1/2 h-10 w-10 md:h-8 md:w-8 text-muted-foreground hover:text-foreground"
                 aria-label='Suchen'>
 
                 <Search className="h-4 w-4" />

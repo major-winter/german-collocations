@@ -20,7 +20,7 @@ export function PosLegend({ sections }: { sections: ReadonlySet<CollocationSecti
     if (shown.length === 0) return null;
 
     return (
-        <ul aria-label="Farblegende" className="mt-6 mb-4 flex flex-wrap gap-x-4 gap-y-1 list-none p-0 text-xs text-muted-foreground">
+        <ul aria-label="Farblegende" className="mt-3 mb-4 flex flex-wrap gap-x-4 gap-y-1 list-none p-0 text-xs text-muted-foreground">
             {shown.map((section) => (
                 <li key={section} className="flex items-center gap-1.5">
                     <span aria-hidden="true" className={cn('inline-block size-2.5 rounded-full', DOT_COLORS[section])} />
