@@ -87,6 +87,6 @@ export interface WordColors {
 /** Nouns are blue and verbs orange (the pos-noun/pos-verb section colours), whichever side was searched. */
 export function wordColors(side: VerbNounPairs['side']): WordColors {
     return side === 'noun'
-        ? { searched: 'font-semibold text-pos-noun', partner: 'text-pos-verb', chip: '' }
+        ? { searched: 'font-semibold text-pos-noun', partner: 'text-pos-verb', chip: 'text-pos-verb' }
         : { searched: 'font-semibold text-pos-verb', partner: 'text-pos-noun', chip: 'text-pos-noun' };
 }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="de">
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
@@ -12,7 +12,19 @@
         document.querySelector('meta[name="viewport"]').content = 'width=device-width, initial-scale=1.0, maximum-scale=1';
       }
     </script>
-    <title>frontend</title>
+    <script>
+      // Follow the system's light/dark setting; index.css keys the dark
+      // colours off a .dark class on <html>.
+      (function () {
+        var darkQuery = window.matchMedia('(prefers-color-scheme: dark)');
+        function applyTheme() {
+          document.documentElement.classList.toggle('dark', darkQuery.matches);
+        }
+        applyTheme();
+        darkQuery.addEventListener('change', applyTheme);
+      })();
+    </script>
+    <title>Wortnetz</title>
   </head>
   <body>
     <div id="root"></div>

@@ -23,6 +23,44 @@ It runs offline, on a laptop, and produces a file that gets loaded
 like any other corpus data. It is never containerized and never part
 of the deploy path. See `tools/pos-tagging/README.md`.
 
+## Commands
+
+Local dev runs through Docker Compose, not host `npm run dev` (Colima
+is the daemon; `colima start` if it's down). Always `--build`.
+
+- Start everything: `docker-compose up -d --build` (db → migrate →
+  backend :3000, frontend :5173 with bind-mounted source).
+- Loaders/extractors are `profiles: ['manual']` services, e.g.
+  `docker-compose --profile manual run --build loader`; see
+  `compose.yml` for the full list (`extract-examples`, etc.).
+- Tests (Node's built-in runner, TS run directly via type stripping —
+  no Jest/Vitest, no build step): `npm test` from the root; single
+  file: `node --test backend/src/services/verbNounPhrases.test.ts`.
+- Typecheck: `npm run typecheck -w backend` (or `-w database`). The
+  root `typecheck` script has a typo (`--worksspaces`) and doesn't work.
+- Frontend: `npm run lint -w frontend`, `npm run build -w frontend`
+  (`tsc -b && vite build`).
+
+## Architecture
+
+- `types/` (`@collocations/types`) — API response types shared by
+  backend and frontend; consumed as raw `.ts`, no build.
+- `backend/src/` — layered, wired by hand in `index.ts`:
+  `routes/` (Express handler factories) → `services/` →
+  `repositories/` (raw SQL via `pg`). Each service/repository has an
+  interface in `contracts/` (import with `import type`). Only two
+  endpoints: `/api/collocations/:word` and `/api/search`.
+- `database/` — `migrations/` + `src/migrate.ts` runner; `scripts/`
+  hold one-shot loaders (`load-data.ts` for the Leipzig corpus, then
+  separate loaders for POS, lemmas, lemma collocations, verb
+  prepositions, adjective attributes, lab verb pairs, examples).
+  Loader order and dependencies are in the session notes/decisions.
+- `frontend/` — React 19 + react-router + Tailwind 4 + shadcn/base-ui.
+  `routes/` (Home, Word), `components/`, `lib/` (pure grouping/
+  highlighting logic with tests). `src/prototype/` is untracked
+  throwaway work.
+- `docs/superpowers/` — specs/plans from the superpowers workflow.
+
 ## Philosophy — read before proposing a change
 
 - **"Boring and minimal."** Prefer the standard, well-documented

@@ -25,6 +25,10 @@ export function Word() {
     const [state, setState] = useState<LookupState>({ status: "loading" });
 
     useEffect(() => {
+        document.title = word ? `${word} – Wortnetz` : 'Wortnetz';
+    }, [word]);
+
+    useEffect(() => {
         if (!word) return;
 
         const controller = new AbortController();
@@ -55,7 +59,7 @@ export function Word() {
                 }
                 setState({
                     status: "error",
-                    message: "Something went wrong. Please try again.",
+                    message: "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut.",
                 });
             }
         }
@@ -66,7 +70,7 @@ export function Word() {
     }, [word]);
 
     if (state.status === "loading") {
-        return <p className="text-sm text-muted-foreground text-center">Loading…</p>;
+        return <p className="text-sm text-muted-foreground text-center">Wird geladen …</p>;
     }
 
     if (state.status === "error") {
@@ -79,12 +83,12 @@ export function Word() {
                 <p>Keine Ergebnisse für „{word}“.</p>
                 {state.suggestions.length > 0 ? (
                     <div>
-                        <p>Did you mean:</p>
+                        <p>Meinten Sie:</p>
                         <ul className="flex flex-wrap justify-center gap-2 list-none">
                             {state.suggestions.map((s) => (
                                 <li key={s.word}>
                                     <Link to={`/wort/${encodeURIComponent(s.word)}`}
-                                        className="inline-flex item-center rounded-md border px-3 py-1 text-sm
+                                        className="inline-flex items-center rounded-md border px-3 py-1 text-sm
                                         hover:bg-accent hover:text-accent-foreground
                                         transition-colors">
                                         {s.word}
@@ -94,7 +98,7 @@ export function Word() {
                         </ul>
                     </div>
                 ) : (
-                    <p>No suggestions found either.</p>
+                    <p>Auch keine ähnlichen Wörter gefunden.</p>
                 )}
             </div>
         );

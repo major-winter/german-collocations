@@ -38,6 +38,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#59](#59) iOS only: `maximum-scale=1` stops the focus zoom #58 didn't (amends #58)
 - [#60](#60) Noun/verb pages read collocation-lab's LL-ranked verb–noun pairs; `verb_arguments` dropped (supersedes #53, #55)
 - [#61](#61) Free-phrase prepositional pairs ("vor Jahren kaufen") and letterless lemmas left out of the lab export
+- [#62](#62) German-only interface, dark mode follows the system, home page with example words
 
 ---
 
@@ -2548,3 +2549,20 @@ cut would have lost most of those.
 *an den Tag* and *am Tag* as one phrase. Pairs with a number (*auf X Euro
 beziffern*, *um X Prozent wachsen*) go too; they belong to the verb's
 valency, not to the noun page.
+
+<a id="62"></a>
+## 62. German-only interface, dark mode follows the system, home page with example words
+
+**Problem.** The interface mixed languages ("Keine Ergebnisse" beside "Did
+you mean:" and "Loading…"), the tab title was the Vite default "frontend",
+the home page rendered nothing, and the dark colours in `index.css` were
+never switched on because nothing set the `.dark` class.
+
+**Decision.** All interface text is German, in the formal "Sie" the search
+placeholder already used; `<html lang="de">`. The tab title is "Wortnetz",
+and "<word> – Wortnetz" on word pages. A small script in `index.html` sets
+`.dark` on `<html>` from `prefers-color-scheme` and follows changes; there
+is no manual toggle. The home page explains the tool in two sentences and
+links eight example words, each checked to return verb-noun pairs. The logo
+links home. The unused Vite starter files (`App.tsx`, `App.css`, logos,
+`public/icons.svg`) are deleted.

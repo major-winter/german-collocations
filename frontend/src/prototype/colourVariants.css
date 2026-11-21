@@ -1,0 +1,62 @@
+/* PROTOTYPE - throwaway. Colour options for the word page, picked with
+   ?variant=A|B|C|D (see PrototypeSwitcher). Only the colours change; the
+   components are untouched. Delete this folder once a variant is chosen. */
+
+/* B, C, D: deeper noun/verb shades that pass WCAG AA (4.5) on white and on
+   the grey open chip. Dark mode keeps its own brighter shades. */
+:root[data-variant="B"]:not(.dark),
+:root[data-variant="C"]:not(.dark),
+:root[data-variant="D"]:not(.dark) {
+  --pos-noun: oklch(0.50 0.16 250);
+  --pos-verb: oklch(0.55 0.14 58);
+}
+
+/* ---------- B: deeper colours, same structure as today ---------- */
+:root[data-variant="B"] header.bg-blue-900 {
+  background: oklch(0.36 0.11 252);
+}
+
+/* ---------- C and D share quiet headings: grey, normal case, only the noun coloured ---------- */
+:root[data-variant="C"] main h3,
+:root[data-variant="D"] main h3 {
+  color: var(--muted-foreground);
+  text-transform: none;
+  letter-spacing: normal;
+  font-size: 0.95rem;
+  font-weight: 500;
+}
+:root[data-variant="C"] main h3 .text-pos-noun,
+:root[data-variant="D"] main h3 .text-pos-noun {
+  color: var(--pos-noun);
+  font-weight: 600;
+}
+
+/* ---------- C: quiet - neutral chips, colour only in phrases and sentences ---------- */
+:root[data-variant="C"] header.bg-blue-900 {
+  background: oklch(0.24 0.01 260);
+}
+:root[data-variant="C"] main section button[aria-pressed] {
+  color: var(--foreground);
+  background: transparent;
+}
+:root[data-variant="C"] main section button[aria-pressed="true"] {
+  color: var(--background);
+  background: var(--foreground);
+  border-color: var(--foreground);
+}
+
+/* ---------- D: tinted pills - soft fill per word class, open chip solid ---------- */
+:root[data-variant="D"] header.bg-blue-900 {
+  background: oklch(0.36 0.11 252);
+}
+:root[data-variant="D"] main section button[aria-pressed] {
+  border-color: transparent;
+  background: color-mix(in oklch, currentColor 10%, transparent);
+}
+:root[data-variant="D"] main section button[aria-pressed="true"] {
+  background: currentColor;
+}
+:root[data-variant="D"] main section button[aria-pressed="true"] {
+  /* currentColor is the fill now, so the label needs its own colour */
+  -webkit-text-fill-color: var(--background);
+}
