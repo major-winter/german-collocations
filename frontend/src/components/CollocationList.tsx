@@ -53,8 +53,7 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                         <div key={section} className="py-3">
                             <h3
                                 className={cn(
-                                    'text-sm font-medium uppercase tracking-wide mb-1.5',
-                                    PAINT_COLORS[section],
+                                    'text-[0.95rem] font-medium mb-1.5 text-muted-foreground',
                                 )}
                             >
                                 {SECTION_LABELS[section]}

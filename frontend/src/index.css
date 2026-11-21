@@ -87,13 +87,13 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
-  /* POS section colors: one hue-spread rule (evenly spaced, matched
-     lightness/chroma) instead of eyeballed Tailwind swatches - see
-     docs/decisions.md. */
-  --pos-noun: oklch(0.62 0.18 250);
-  --pos-verb: oklch(0.62 0.17 65);
-  --pos-adjective: oklch(0.62 0.18 145);
-  --pos-preposition: oklch(0.62 0.18 300);
+  /* POS section colors: one hue-spread rule instead of eyeballed Tailwind
+     swatches - see docs/decisions.md. Light-mode lightness is lowered to
+     pass WCAG AA (4.5:1) for small text on white and on the open chip. */
+  --pos-noun: oklch(0.50 0.16 250);
+  --pos-verb: oklch(0.55 0.14 58);
+  --pos-adjective: oklch(0.52 0.14 145);
+  --pos-preposition: oklch(0.50 0.16 300);
   /* Grammatical-case colors: a second, deliberately separate dimension
      from the POS palette above (decision #51) - German case (Nominativ/
      Akkusativ/Dativ/Genitiv) is the one grammar axis with real currency

@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import { Link, matchPath, useLocation } from 'react-router';
 import { SearchBox } from './SearchBox';
-import { PrototypeSwitcher } from '../prototype/PrototypeSwitcher';
 
 interface LayoutProps {
     children: ReactNode;
@@ -10,7 +9,7 @@ interface LayoutProps {
 function Logomark() {
     return (
         <Link to="/" className="flex items-center gap-2 shrink-0">
-            <span className="flex items-center justify-center w-7 h-7 rounded-md bg-white text-blue-900 text-xs font-semibold">
+            <span className="flex items-center justify-center w-7 h-7 rounded-md bg-white text-neutral-900 text-xs font-semibold">
                 WN
             </span>
             <h1 className="text-lg font-semibold text-white">
@@ -28,7 +27,7 @@ export function Layout({ children }: LayoutProps) {
 
     return (
         <div className="min-h-screen flex flex-col">
-            <header className="sticky top-0 z-40 bg-blue-900">
+            <header className="sticky top-0 z-40 bg-neutral-900">
                 <div className="py-4 max-w-xl md:max-w-2xl mx-auto px-4 w-full flex items-center gap-3">
                     <Logomark />
                     <div className="flex-1">
@@ -46,7 +45,6 @@ export function Layout({ children }: LayoutProps) {
                     Daten: Leipzig Corpora Collection · sortiert nach Kollokationsstärke
                 </p>
             </footer>
-            {import.meta.env.DEV && <PrototypeSwitcher />}
         </div>
     );
 }
