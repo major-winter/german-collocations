@@ -1,25 +1,19 @@
 import { Pool } from "pg";
+import type { GovernedPreposition } from "@collocations/types";
 import type {
+  CollocationStore,
+  DominantLemma,
+} from "../../application/ports/CollocationStore.ts";
+import type {
+  AdjacencyRow,
   AdjectiveAttributeRow,
-  CollocationLookup,
-  CollocationRepository,
-  CollocationRow,
   LabVerbPairRow,
-} from "../contracts/CollocationRepository.ts";
-import type {
-  CollocationEntry,
-  CollocationSection,
-  GovernedPreposition,
-  VerbNounPair,
-  VerbNounPairs,
-} from "@collocations/types";
-import {
-  chipOf,
-  lookupCandidates,
-  pageSide,
-  phraseOf,
-  type PageSide,
-} from "../services/verbNounPhrases.ts";
+} from "../../domain/collocations.ts";
+import type { PageSide } from "../../domain/verbNounPhrases.ts";
+
+// Driven adapter: implements the CollocationStore port with SQL. Every
+// tuning constant below is a storage-side filter, so it lives with the
+// query that applies it.
 
 // Decision #36 (docs/decisions.md), now applied at lemma
 // granularity (lemma_dominant_pos, decision #44): a lemma's dominant
@@ -350,236 +344,63 @@ const ADJECTIVE_ATTRIBUTES_QUERY = `
   ORDER BY r.share DESC
 `;
 
-// Keyed by (left_lemma_id, right_lemma_id), not by word text - the same
-// partner lemma can appear via two distinct pairs now that both
-// directions are combined (e.g. "X folgt Y" and "Y folgt X" both
-// significant), and each pair has its own cooccurrence/logDice.
-// Keying by word text would silently mix example sentences from two
-// unrelated pairs under one entry.
-// queryLemmaId picks out, per row, which of leftWord/rightWord is the
-// surface form of the word the user looked up vs. its collocate - by
-// lemma id, not by string equality against `word`, since either side's
-// literal surface form can differ from its own lemma's spelling (the
-// same divergence documented above for the LATERAL join).
-function groupRows(
-  rows: CollocationRow[],
-  queryLemmaId: number,
-): CollocationEntry[] {
-  const entries = new Map<string, CollocationEntry>();
-
-  for (const row of rows) {
-    const key = `${row.leftLemmaId}-${row.rightLemmaId}`;
-    const isQueryLeft = row.leftLemmaId === queryLemmaId;
-    // searchWord/collocateWord are only ever null together with
-    // sentence - all three come from the same LATERAL row.
-    const example =
-      row.sentence && row.leftWord && row.rightWord
-        ? {
-            sentence: row.sentence,
-            searchWord: isQueryLeft ? row.leftWord : row.rightWord,
-            collocateWord: isQueryLeft ? row.rightWord : row.leftWord,
-          }
-        : null;
-    const existing = entries.get(key);
-
-    if (existing) {
-      if (example) {
-        existing.examples.push(example);
-      }
-    } else {
-      entries.set(key, {
-        word: row.word,
-        cooccurrence: row.cooccurrence,
-        significance: row.significance,
-        section: row.section,
-        examples: example ? [example] : [],
-      });
-    }
-  }
-
-  return Array.from(entries.values());
-}
-
-// Same shape as groupRows, but keyed by (nounLemmaId,
-// adjectiveLemmaId) with no section suffix needed: adjective_attributes'
-// primary key already guarantees a (noun, adjective) pair is never
-// ambiguous between the two query branches (see ADJECTIVE_ATTRIBUTES
-// _QUERY's comment on why no DISTINCT ON is needed).
-function groupAdjectiveAttributeRows(
-  rows: AdjectiveAttributeRow[],
-  queryLemmaId: number,
-): CollocationEntry[] {
-  const entries = new Map<string, CollocationEntry>();
-
-  for (const row of rows) {
-    const key = `${row.nounLemmaId}-${row.adjectiveLemmaId}`;
-    const isQueryNounSide = row.nounLemmaId === queryLemmaId;
-    const example =
-      row.sentence && row.nounSurface && row.adjectiveSurface
-        ? {
-            sentence: row.sentence,
-            searchWord: isQueryNounSide ? row.nounSurface : row.adjectiveSurface,
-            collocateWord: isQueryNounSide
-              ? row.adjectiveSurface
-              : row.nounSurface,
-          }
-        : null;
-    const existing = entries.get(key);
-
-    if (existing) {
-      if (example) {
-        existing.examples.push(example);
-      }
-    } else {
-      entries.set(key, {
-        word: row.word,
-        cooccurrence: row.cooccurrence,
-        significance: row.significance,
-        section: row.section,
-        examples: example ? [example] : [],
-      });
-    }
-  }
-
-  return Array.from(entries.values());
-}
-
-// One VerbNounPair per (relation, verb, prep, noun), its example rows
-// folded in - rows arrive in display order from buildLabVerbPairsQuery.
-// The searched side's surface is the example's searchWord.
-function groupLabVerbPairRows(rows: LabVerbPairRow[], side: PageSide): VerbNounPair[] {
-  const pairs = new Map<string, VerbNounPair>();
-
-  for (const row of rows) {
-    const key = `${row.relation}\t${row.verb}\t${row.prep}\t${row.noun}`;
-    let pair = pairs.get(key);
-    if (!pair) {
-      pair = {
-        relation: row.relation,
-        partner: side === "noun" ? row.verb : row.noun,
-        chip: chipOf(side, row.relation, row.verb, row.phraseNoun, row.noun),
-        phrase: phraseOf(row.relation, row.verb, row.phraseNoun, row.noun),
-        score: row.score,
-        frequency: row.pairFreq,
-        examples: [],
-      };
-      pairs.set(key, pair);
-    }
-    if (row.sentence && row.verbSurface !== null && row.nounSurface !== null) {
-      pair.examples.push({
-        sentence: row.sentence,
-        searchWord: side === "noun" ? row.nounSurface : row.verbSurface,
-        collocateWord: side === "noun" ? row.verbSurface : row.nounSurface,
-      });
-    }
-  }
-
-  return Array.from(pairs.values());
-}
-
-export class PgCollocationRepository implements CollocationRepository {
+export class PgCollocationStore implements CollocationStore {
   #pool: Pool;
   constructor(pool: Pool) {
     this.#pool = pool;
   }
-  async findByWord(word: string): Promise<CollocationLookup | null> {
-    const wordResult = await this.#pool.query<{ id: number }>(
+
+  async findWordId(word: string): Promise<number | null> {
+    const result = await this.#pool.query<{ id: number }>(
       "SELECT id FROM words WHERE word = $1",
       [word],
     );
-
-    const wordRow = wordResult.rows[0];
-    if (!wordRow) return null;
-
-    // A word can be missing a lemma mapping if extract_lemmas.py's
-    // corpus scan never produced a row for it (e.g. only ever appeared
-    // as punctuation-adjacent noise) - degrade to an empty result
-    // rather than erroring, same tolerant-of-gaps spirit as the rest of
-    // this pipeline (load-lemmas.ts skips unmatched rows instead of
-    // failing). The lab pairs below still get looked up by the word
-    // itself.
-    const [lemmaResult, posResult] = await Promise.all([
-      this.#pool.query<{ lemma_id: number; lemma: string }>(
-        `SELECT wdl.lemma_id, l.lemma
-         FROM word_dominant_lemma wdl JOIN lemmas l ON l.id = wdl.lemma_id
-         WHERE wdl.word_id = $1`,
-        [wordRow.id],
-      ),
-      this.#pool.query<{ pos: string }>(
-        "SELECT pos FROM word_dominant_pos WHERE word_id = $1",
-        [wordRow.id],
-      ),
-    ]);
-
-    const lemmaRow = lemmaResult.rows[0];
-    const side = pageSide(posResult.rows[0]?.pos ?? null);
-    const verbNounPairs = side
-      ? await this.#findLabVerbPairs(side, word, lemmaRow?.lemma ?? null)
-      : null;
-
-    if (!lemmaRow)
-      return { wordId: wordRow.id, collocations: [], governedPrepositions: [], verbNounPairs };
-
-    const lemmaId = lemmaRow.lemma_id;
-
-    const [
-      collocationsResult,
-      adjectiveAttributesResult,
-      governedPrepositionsResult,
-    ] = await Promise.all([
-      this.#pool.query<CollocationRow>(COLLOCATIONS_QUERY, [lemmaId]),
-      this.#pool.query<AdjectiveAttributeRow>(ADJECTIVE_ATTRIBUTES_QUERY, [
-        lemmaId,
-      ]),
-      this.#pool.query<{ preposition: string; case: string }>(
-        GOVERNED_PREPOSITIONS_QUERY,
-        [lemmaId],
-      ),
-    ]);
-
-    const attributeEntries = groupAdjectiveAttributeRows(
-      adjectiveAttributesResult.rows,
-      lemmaId,
-    );
-    // Sections adjective_attributes actually produced data for replace
-    // the lemma_collocations-sourced section entirely (decision #54).
-    // Decision #60: on a noun page the "verb" section, and on a verb
-    // page the "noun" section, is the lab pairs' alone - the adjacency
-    // one never shows, even when the lab has nothing for this word.
-    const supersededSections = new Set<CollocationSection>(
-      attributeEntries.map((e) => e.section),
-    );
-    if (side === "noun") supersededSections.add("verb");
-    if (side === "verb") supersededSections.add("noun");
-    const adjacencyEntries = groupRows(collocationsResult.rows, lemmaId).filter(
-      (entry) => !supersededSections.has(entry.section),
-    );
-
-    return {
-      wordId: wordRow.id,
-      collocations: [...adjacencyEntries, ...attributeEntries],
-      governedPrepositions: governedPrepositionsResult.rows,
-      verbNounPairs,
-    };
+    return result.rows[0]?.id ?? null;
   }
 
-  // Decision #60: the searched word first, then its dominant lemma's
-  // text; the first that has any lab pairs on this side wins.
-  async #findLabVerbPairs(
-    side: PageSide,
-    word: string,
-    lemmaText: string | null,
-  ): Promise<VerbNounPairs> {
-    const candidates = lookupCandidates(word, lemmaText);
-    for (const candidate of candidates) {
-      const result = await this.#pool.query<LabVerbPairRow>(
-        LAB_VERB_PAIRS_QUERY[side],
-        [candidate],
-      );
-      if (result.rows.length > 0) {
-        return { side, lemma: candidate, pairs: groupLabVerbPairRows(result.rows, side) };
-      }
-    }
-    return { side, lemma: candidates[candidates.length - 1], pairs: [] };
+  async findDominantLemma(wordId: number): Promise<DominantLemma | null> {
+    const result = await this.#pool.query<DominantLemma>(
+      `SELECT wdl.lemma_id AS id, l.lemma AS text
+       FROM word_dominant_lemma wdl JOIN lemmas l ON l.id = wdl.lemma_id
+       WHERE wdl.word_id = $1`,
+      [wordId],
+    );
+    return result.rows[0] ?? null;
+  }
+
+  async findDominantPos(wordId: number): Promise<string | null> {
+    const result = await this.#pool.query<{ pos: string }>(
+      "SELECT pos FROM word_dominant_pos WHERE word_id = $1",
+      [wordId],
+    );
+    return result.rows[0]?.pos ?? null;
+  }
+
+  async findAdjacencyCollocations(lemmaId: number): Promise<AdjacencyRow[]> {
+    const result = await this.#pool.query<AdjacencyRow>(COLLOCATIONS_QUERY, [lemmaId]);
+    return result.rows;
+  }
+
+  async findAdjectiveAttributes(lemmaId: number): Promise<AdjectiveAttributeRow[]> {
+    const result = await this.#pool.query<AdjectiveAttributeRow>(
+      ADJECTIVE_ATTRIBUTES_QUERY,
+      [lemmaId],
+    );
+    return result.rows;
+  }
+
+  async findGovernedPrepositions(lemmaId: number): Promise<GovernedPreposition[]> {
+    const result = await this.#pool.query<GovernedPreposition>(
+      GOVERNED_PREPOSITIONS_QUERY,
+      [lemmaId],
+    );
+    return result.rows;
+  }
+
+  async findLabVerbPairs(side: PageSide, lemma: string): Promise<LabVerbPairRow[]> {
+    const result = await this.#pool.query<LabVerbPairRow>(LAB_VERB_PAIRS_QUERY[side], [
+      lemma,
+    ]);
+    return result.rows;
   }
 }
