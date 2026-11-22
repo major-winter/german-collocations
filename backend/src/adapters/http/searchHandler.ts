@@ -1,7 +1,7 @@
 import type { Request, Response } from "express";
-import type { WordSearchService } from "../contracts/WordSearchService.ts";
+import type { SearchWords } from "../../application/ports/in/SearchWords.ts";
 
-export function createSearchHandler(service: WordSearchService) {
+export function createSearchHandler(useCase: SearchWords) {
   return async (req: Request, res: Response): Promise<void> => {
     const query = req.query.q;
     const q = Array.isArray(query) ? query[0] : query;
@@ -10,7 +10,7 @@ export function createSearchHandler(service: WordSearchService) {
       return;
     }
     try {
-      const result = await service.search(q);
+      const result = await useCase.search(q);
       res.status(200).json(result);
     } catch (err) {
       console.error("Error searching words:", err);

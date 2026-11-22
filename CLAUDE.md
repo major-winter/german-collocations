@@ -40,7 +40,7 @@ is the daemon; `colima start` if it's down). Always `--build`.
   `compose.yml` for the full list (`extract-examples`, etc.).
 - Tests (Node's built-in runner, TS run directly via type stripping —
   no Jest/Vitest, no build step): `npm test` from the root; single
-  file: `node --test backend/src/services/verbNounPhrases.test.ts`.
+  file: `node --test backend/src/domain/verbNounPhrases.test.ts`.
 - Typecheck: `npm run typecheck -w backend` (or `-w database`). The
   root `typecheck` script has a typo (`--worksspaces`) and doesn't work.
 - Frontend: `npm run lint -w frontend`, `npm run build -w frontend`

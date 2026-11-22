@@ -1,18 +1,17 @@
 import { Pool } from "pg";
-import type {
-  WordSearchRepository,
-  WordSearchResult,
-} from "../contracts/WordSearchRepository.ts";
+import type { WordSuggestion } from "@collocations/types";
+import type { WordIndex } from "../../application/ports/out/WordIndex.ts";
 
-export class PgWordSearchRepository implements WordSearchRepository {
+// Driven adapter: pg_trgm fuzzy search over words.
+export class PgWordIndex implements WordIndex {
   #pool: Pool;
 
   constructor(pool: Pool) {
     this.#pool = pool;
   }
 
-  async search(query: string, limit: number): Promise<WordSearchResult[]> {
-    const result = await this.#pool.query<WordSearchResult>(
+  async search(query: string, limit: number): Promise<WordSuggestion[]> {
+    const result = await this.#pool.query<WordSuggestion>(
       `
 SELECT word, frequency, score
 FROM (
