@@ -121,7 +121,6 @@ export function Word() {
                 )}
             </div>
             <PosLegend sections={legendSections} />
-            {/* <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} /> */}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
             {state.data.verbNounPairs && (
                 <VerbNounPairs key={state.data.word} data={state.data.verbNounPairs} />

@@ -1,15 +1,12 @@
 import { Pool } from "pg";
-import type { GovernedPreposition } from "@collocations/types";
+import type { CollocationEntry, CollocationSection, VerbNounRelation } from "@collocations/types";
 import type {
   CollocationStore,
-  DominantLemma,
+  Headword,
 } from "../../application/ports/out/CollocationStore.ts";
-import type {
-  AdjacencyRow,
-  AdjectiveAttributeRow,
-  LabVerbPairRow,
-} from "../../domain/collocations.ts";
+import type { LabVerbPair } from "../../domain/collocations.ts";
 import type { PageSide } from "../../domain/verbNounPhrases.ts";
+import { foldRows } from "./foldRows.ts";
 
 // Driven adapter: implements the CollocationStore port with SQL. Every
 // tuning constant below is a storage-side filter, so it lives with the
@@ -36,20 +33,6 @@ const PER_SECTION_LIMIT = 10;
 // in decision #43 and re-verified (not re-derived) at lemma granularity
 // in decision #44 - see that decision for the re-verification numbers.
 const MIN_LOG_DICE = 6.3;
-
-// Decision #52 (docs/decisions.md): governed prepositions are ranked
-// by share of the verb's own total attached-PP count, not logDice - a
-// different, smaller population than lemma_collocations' raw adjacency.
-// 0.20 and MAX=2 were tuned against 8 hand-picked Rektion verbs (0.10 let
-// through generic locative adjuncts like "warten in", 0.15 still let
-// through a journalistic-template artifact "achten bei" - see that
-// decision for the full comparison). MIN_COUNT=5 is a light noise floor
-// verified against the real verb_preposition.tsv: 81,310 of its 99,547
-// rows (over 80%) have a count under 5, mostly rare/misparsed verb
-// lemmas where a single co-occurrence trivially reaches high share.
-const MIN_GOVERNED_PREPOSITION_COUNT = 5;
-const MIN_GOVERNED_PREPOSITION_SHARE = 0.2;
-const MAX_GOVERNED_PREPOSITIONS = 2;
 
 // Decision #54 (docs/decisions.md): same light-noise-floor reasoning
 // as decision #53's MIN_ARGUMENT_COUNT (removed by #60), re-verified against the real full-corpus
@@ -221,28 +204,6 @@ const LAB_VERB_PAIRS_QUERY: Record<PageSide, string> = {
   verb: buildLabVerbPairsQuery("verb"),
 };
 
-// Decision #52: a governed preposition is a grammatical fact ("warten"
-// requires "auf" + Akkusativ), ranked by share of the verb's own total
-// attached-PP count - see the module-level threshold comment above.
-const GOVERNED_PREPOSITIONS_QUERY = `
-  WITH totals AS (
-    SELECT verb_lemma_id, SUM(count) AS total
-    FROM verb_prepositions
-    WHERE verb_lemma_id = $1
-    GROUP BY verb_lemma_id
-  )
-  SELECT l.lemma AS preposition, vp.grammatical_case AS "case",
-    (vp.count::real / t.total) AS share
-  FROM verb_prepositions vp
-  JOIN totals t ON t.verb_lemma_id = vp.verb_lemma_id
-  JOIN lemmas l ON l.id = vp.preposition_lemma_id
-  WHERE vp.verb_lemma_id = $1
-    AND vp.count >= ${MIN_GOVERNED_PREPOSITION_COUNT}
-    AND (vp.count::real / t.total) >= ${MIN_GOVERNED_PREPOSITION_SHARE}
-  ORDER BY share DESC
-  LIMIT ${MAX_GOVERNED_PREPOSITIONS}
-`;
-
 // Decision #54: replaces, for a noun headword, the "adjective" section
 // (noun_lemma_id = $1 - which adjectives genuinely modify this noun
 // attributively) and, for an adjective headword, the "noun" section
@@ -344,63 +305,164 @@ const ADJECTIVE_ATTRIBUTES_QUERY = `
   ORDER BY r.share DESC
 `;
 
+// One adjacency row from lemma_collocations, one per example sentence
+// (or one with null example fields for a pair without examples).
+interface AdjacencyRow {
+  leftLemmaId: number;
+  rightLemmaId: number;
+  word: string;
+  cooccurrence: number;
+  significance: number;
+  sentence: string | null;
+  leftWord: string | null;
+  rightWord: string | null;
+  section: CollocationSection;
+}
+
+// Unlike AdjacencyRow's symmetric left/right shape, a row from
+// adjective_attributes always has a fixed noun side and adjective side.
+interface AdjectiveAttributeRow {
+  nounLemmaId: number;
+  adjectiveLemmaId: number;
+  word: string;
+  cooccurrence: number;
+  significance: number;
+  sentence: string | null;
+  nounSurface: string | null;
+  adjectiveSurface: string | null;
+  section: CollocationSection;
+}
+
+// lab_verb_pairs joined with lab_verb_pair_examples: one row per example,
+// or one row with null example fields for a pair without examples.
+interface LabVerbPairRow {
+  relation: VerbNounRelation;
+  verb: string;
+  prep: string;
+  noun: string;
+  phraseNoun: string;
+  score: number;
+  pairFreq: number;
+  sentence: string | null;
+  verbSurface: string | null;
+  nounSurface: string | null;
+}
+
+// One query for the searched word's dominant lemma and POS. The POS is a
+// correlated subquery, not a join: joining the DISTINCT ON view
+// word_dominant_pos made Postgres materialize all of it (289 ms against
+// 0.16 ms, EXPLAIN ANALYZE in decision #68; database/CLAUDE.md pitfall 3).
+const HEADWORD_QUERY = `
+  SELECT wdl.lemma_id AS "lemmaId", l.lemma AS "lemmaText",
+    (SELECT wdp.pos FROM word_dominant_pos wdp WHERE wdp.word_id = w.id) AS pos
+  FROM words w
+  LEFT JOIN word_dominant_lemma wdl ON wdl.word_id = w.id
+  LEFT JOIN lemmas l ON l.id = wdl.lemma_id
+  WHERE w.word = $1
+`;
+
+const entryOf = (row: AdjacencyRow | AdjectiveAttributeRow): CollocationEntry => ({
+  word: row.word,
+  cooccurrence: row.cooccurrence,
+  significance: row.significance,
+  section: row.section,
+  examples: [],
+});
+
 export class PgCollocationStore implements CollocationStore {
   #pool: Pool;
   constructor(pool: Pool) {
     this.#pool = pool;
   }
 
-  async findWordId(word: string): Promise<number | null> {
-    const result = await this.#pool.query<{ id: number }>(
-      "SELECT id FROM words WHERE word = $1",
-      [word],
-    );
-    return result.rows[0]?.id ?? null;
+  async resolveHeadword(word: string): Promise<Headword | null> {
+    const result = await this.#pool.query<{
+      lemmaId: number | null;
+      lemmaText: string | null;
+      pos: string | null;
+    }>(HEADWORD_QUERY, [word]);
+    const row = result.rows[0];
+    if (!row) return null;
+    return {
+      lemma: row.lemmaId !== null && row.lemmaText !== null ? { id: row.lemmaId, text: row.lemmaText } : null,
+      pos: row.pos,
+    };
   }
 
-  async findDominantLemma(wordId: number): Promise<DominantLemma | null> {
-    const result = await this.#pool.query<DominantLemma>(
-      `SELECT wdl.lemma_id AS id, l.lemma AS text
-       FROM word_dominant_lemma wdl JOIN lemmas l ON l.id = wdl.lemma_id
-       WHERE wdl.word_id = $1`,
-      [wordId],
-    );
-    return result.rows[0] ?? null;
-  }
-
-  async findDominantPos(wordId: number): Promise<string | null> {
-    const result = await this.#pool.query<{ pos: string }>(
-      "SELECT pos FROM word_dominant_pos WHERE word_id = $1",
-      [wordId],
-    );
-    return result.rows[0]?.pos ?? null;
-  }
-
-  async findAdjacencyCollocations(lemmaId: number): Promise<AdjacencyRow[]> {
+  // Keyed by (left_lemma_id, right_lemma_id), not by word text - the same
+  // partner lemma can appear via two distinct pairs now that both
+  // directions are combined (e.g. "X folgt Y" and "Y folgt X" both
+  // significant), and each pair has its own cooccurrence/logDice.
+  // Keying by word text would silently mix example sentences from two
+  // unrelated pairs under one entry. The lemma id, not string equality,
+  // picks out which of leftWord/rightWord is the searched word's surface
+  // form, since either side's spelling can differ from its own lemma's.
+  async findAdjacencyCollocations(lemmaId: number): Promise<CollocationEntry[]> {
     const result = await this.#pool.query<AdjacencyRow>(COLLOCATIONS_QUERY, [lemmaId]);
-    return result.rows;
+    return foldRows(
+      result.rows,
+      (row) => `${row.leftLemmaId}-${row.rightLemmaId}`,
+      entryOf,
+      (row) => {
+        // leftWord/rightWord are only ever null together with sentence -
+        // all three come from the same LATERAL row.
+        if (!row.sentence || !row.leftWord || !row.rightWord) return null;
+        const isQueryLeft = row.leftLemmaId === lemmaId;
+        return {
+          sentence: row.sentence,
+          searchWord: isQueryLeft ? row.leftWord : row.rightWord,
+          collocateWord: isQueryLeft ? row.rightWord : row.leftWord,
+        };
+      },
+    );
   }
 
-  async findAdjectiveAttributes(lemmaId: number): Promise<AdjectiveAttributeRow[]> {
+  // adjective_attributes' primary key already guarantees a (noun,
+  // adjective) pair is never ambiguous between the two query branches.
+  async findAdjectiveAttributes(lemmaId: number): Promise<CollocationEntry[]> {
     const result = await this.#pool.query<AdjectiveAttributeRow>(
       ADJECTIVE_ATTRIBUTES_QUERY,
       [lemmaId],
     );
-    return result.rows;
-  }
-
-  async findGovernedPrepositions(lemmaId: number): Promise<GovernedPreposition[]> {
-    const result = await this.#pool.query<GovernedPreposition>(
-      GOVERNED_PREPOSITIONS_QUERY,
-      [lemmaId],
+    return foldRows(
+      result.rows,
+      (row) => `${row.nounLemmaId}-${row.adjectiveLemmaId}`,
+      entryOf,
+      (row) => {
+        if (!row.sentence || !row.nounSurface || !row.adjectiveSurface) return null;
+        const isQueryNounSide = row.nounLemmaId === lemmaId;
+        return {
+          sentence: row.sentence,
+          searchWord: isQueryNounSide ? row.nounSurface : row.adjectiveSurface,
+          collocateWord: isQueryNounSide ? row.adjectiveSurface : row.nounSurface,
+        };
+      },
     );
-    return result.rows;
   }
 
-  async findLabVerbPairs(side: PageSide, lemma: string): Promise<LabVerbPairRow[]> {
+  // One pair per (relation, verb, prep, noun); rows arrive in display
+  // order, examples in rank order.
+  async findLabVerbPairs(side: PageSide, lemma: string): Promise<LabVerbPair[]> {
     const result = await this.#pool.query<LabVerbPairRow>(LAB_VERB_PAIRS_QUERY[side], [
       lemma,
     ]);
-    return result.rows;
+    return foldRows(
+      result.rows,
+      (row) => `${row.relation}\t${row.verb}\t${row.prep}\t${row.noun}`,
+      (row): LabVerbPair => ({
+        relation: row.relation,
+        verb: row.verb,
+        prep: row.prep,
+        noun: row.noun,
+        phraseNoun: row.phraseNoun,
+        score: row.score,
+        pairFreq: row.pairFreq,
+        examples: [],
+      }),
+      (row) =>
+        row.sentence && row.verbSurface !== null && row.nounSurface !== null
+          ? { sentence: row.sentence, verbSurface: row.verbSurface, nounSurface: row.nounSurface }
+          : null,
+    );
   }
 }

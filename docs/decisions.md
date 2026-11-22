@@ -43,6 +43,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#64](#64) Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
 - [#65](#65) Backend restructured as hexagonal architecture: domain, application with in/out ports, Postgres and HTTP adapters
 - [#67](#67) Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
+- [#68](#68) Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
 
 ---
 
@@ -2773,3 +2774,61 @@ Colima. Each of these deliberate breaks made at least one test fail:
 `npm run typecheck -w backend` is clean, and `npm test` still passes without
 a database. The governed-preposition query has no test, because #68 removes
 it.
+
+<a id="68"></a>
+## 68. Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
+
+**Problem.** The `CollocationStore` port from #65 had seven methods shaped
+like the SQL queries. That caused three kinds of friction:
+
+- **Three round-trips for one word.** `findWordId`, `findDominantLemma` and
+  `findDominantPos` are separate calls for one concept, the searched word.
+- **Rows that leak a storage detail.** Every method returned one row per
+  example sentence, because the examples come from a LATERAL or LEFT join.
+  Two near-identical functions in `domain/` then folded the rows back
+  together. Every fake in the tests had to hand-build raw rows.
+- **A query nobody sees.** `findGovernedPrepositions` ran on every lookup,
+  but its display had been commented out of `Word.tsx`.
+
+**Chosen:**
+
+- **`resolveHeadword(word)`** returns `{ lemma: {id, text} | null, pos }`,
+  or null when the word is unknown. It is one query. The POS is a
+  correlated subquery, because a `LEFT JOIN` on the `DISTINCT ON` view
+  `word_dominant_pos` made Postgres materialize the whole view (pitfall 3
+  in `database/CLAUDE.md`). On the dev database, `EXPLAIN (ANALYZE,
+  BUFFERS)` for "Kritiken" measured 289 ms and 25k buffers for the join,
+  and 0.16 ms and 19 buffers, all index scans, for the subquery.
+- **The adapter groups its own rows.** `findAdjacencyCollocations` and
+  `findAdjectiveAttributes` return finished `CollocationEntry[]`, with the
+  searched word's surface form first in each example. `findLabVerbPairs`
+  returns `LabVerbPair[]`, the lab's lemma pairs with their examples
+  attached. One helper, `adapters/postgres/foldRows.ts`, does the grouping
+  for all three. The chip and phrase wording stays in `domain/`
+  (`toVerbNounPairs`), because it is learner-facing language, not storage.
+  **This amends #65:** the Postgres adapter is no longer SQL only. It also
+  undoes the row layout of its own queries.
+- **Governed prepositions removed from the lookup.** The port method, the
+  query and its constants, the `governedPrepositions` response field and
+  `GovernedPreposition` type, `GovernedPrepositions.tsx`,
+  `lib/grammaticalCase.ts` and the `--case-*` colour tokens are all gone.
+  **#52 is paused, not reversed.** The `verb_prepositions` table, its
+  loader and its data stay, so bringing the callout back takes a query and
+  a component, not a reload. Git and #52 keep the old code and the tuning.
+
+**Considered:** keeping the grouping in `domain/` as one shared function.
+That keeps #65's "adapters are SQL only" rule, but every fake would still
+have to build rows in the SQL's layout.
+
+### Verification
+
+- `npm run typecheck -w backend` is clean.
+- `npm test` passes, and the use-case tests' fakes now return plain entries.
+- `npm run test:db -w backend` passes all 14 #67 tests, unchanged, against
+  the new port.
+- `npm run build -w frontend` succeeds.
+- This branch's backend was run against the dev database next to `main`'s.
+  17 `/api/collocations` lookups were compared: noun, verb, adjective, an
+  inflected form, function words, a reflexive form, umlauts and an unknown
+  word. They were identical once `governedPrepositions` was removed from
+  `main`'s responses.

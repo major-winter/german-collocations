@@ -43,7 +43,7 @@ test('initialOpen opens the first chip of the first group only', () => {
 });
 
 test('hasAnyResults counts lab pairs as results', () => {
-  const empty: CollocationResponse = { word: 'x', collocations: [], governedPrepositions: [], verbNounPairs: null };
+  const empty: CollocationResponse = { word: 'x', collocations: [], verbNounPairs: null };
   assert.equal(hasAnyResults(empty), false);
   assert.equal(
     hasAnyResults({ ...empty, verbNounPairs: { side: 'noun', lemma: 'x', pairs: [pair('obj', 'üben')] } }),

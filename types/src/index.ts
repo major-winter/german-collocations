@@ -22,16 +22,6 @@ export interface CollocationEntry {
   section: CollocationSection;
 }
 
-// Decision #52 (docs/decisions.md): a governed preposition (Rektion) is
-// a grammatical fact ("warten" requires "auf" + Akkusativ), not a ranked
-// collocate - rendered as its own callout (GovernedPrepositions.tsx), not
-// folded into CollocationEntry's "preposition" section. `case` is empty
-// when spaCy's morphology didn't resolve a Case feature.
-export interface GovernedPreposition {
-  preposition: string;
-  case: string;
-}
-
 // Decision #60 (docs/decisions.md): verb-noun pairs from collocation-lab
 // (LL-ranked, Stanza-parsed). obj = "Kritik üben", obl = "in der Kritik
 // stehen", nsubj = "die Kritik kommt".
@@ -56,7 +46,6 @@ export interface VerbNounPairs {
 export interface CollocationResponse {
   word: string;
   collocations: CollocationEntry[];
-  governedPrepositions: GovernedPreposition[];
   // null when the searched word is neither a noun nor a verb.
   verbNounPairs: VerbNounPairs | null;
 }
