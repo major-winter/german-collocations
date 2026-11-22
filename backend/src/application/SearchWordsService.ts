@@ -1,6 +1,6 @@
 import type { WordSuggestion } from "@collocations/types";
-import type { WordIndex } from "./ports/WordIndex.ts";
-import type { SearchWords } from "./ports/useCases.ts";
+import type { WordIndex } from "./ports/out/WordIndex.ts";
+import type { SearchWords } from "./ports/in/SearchWords.ts";
 
 export class SearchWordsService implements SearchWords {
   #index: WordIndex;

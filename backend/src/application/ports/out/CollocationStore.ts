@@ -3,8 +3,8 @@ import type {
   AdjacencyRow,
   AdjectiveAttributeRow,
   LabVerbPairRow,
-} from "../../domain/collocations.ts";
-import type { PageSide } from "../../domain/verbNounPhrases.ts";
+} from "../../../domain/collocations.ts";
+import type { PageSide } from "../../../domain/verbNounPhrases.ts";
 
 // Driven (outbound) port: everything the collocation use case needs from
 // storage, phrased in domain terms. The Postgres adapter implements it;

@@ -3,7 +3,7 @@ import type { GovernedPreposition } from "@collocations/types";
 import type {
   CollocationStore,
   DominantLemma,
-} from "../../application/ports/CollocationStore.ts";
+} from "../../application/ports/out/CollocationStore.ts";
 import type {
   AdjacencyRow,
   AdjectiveAttributeRow,

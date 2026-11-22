@@ -1,6 +1,7 @@
 import express, { type Express } from "express";
 import cors from "cors";
-import type { LookupCollocations, SearchWords } from "../../application/ports/useCases.ts";
+import type { LookupCollocations } from "../../application/ports/in/LookupCollocations.ts";
+import type { SearchWords } from "../../application/ports/in/SearchWords.ts";
 import { createCollocationsHandler } from "./collocationsHandler.ts";
 import { createSearchHandler } from "./searchHandler.ts";
 

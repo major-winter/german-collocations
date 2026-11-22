@@ -1,6 +1,6 @@
 import { Pool } from "pg";
 import type { WordSuggestion } from "@collocations/types";
-import type { WordIndex } from "../../application/ports/WordIndex.ts";
+import type { WordIndex } from "../../application/ports/out/WordIndex.ts";
 
 // Driven adapter: pg_trgm fuzzy search over words.
 export class PgWordIndex implements WordIndex {

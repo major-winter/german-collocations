@@ -6,8 +6,8 @@ import {
   mergeSections,
 } from "../domain/collocations.ts";
 import { lookupCandidates, pageSide, type PageSide } from "../domain/verbNounPhrases.ts";
-import type { CollocationStore } from "./ports/CollocationStore.ts";
-import type { LookupCollocations } from "./ports/useCases.ts";
+import type { CollocationStore } from "./ports/out/CollocationStore.ts";
+import type { LookupCollocations } from "./ports/in/LookupCollocations.ts";
 
 export class LookupCollocationsService implements LookupCollocations {
   #store: CollocationStore;

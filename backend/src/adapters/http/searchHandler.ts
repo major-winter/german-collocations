@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { SearchWords } from "../../application/ports/useCases.ts";
+import type { SearchWords } from "../../application/ports/in/SearchWords.ts";
 
 export function createSearchHandler(useCase: SearchWords) {
   return async (req: Request, res: Response): Promise<void> => {

@@ -1,5 +1,5 @@
 import type { Request, Response } from "express";
-import type { LookupCollocations } from "../../application/ports/useCases.ts";
+import type { LookupCollocations } from "../../application/ports/in/LookupCollocations.ts";
 
 export function createCollocationsHandler(useCase: LookupCollocations) {
   return async (req: Request, res: Response): Promise<void> => {

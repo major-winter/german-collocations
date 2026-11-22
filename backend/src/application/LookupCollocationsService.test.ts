@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import type { CollocationStore } from "./ports/CollocationStore.ts";
+import type { CollocationStore } from "./ports/out/CollocationStore.ts";
 import type { AdjacencyRow, LabVerbPairRow } from "../domain/collocations.ts";
 import { LookupCollocationsService } from "./LookupCollocationsService.ts";
 
