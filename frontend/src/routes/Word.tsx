@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router";
-import type { CollocationResponse, CollocationSection, WordSuggestion } from "@collocations/types";
+import type { CollocationResponse, WordSuggestion } from "@collocations/types";
 import { fetchCollocations } from "../api/collocations.ts";
 import { fetchSearch } from "../api/search.ts";
 import { CollocationList } from "../components/CollocationList.tsx";
 import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { hasAnyResults } from "../lib/verbNounGroups.ts";
+import { legendSections } from "../lib/wordClass.ts";
 
 import { API_BASE_URL } from "../config.ts";
 
@@ -104,12 +105,6 @@ export function Word() {
         );
     }
 
-    const legendSections = new Set<CollocationSection>(state.data.collocations.map((entry) => entry.section));
-    if (state.data.verbNounPairs?.pairs.length) {
-        legendSections.add("noun");
-        legendSections.add("verb");
-    }
-
     return (
         <div>
             <div className="mt-6 flex items-baseline gap-3">
@@ -120,7 +115,7 @@ export function Word() {
                     </span>
                 )}
             </div>
-            <PosLegend sections={legendSections} />
+            <PosLegend sections={legendSections(state.data)} />
             {/* <GovernedPrepositions word={state.data.word} entries={state.data.governedPrepositions} /> */}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
             {state.data.verbNounPairs && (

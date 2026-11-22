@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { highlightCollocates } from '@/lib/highlight.tsx';
-import { groupPairs, headingParts, initialOpen, openAfterClick, wordColors, type WordColors } from '@/lib/verbNounGroups.ts';
+import { groupPairs, headingParts, initialOpen, openAfterClick } from '@/lib/verbNounGroups.ts';
+import { wordClassStyle } from '@/lib/wordClass.ts';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
 
 interface VerbNounPairsProps {
@@ -12,6 +13,20 @@ interface VerbNounPairsProps {
 // appears as its own token in a phrase like "Kritik … sich richten".
 function lastWord(lemma: string): string {
     return lemma.split(' ').at(-1) ?? lemma;
+}
+
+interface WordColors {
+    searched: string; // the looked-up word in phrases and sentences: bold, in its word class colour
+    partner: string;  // the other side of the pair, in its word class colour
+}
+
+// Nouns take the noun colour and verbs the verb colour, whichever side was searched.
+function wordColors(side: VerbNounPairsData['side']): WordColors {
+    const partnerSide = side === 'noun' ? 'verb' : 'noun';
+    return {
+        searched: cn('font-semibold', wordClassStyle(side).text),
+        partner: wordClassStyle(partnerSide).text,
+    };
 }
 
 function OpenPair({ pair, side, lemma, colors }: {
@@ -70,7 +85,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                     <div key={relation} className="py-3">
                         <h3 className="text-[0.95rem] font-medium mb-1.5 text-muted-foreground">
                             {headings[relation].map((part) => (
-                                <span key={part.text} className={cn(part.noun && 'font-semibold text-pos-noun')}>
+                                <span key={part.text} className={cn(part.noun && cn('font-semibold', wordClassStyle('noun').text))}>
                                     {part.text}
                                 </span>
                             ))}

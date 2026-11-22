@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #62), and add it to the index.
+(next: #67), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -42,6 +42,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#63](#63) Quiet colour coding: AA-contrast word-class colours, colour only inside phrases and sentences, neutral header
 - [#64](#64) Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
 - [#65](#65) Backend restructured as hexagonal architecture: domain, application with in/out ports, Postgres and HTTP adapters
+- [#66](#66) Word-class order, labels and colours live in one frontend module (`lib/wordClass.ts`)
 
 ---
 
@@ -2709,3 +2710,51 @@ Checked against the live site:
 The first lookups after the restart took 1.2-1.5 s. Repeats of the same
 lookups took 0.24-0.74 s. The query text is unchanged, so the slow first
 lookups are the database cache warming up, not the refactor.
+
+<a id="66"></a>
+## 66. Word-class order, labels and colours live in one frontend module
+
+**Problem.** Five files each had a part of the word-class concept (noun,
+verb, adjective, preposition, other):
+
+- `CollocationList` had the order, the German labels and the text colours.
+- `PosLegend` had a hand-kept "twin" map of dot colours, and imported
+  `CollocationList`'s labels.
+- `verbNounGroups` had `wordColors`.
+- `VerbNounPairs` and `Home` had the colour classes written out inline.
+- `Word.tsx` had the rule for what goes in the legend.
+
+Recolouring the word classes for #63 meant touching all of them. The
+legend rule could only be tested by rendering the page.
+
+**Chosen:** `frontend/src/lib/wordClass.ts` holds it all. It exports:
+
+- `WORD_CLASS_ORDER`
+- `wordClassStyle(wordClass)`, which returns `{ label, text, dot }`. `dot`
+  is null for "other".
+- `legendSections(response)`. It returns the collocation list's word
+  classes, plus noun and verb whenever there are lab pairs.
+
+The module gives colours only. Callers still decide when to bold the
+searched word. Class names stay written out in full, because Tailwind only
+generates classes it finds literally in the source. "Word class" is now a
+term in `GLOSSARY.md`. The `CollocationSection` type in `types/` keeps its
+name, because renaming it touches the backend.
+
+**Left out on purpose:** the logo badge in `Layout.tsx` uses the noun blue
+as site decoration, not to mark a noun. `GovernedPrepositions` is not
+rendered (it is commented out in `Word.tsx`).
+
+**Considered:** React pieces such as `<WordClassText>`. The repo has no
+React renderer in its tests, and plain functions can be tested with
+`node:test` like the rest of `lib/`.
+
+### Verification
+
+`npm test` passes (27 tests; the new `wordClass.test.ts` replaces the
+`wordColors` test). `npm run build -w frontend` succeeds, and all eight
+`text-pos-*`/`bg-pos-*` classes are in the built CSS. This is a frontend
+change only: no backend, migration or reload. `npm run lint -w frontend`
+crashes before it lints anything (`ts-api-utils`: "Cannot read properties
+of undefined (reading 'Intrinsic')"). It crashes the same way on `main`, so
+this change did not cause it.

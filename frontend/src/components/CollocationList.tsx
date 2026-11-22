@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 import { highlightCollocates } from '@/lib/highlight.tsx';
+import { WORD_CLASS_ORDER, wordClassStyle } from '@/lib/wordClass.ts';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
 
 interface CollocationListProps {
@@ -8,24 +9,6 @@ interface CollocationListProps {
     // False when another part of the page (VerbNounPairs) has results.
     showEmptyMessage: boolean;
 }
-
-export const SECTION_ORDER: CollocationSection[] = ['noun', 'verb', 'adjective', 'preposition', 'other'];
-
-export const SECTION_LABELS: Record<CollocationSection, string> = {
-    noun: 'Substantive',
-    verb: 'Verben',
-    adjective: 'Adjektive',
-    preposition: 'Präpositionen',
-    other: 'Sonstige',
-};
-
-const PAINT_COLORS: Record<CollocationSection, string> = {
-    noun: 'text-pos-noun',
-    verb: 'text-pos-verb',
-    adjective: 'text-pos-adjective',
-    preposition: 'text-pos-preposition',
-    other: 'text-foreground',
-};
 
 function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, CollocationEntry[]> {
     const groups = new Map<CollocationSection, CollocationEntry[]>();
@@ -49,14 +32,14 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                 showEmptyMessage && <p className="text-sm text-muted-foreground text-center">Keine Ergebnisse.</p>
             ) : (
                 <div className="flex flex-col gap-4">
-                    {SECTION_ORDER.filter((section) => groups.has(section)).map((section) => (
+                    {WORD_CLASS_ORDER.filter((section) => groups.has(section)).map((section) => (
                         <div key={section} className="py-3">
                             <h3
                                 className={cn(
                                     'text-[0.95rem] font-medium mb-1.5 text-muted-foreground',
                                 )}
                             >
-                                {SECTION_LABELS[section]}
+                                {wordClassStyle(section).label}
                             </h3>
                             <div className="flex flex-col gap-1.5">
                                 {groups
@@ -73,14 +56,14 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                                                             example.sentence,
                                                             example.searchWord,
                                                             example.collocateWord,
-                                                            PAINT_COLORS[section],
+                                                            wordClassStyle(section).text,
                                                         )}
                                                     </p>
                                                 ))
                                             ) : (
                                                 <p className="text-base text-muted-foreground">
                                                     <span className="font-semibold not-italic">{word}</span>{' '}
-                                                    <span className={cn('not-italic', PAINT_COLORS[section])}>
+                                                    <span className={cn('not-italic', wordClassStyle(section).text)}>
                                                         {entry.word}
                                                     </span>
                                                 </p>

@@ -16,7 +16,7 @@ export interface VerbNounGroup {
 
 export interface HeadingPart {
     text: string;
-    noun: boolean; // the noun part is blue, the rest in the verb colour
+    noun: boolean; // the noun part takes the noun colour, the rest stays grey
 }
 
 export function headingParts(
@@ -76,16 +76,4 @@ export function openAfterClick(
 
 export function hasAnyResults(response: CollocationResponse): boolean {
     return response.collocations.length > 0 || (response.verbNounPairs?.pairs.length ?? 0) > 0;
-}
-
-export interface WordColors {
-    searched: string; // the looked-up word in phrases and sentences
-    partner: string;  // the other side of the pair
-}
-
-/** Nouns are blue and verbs orange (the pos-noun/pos-verb section colours), whichever side was searched. */
-export function wordColors(side: VerbNounPairs['side']): WordColors {
-    return side === 'noun'
-        ? { searched: 'font-semibold text-pos-noun', partner: 'text-pos-verb' }
-        : { searched: 'font-semibold text-pos-verb', partner: 'text-pos-noun' };
 }
