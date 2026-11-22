@@ -2881,3 +2881,32 @@ have to build rows in the SQL's layout.
   inflected form, function words, a reflexive form, umlauts and an unknown
   word. They were identical once `governedPrepositions` was removed from
   `main`'s responses.
+
+### Follow-up: #66-#68 deployed to production (2026-11-22)
+
+Merged as `a627471`. Deployed with the #65 procedure:
+
+1. `git push`.
+2. `docker inspect` confirmed `/root/german-collocations` as the live
+   checkout. It was clean and at `42c7883`.
+3. `git pull`.
+4. `docker compose -f compose.prod.yml build backend frontend`, then
+   `up -d backend frontend`.
+
+The build finished at 15:47:19 UTC. The containers started at 15:48:09
+(frontend) and 15:48:10 (backend), and the backend image has
+`adapters/postgres/foldRows.ts`. There was no migration and no reload. The
+`verb_prepositions` data stays in the database (#52 is paused).
+
+Checked against the live site:
+
+- `/api/collocations/Kritik`, `/Kritiken`, `/stellen` and `/groß` return
+  200 without `governedPrepositions`. `Kritik` has 40 collocations and 30
+  lab pairs.
+- `/zzzqqq` returns 404. `/api/search?q=Kri` and the home page return 200.
+- The served bundle contains the "Farblegende" legend.
+- The backend logged no errors.
+
+The first `Kritik` lookup took 7.3 s, because building both images on the
+1 GB VM pushed the database's pages out of memory. Repeats of five lookups
+took 0.23-0.78 s, the same range as after #65.
