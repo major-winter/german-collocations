@@ -41,6 +41,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#62](#62) German-only interface, dark mode follows the system, home page with example words
 - [#63](#63) Quiet colour coding: AA-contrast word-class colours, colour only inside phrases and sentences, neutral header
 - [#64](#64) Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
+- [#65](#65) Backend restructured as hexagonal architecture: domain, application with in/out ports, Postgres and HTTP adapters
 
 ---
 
@@ -2639,3 +2640,47 @@ doesn't show still slip through ("sich nicht in die Karten blicken lassen",
 **Rollout.** The live pairs change only after a lab reload (`colloc load`
 of the three parses), dataset rebuild, `ll` runs, `colloc export`, and the
 #60 refresh runbook.
+
+<a id="65"></a>
+## 65. Backend restructured as hexagonal architecture (ports and adapters)
+
+`backend/src/repositories/CollocationRepository.ts` had grown to 585
+lines. It held seven SQL queries, three row-grouping functions, the
+section-superseding rule (#54, #60) and the word-to-lemma lab-pair
+fallback (#60). The service layer above it only passed results through.
+
+**Chosen:** hexagonal layout, one interface per port file.
+
+- `domain/`: pure functions, no `pg` or `express` imports. These are row
+  grouping, `mergeSections` and `verbNounPhrases`.
+- `application/`: the `LookupCollocationsService` and `SearchWordsService`
+  use cases.
+  - `application/ports/in/` holds the driving ports: `LookupCollocations`
+    and `SearchWords`.
+  - `application/ports/out/` holds the driven ports: `CollocationStore`
+    and `WordIndex`.
+- `adapters/postgres/`: SQL only. `adapters/http/`: Express only.
+  `index.ts` is the composition root (manual DI, as before).
+
+Query text, query order and concurrency are unchanged. The use cases are
+tested against an in-memory store, with no database.
+
+**Considered:** four other branches built for comparison: Strategy,
+Pipeline/Chain of Responsibility, Decorator and Mediator (query bus).
+Pros and cons are in `docs/backend-design-patterns-comparison.md`.
+Hexagonal was the only one that split the repository by responsibility.
+The Decorator branch's opt-in cache and slow-lookup log can wrap the
+`LookupCollocations` port later. They are not part of this decision.
+
+**Known, not fixed here:** a blank `:word` (`/api/collocations/%20`)
+sends its 400 without returning, then throws `ERR_HTTP_HEADERS_SENT`.
+This is pre-existing and kept as it was so the comparison stayed exact.
+
+### Verification
+
+`npm run typecheck -w backend` is clean and `npm test` passes (24
+tests). The branch was run against the local database and its responses
+diffed with `main`'s. The set covered 17 `/api/collocations` lookups
+(noun, verb, adjective and function words, an inflected form, a
+reflexive verb, umlauts, an unknown word) and 7 `/api/search` cases. All
+responses were byte-identical.
