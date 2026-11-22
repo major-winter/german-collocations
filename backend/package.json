@@ -7,7 +7,8 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env --watch src/index.ts",
     "start": "node src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:db": "node --env-file-if-exists=../.env --test --test-concurrency=1 \"src/**/*.dbtest.ts\""
   },
   "keywords": [],
   "author": "",

@@ -42,6 +42,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#63](#63) Quiet colour coding: AA-contrast word-class colours, colour only inside phrases and sentences, neutral header
 - [#64](#64) Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
 - [#65](#65) Backend restructured as hexagonal architecture: domain, application with in/out ports, Postgres and HTTP adapters
+- [#67](#67) Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
 
 ---
 
@@ -2709,3 +2710,66 @@ Checked against the live site:
 The first lookups after the restart took 1.2-1.5 s. Repeats of the same
 lookups took 0.24-0.74 s. The query text is unchanged, so the slow first
 lookups are the database cache warming up, not the refactor.
+
+<a id="67"></a>
+## 67. Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
+
+**Problem.** Almost every production bug in this log was in SQL: #47 (join
+order), #53 and #54 (window-function shares), #56 and #57 (proper nouns).
+The tests from #65 run the use case against an in-memory store, so they stop
+in front of `PgCollocationStore`, the adapter that holds those rules. Before
+this decision, nothing in the test suite could catch a broken cap, floor or
+filter.
+
+**Chosen:** `backend/src/adapters/postgres/lookupCollocations.dbtest.ts`
+wires `LookupCollocationsService` to the real `PgCollocationStore` and checks
+what a learner gets back from `lookup(word)`:
+
+- partners from either side, strongest first, each under its word class
+- no proper nouns (#57)
+- the logDice floor (#43)
+- at most 10 partners per word class (#36)
+- an unclear word class goes under "other"
+- up to 3 examples, with their surface words (#44, #45)
+- attributive adjectives replace adjacent ones (#54), and an adjective page
+  lists the nouns it modifies
+- lab pairs: examples in rank order, a verb page also finds its reflexive
+  "sich" pairs, at most 10 per relation, an inflected word falls back to
+  its lemma's pairs, and a noun page never shows adjacent verbs (#60)
+
+The tests go through the inbound port, not `CollocationStore`, so they keep
+working when that port changes shape (#68).
+
+- **Database:** `collocations_test`, in the same dev Postgres container. It
+  is dropped, re-created and migrated (`database/src/migrate.ts`, run as a
+  child process) once per run, and truncated between tests. The harness
+  refuses any database name that doesn't end in `_test`.
+- **Data:** each test seeds only the rows it needs through `seeder()` in
+  `testDatabase.ts`, by word text, never by Leipzig ids.
+- **Running:** `npm run test:db -w backend`. The URL comes from
+  `TEST_DATABASE_URL`, or else from `DB_PASSWORD` in `.env`. The files are
+  named `*.dbtest.ts`, because the root `npm test` glob `**/*.test.ts` would
+  also match `*.db.test.ts`. Plain `npm test` still needs no database.
+
+**Considered:**
+
+- A tmpfs `test-db` Compose service, which means one more service to keep
+  in sync.
+- testcontainers, which is a new dependency and needs the Docker socket.
+- One contract suite run against both the Postgres and in-memory adapters.
+  That would mean copying the SQL rules into the fake. The fake stays a
+  simple stub for the use-case tests.
+
+### Verification
+
+`npm run test:db -w backend` passes 14 tests against Postgres 18 under
+Colima. Each of these deliberate breaks made at least one test fail:
+
+- removing the PROPN filter
+- setting `MIN_LOG_DICE` to -99
+- setting `PER_SECTION_LIMIT` to 11
+- dropping the `sich $1` match
+
+`npm run typecheck -w backend` is clean, and `npm test` still passes without
+a database. The governed-preposition query has no test, because #68 removes
+it.
