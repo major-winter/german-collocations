@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #67), and add it to the index.
+(next: #69), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -43,6 +43,8 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#64](#64) Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
 - [#65](#65) Backend restructured as hexagonal architecture: domain, application with in/out ports, Postgres and HTTP adapters
 - [#66](#66) Word-class order, labels and colours live in one frontend module (`lib/wordClass.ts`)
+- [#67](#67) Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
+- [#68](#68) Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
 
 ---
 
@@ -2758,3 +2760,124 @@ change only: no backend, migration or reload. `npm run lint -w frontend`
 crashes before it lints anything (`ts-api-utils`: "Cannot read properties
 of undefined (reading 'Intrinsic')"). It crashes the same way on `main`, so
 this change did not cause it.
+
+<a id="67"></a>
+## 67. Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
+
+**Problem.** Almost every production bug in this log was in SQL: #47 (join
+order), #53 and #54 (window-function shares), #56 and #57 (proper nouns).
+The tests from #65 run the use case against an in-memory store, so they stop
+in front of `PgCollocationStore`, the adapter that holds those rules. Before
+this decision, nothing in the test suite could catch a broken cap, floor or
+filter.
+
+**Chosen:** `backend/src/adapters/postgres/lookupCollocations.dbtest.ts`
+wires `LookupCollocationsService` to the real `PgCollocationStore` and checks
+what a learner gets back from `lookup(word)`:
+
+- partners from either side, strongest first, each under its word class
+- no proper nouns (#57)
+- the logDice floor (#43)
+- at most 10 partners per word class (#36)
+- an unclear word class goes under "other"
+- up to 3 examples, with their surface words (#44, #45)
+- attributive adjectives replace adjacent ones (#54), and an adjective page
+  lists the nouns it modifies
+- lab pairs: examples in rank order, a verb page also finds its reflexive
+  "sich" pairs, at most 10 per relation, an inflected word falls back to
+  its lemma's pairs, and a noun page never shows adjacent verbs (#60)
+
+The tests go through the inbound port, not `CollocationStore`, so they keep
+working when that port changes shape (#68).
+
+- **Database:** `collocations_test`, in the same dev Postgres container. It
+  is dropped, re-created and migrated (`database/src/migrate.ts`, run as a
+  child process) once per run, and truncated between tests. The harness
+  refuses any database name that doesn't end in `_test`.
+- **Data:** each test seeds only the rows it needs through `seeder()` in
+  `testDatabase.ts`, by word text, never by Leipzig ids.
+- **Running:** `npm run test:db -w backend`. The URL comes from
+  `TEST_DATABASE_URL`, or else from `DB_PASSWORD` in `.env`. The files are
+  named `*.dbtest.ts`, because the root `npm test` glob `**/*.test.ts` would
+  also match `*.db.test.ts`. Plain `npm test` still needs no database.
+
+**Considered:**
+
+- A tmpfs `test-db` Compose service, which means one more service to keep
+  in sync.
+- testcontainers, which is a new dependency and needs the Docker socket.
+- One contract suite run against both the Postgres and in-memory adapters.
+  That would mean copying the SQL rules into the fake. The fake stays a
+  simple stub for the use-case tests.
+
+### Verification
+
+`npm run test:db -w backend` passes 14 tests against Postgres 18 under
+Colima. Each of these deliberate breaks made at least one test fail:
+
+- removing the PROPN filter
+- setting `MIN_LOG_DICE` to -99
+- setting `PER_SECTION_LIMIT` to 11
+- dropping the `sich $1` match
+
+`npm run typecheck -w backend` is clean, and `npm test` still passes without
+a database. The governed-preposition query has no test, because #68 removes
+it.
+
+<a id="68"></a>
+## 68. Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
+
+**Problem.** The `CollocationStore` port from #65 had seven methods shaped
+like the SQL queries. That caused three kinds of friction:
+
+- **Three round-trips for one word.** `findWordId`, `findDominantLemma` and
+  `findDominantPos` are separate calls for one concept, the searched word.
+- **Rows that leak a storage detail.** Every method returned one row per
+  example sentence, because the examples come from a LATERAL or LEFT join.
+  Two near-identical functions in `domain/` then folded the rows back
+  together. Every fake in the tests had to hand-build raw rows.
+- **A query nobody sees.** `findGovernedPrepositions` ran on every lookup,
+  but its display had been commented out of `Word.tsx`.
+
+**Chosen:**
+
+- **`resolveHeadword(word)`** returns `{ lemma: {id, text} | null, pos }`,
+  or null when the word is unknown. It is one query. The POS is a
+  correlated subquery, because a `LEFT JOIN` on the `DISTINCT ON` view
+  `word_dominant_pos` made Postgres materialize the whole view (pitfall 3
+  in `database/CLAUDE.md`). On the dev database, `EXPLAIN (ANALYZE,
+  BUFFERS)` for "Kritiken" measured 289 ms and 25k buffers for the join,
+  and 0.16 ms and 19 buffers, all index scans, for the subquery.
+- **The adapter groups its own rows.** `findAdjacencyCollocations` and
+  `findAdjectiveAttributes` return finished `CollocationEntry[]`, with the
+  searched word's surface form first in each example. `findLabVerbPairs`
+  returns `LabVerbPair[]`, the lab's lemma pairs with their examples
+  attached. One helper, `adapters/postgres/foldRows.ts`, does the grouping
+  for all three. The chip and phrase wording stays in `domain/`
+  (`toVerbNounPairs`), because it is learner-facing language, not storage.
+  **This amends #65:** the Postgres adapter is no longer SQL only. It also
+  undoes the row layout of its own queries.
+- **Governed prepositions removed from the lookup.** The port method, the
+  query and its constants, the `governedPrepositions` response field and
+  `GovernedPreposition` type, `GovernedPrepositions.tsx`,
+  `lib/grammaticalCase.ts` and the `--case-*` colour tokens are all gone.
+  **#52 is paused, not reversed.** The `verb_prepositions` table, its
+  loader and its data stay, so bringing the callout back takes a query and
+  a component, not a reload. Git and #52 keep the old code and the tuning.
+
+**Considered:** keeping the grouping in `domain/` as one shared function.
+That keeps #65's "adapters are SQL only" rule, but every fake would still
+have to build rows in the SQL's layout.
+
+### Verification
+
+- `npm run typecheck -w backend` is clean.
+- `npm test` passes, and the use-case tests' fakes now return plain entries.
+- `npm run test:db -w backend` passes all 14 #67 tests, unchanged, against
+  the new port.
+- `npm run build -w frontend` succeeds.
+- This branch's backend was run against the dev database next to `main`'s.
+  17 `/api/collocations` lookups were compared: noun, verb, adjective, an
+  inflected form, function words, a reflexive form, umlauts and an unknown
+  word. They were identical once `governedPrepositions` was removed from
+  `main`'s responses.

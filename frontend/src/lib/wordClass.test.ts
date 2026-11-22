@@ -7,7 +7,7 @@ function entry(section: CollocationSection): CollocationEntry {
   return { word: 'x', cooccurrence: 1, significance: 1, examples: [], section };
 }
 
-const empty: CollocationResponse = { word: 'Kritik', collocations: [], governedPrepositions: [], verbNounPairs: null };
+const empty: CollocationResponse = { word: 'Kritik', collocations: [], verbNounPairs: null };
 
 test('every word class but "other" has a text colour and a matching dot colour', () => {
   for (const wordClass of WORD_CLASS_ORDER) {
