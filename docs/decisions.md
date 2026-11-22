@@ -2684,3 +2684,28 @@ diffed with `main`'s. The set covered 17 `/api/collocations` lookups
 (noun, verb, adjective and function words, an inflected form, a
 reflexive verb, umlauts, an unknown word) and 7 `/api/search` cases. All
 responses were byte-identical.
+
+### Follow-up: deployed to production (2026-11-22)
+
+Merged as `b990d62`. Deployed with the #57 procedure: `git push`, then
+`ssh root@139.162.13.171`, then `git pull` in `/root/german-collocations`
+(the live checkout per `docker inspect`). After that, `docker compose -f
+compose.prod.yml build backend` and `up -d backend`. The container's
+StartedAt was 14:56:09 UTC, matching the deploy, and `src/` inside it
+has the `adapters/`, `application/ports/{in,out}/` and `domain/` layout.
+There was no migration, no reload and no frontend change.
+
+Checked against the live site:
+
+- `/api/collocations/Kritik`, `/stellen`, `/groß` and `/Kritiken`
+  return 200.
+- `Kritik` has its lab pairs: noun side, 30 pairs.
+- `/zzzqqq` returns 404.
+- `/api/search?q=Kri` returns 200. `q=a` returns `[]` and no `q`
+  returns 400.
+- The home page returns 200.
+- The backend logged no errors.
+
+The first lookups after the restart took 1.2-1.5 s. Repeats of the same
+lookups took 0.24-0.74 s. The query text is unchanged, so the slow first
+lookups are the database cache warming up, not the refactor.
