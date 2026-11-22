@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 import { Link } from 'react-router';
+import { cn } from '@/lib/utils';
+import { wordClassStyle } from '@/lib/wordClass.ts';
 
 // Words with plenty of verb-noun pairs, checked against the live data.
 const EXAMPLE_WORDS = ['Rolle', 'Entscheidung', 'Kritik', 'Frage', 'Verantwortung', 'Ziel', 'treffen', 'stellen'];
@@ -14,8 +16,8 @@ export function Home() {
             <div className="space-y-2">
                 <h2 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h2>
                 <Link to="/wort/Rolle" className="block font-serif text-2xl py-2 hover:underline">
-                    eine <span className="font-semibold text-pos-noun">Rolle</span>{' '}
-                    <span className="text-pos-verb">spielen</span>
+                    eine <span className={cn('font-semibold', wordClassStyle('noun').text)}>Rolle</span>{' '}
+                    <span className={wordClassStyle('verb').text}>spielen</span>
                 </Link>
                 <p className="text-muted-foreground">
                     Blau das Substantiv, orange das Verb. Geben Sie eins von beiden ein und sehen Sie,
