@@ -23,6 +23,11 @@ It runs offline, on a laptop, and produces a file that gets loaded
 like any other corpus data. It is never containerized and never part
 of the deploy path. See `tools/pos-tagging/README.md`.
 
+## Workflow
+
+A new feature on a new branch.
+A branch name can be 'frontend-feature-a-short-name' or 'backend-bug-a-bug-name'
+
 ## Commands
 
 Local dev runs through Docker Compose, not host `npm run dev` (Colima
@@ -43,23 +48,10 @@ is the daemon; `colima start` if it's down). Always `--build`.
 
 ## Architecture
 
-- `types/` (`@collocations/types`) — API response types shared by
-  backend and frontend; consumed as raw `.ts`, no build.
-- `backend/src/` — layered, wired by hand in `index.ts`:
-  `routes/` (Express handler factories) → `services/` →
-  `repositories/` (raw SQL via `pg`). Each service/repository has an
-  interface in `contracts/` (import with `import type`). Only two
-  endpoints: `/api/collocations/:word` and `/api/search`.
-- `database/` — `migrations/` + `src/migrate.ts` runner; `scripts/`
-  hold one-shot loaders (`load-data.ts` for the Leipzig corpus, then
-  separate loaders for POS, lemmas, lemma collocations, verb
-  prepositions, adjective attributes, lab verb pairs, examples).
-  Loader order and dependencies are in the session notes/decisions.
-- `frontend/` — React 19 + react-router + Tailwind 4 + shadcn/base-ui.
-  `routes/` (Home, Word), `components/`, `lib/` (pure grouping/
-  highlighting logic with tests). `src/prototype/` is untracked
-  throwaway work.
-- `docs/superpowers/` — specs/plans from the superpowers workflow.
+Per-package structure is in the code. The loader scripts in
+`database/scripts/` run in a fixed order; it is recorded in
+`docs/decisions.md` and the session notes, not in the scripts themselves.
+Database and loader pitfalls are in `database/CLAUDE.md`.
 
 ## Philosophy — read before proposing a change
 
@@ -109,14 +101,12 @@ is the daemon; `colima start` if it's down). Always `--build`.
    The production outage was caused by exactly this — `name:`
    present in `compose.yml`, missing from `compose.prod.yml`. When a
    decision names multiple files, verify each one individually.
-3. **`ON CONFLICT DO NOTHING` only suppresses duplicate-key conflicts**,
-   not FK violations — the `validIds`/lookup-map pattern is required
-   to skip orphaned or unresolvable rows safely.
-4. **Leipzig word IDs are not stable across package sizes.** The same
-   numeric ID means a different word in the `100K` vs `1M` packages.
-   A corpus package upgrade is always `TRUNCATE ... CASCADE` + full
-   reload, never incremental — see decision #37.
-5. **Production moved from GCP to Linode; old deploy notes describe
+3. **Database and loader pitfalls** (`ON CONFLICT` vs FK violations,
+   unstable Leipzig word IDs, `DISTINCT ON` view re-aggregation) live in
+   `database/CLAUDE.md`. Any new pipeline outside `database/` that scans
+   the raw corpus (e.g. `tools/pos-tagging/`) must apply the same
+   stopword/non-alphabetic filters as `database/src/filters.ts`.
+4. **Production moved from GCP to Linode; old deploy notes describe
    the wrong host.** Production is a Linode VM, reached with `ssh
    root@139.162.13.171`, with one checkout, `/root/german-collocations`,
    owned by root (no `sudo -u`). Decisions #48-#55 describe the old GCP
@@ -125,33 +115,6 @@ is the daemon; `colima start` if it's down). Always `--build`.
    log`/`git status` on the VM, confirm the live checkout with `docker
    inspect <container> --format '{{index .Config.Labels
    "com.docker.compose.project.config_files"}}'`.
-6. **A view that re-aggregates another `DISTINCT ON` view by a
-   *different* key isn't push-down-able**, even with an index on that
-   key present — Postgres has to materialize the whole underlying view
-   before it can group by the new key. `word_dominant_pos` (decision
-   #36) is cheap because every caller filters it by the same key it's
-   `DISTINCT ON`'d by (`word_id`); `word_dominant_lemma`'s downstream
-   views (decision #44) needed to re-aggregate by `lemma_id` instead,
-   and that measured as a >2 minute timeout on a single query — even
-   after adding an index on `lemma_id`, `EXPLAIN (ANALYZE, BUFFERS)`
-   showed the *same* view use the index in one join and fully
-   re-materialize in another, in the same query. Fix was to
-   materialize as a table, not to trust the index existing. Any new
-   derived-from-a-derived-view pattern needs the same `EXPLAIN` check
-   before assuming a view is fine just because an earlier,
-   differently-keyed view was.
-7. **A new pipeline that scans the raw corpus directly must apply the
-   same word/pair filters as `database/src/filters.ts`'s
-   `isStopword`/`isNonAlphabetic`** (used by `load-data.ts` to exclude
-   stopwords and non-alphabetic tokens from `words`/`collocations`), or
-   a numerator/denominator mismatch appears: a filtered word's
-   cooccurrence gets tallied from the full unfiltered scan while its
-   frequency (sourced from the already-filtered `words` table
-   downstream) stays near zero — making the excluded word score
-   *artificially higher* than genuine results, not just present when it
-   shouldn't be. Bit `tools/pos-tagging/extract_lemmas.py` in decision
-   #44 — "der"/"und" outscored real collocations by logDice until the
-   same filter was ported in.
 
 ## Conventions
 
