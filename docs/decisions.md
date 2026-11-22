@@ -40,6 +40,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#61](#61) Free-phrase prepositional pairs ("vor Jahren kaufen") and letterless lemmas left out of the lab export
 - [#62](#62) German-only interface, dark mode follows the system, home page with example words
 - [#63](#63) Quiet colour coding: AA-contrast word-class colours, colour only inside phrases and sentences, neutral header
+- [#64](#64) Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
 
 ---
 
@@ -2591,3 +2592,50 @@ names the colours in use. The prototype folder and its switcher are deleted.
 are a second colour system and should be shown on request, not by default.
 Adjective and preposition shades were darkened by the same rule without a
 visual check.
+
+<a id="64"></a>
+## 64. Lab extraction: no objects for existential "es gibt", modal-passive subjects count as objects
+
+**Problem.** Two parse constructions put wrong pairs on noun pages (a review
+of the lab's extraction, 2026-11-22):
+- "Allerdings gibt es Kritik" was counted as *Kritik geben*. *geben* was in
+  the obj top 3 of 671 nouns, mostly from "es gibt", which says something
+  exists, not that anyone gives it.
+- In "Wie lässt sich das Problem lösen?" and "Die Frage ist nicht leicht zu
+  beantworten", Stanza makes the noun the subject. It became an `nsubj` pair
+  with *sich lassen* or *beantworten*, while it is the object of the
+  infinitive, as in a passive (which #60's lab already maps).
+
+**Decision** (collocation-lab `extract.py`, commit `98ee7eb`):
+- *geben* with an *es* subject and no dative yields no obj. With a dative
+  ("Es gibt mir Kraft") *es* is referential, and the object is kept.
+- *sein* + *zu*-infinitive, including fused VVIZU ("ist zurückzuführen"):
+  the subject counts as the infinitive's obj, voice `pass`.
+- *sich lassen* + infinitive: the subject of *lassen* counts as the
+  infinitive's obj, voice `pass`. Not when there is another object, on the
+  infinitive or on *lassen* ("sich ihre Pläne genehmigen lassen", where *sich*
+  is a dative), nor when *lassen* has two subjects.
+
+**Rejected.** A bare participle ("Problem gelöst") as a passive. Stanza
+tags finite -t verbs as participles too ("Die Mitglieder beschlossen",
+"Studie ermittelt"), and about half of a 45-sentence sample was wrong.
+
+**Measured** (old vs new extract over news + wiki + web, 3M sentences):
+- 57,446 es-gibt objects dropped; 22,387 *sein*+*zu* and 8,687 *sich lassen*
+  subjects moved to obj.
+- *geben* in the obj top 3 (LL, freq >= 5): 671 -> 127 nouns. *sich lassen*
+  in the nsubj top 3: 41 -> 0. Exported obj pairs 44,152 -> 43,910, nsubj
+  29,898 -> 29,270, obl unchanged.
+- Kept as real: *Möglichkeit geben* (555, "jemandem die Möglichkeit geben").
+  Gained counts: *Problem lösen* 577 -> 615, *Frage beantworten* 1,345 -> 1,427.
+- Hand-checked random samples: es gibt 30/30, *sein*+*zu* 36/36, *sich
+  lassen* about 38/42.
+
+**Known costs.** *sich lassen* idioms with a dative *sich* that the parse
+doesn't show still slip through ("sich nicht in die Karten blicken lassen",
+"sich vertraglich zusichern lassen"). Prepositional phrases attached to
+*lassen* ("mit Geld lassen sich ... lösen") stay with *sich lassen*.
+
+**Rollout.** The live pairs change only after a lab reload (`colloc load`
+of the three parses), dataset rebuild, `ll` runs, `colloc export`, and the
+#60 refresh runbook.
