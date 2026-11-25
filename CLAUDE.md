@@ -5,9 +5,35 @@ pointers below before making architectural decisions.
 
 ## What this is
 
-A German collocation lookup tool.
+A German collocation lookup for learners. Given a headword, show its
+typical partners grouped by grammatical relation, each with example
+sentences (ranked for simplicity, #41/#50):
 
-Extract verb with accusative objects from a text corpus.
+- **Noun ↔ verb** (object, prepositional, subject): LL-ranked pairs
+  imported from the sister repo `collocation-lab` (#60, #64).
+- **Adjective + noun**, attributive (#54).
+- **Everything else**: lemma co-occurrence ranked by logDice (#43, #44).
+- Governed verb-preposition (Rektion, #52) is paused (#68).
+
+## Data flow
+
+Leipzig corpus → offline extraction (`tools/pos-tagging/` spaCy, or
+`collocation-lab`'s `colloc export`) → TSV files →
+`database/scripts/load-*.ts` → Postgres → backend `LookupCollocations`
+port → frontend. Everything before the loaders runs on a laptop, never
+on the 1 GB VM.
+
+## Terms (use these words in code, docs and commits)
+
+- **word** = surface form (Leipzig `words`); **lemma** = dictionary
+  form. Chips show lemmas, examples highlight the surface words (#45).
+  Mixing the two causes numerator/denominator bugs (`database/CLAUDE.md` #4).
+- **relation** = grammatical link between headword and partner
+  (verb–object, verb–subject, verb–prep, adj–noun). A new relation gets
+  its own table.
+- **logDice** scores window co-occurrence; **LL** (log-likelihood) scores
+  lab pairs. The scales aren't comparable — never merge their rankings.
+- **Proper-noun partners are dropped per lemma**, not per token (#56, #57).
 
 ## Stack
 
@@ -25,7 +51,7 @@ of the deploy path. See `tools/pos-tagging/README.md`.
 
 ## Workflow
 
-A new feature on a new branch.
+A new feature or a bug fix on a new branch.
 A branch name can be 'frontend-feature-a-short-name' or 'backend-bug-a-bug-name'
 
 ## Commands
@@ -44,8 +70,7 @@ is the daemon; `colima start` if it's down). Always `--build`.
 - Database tests (decision #67): `npm run test:db -w backend`, against a
   throwaway `collocations_test` database in the running dev Postgres. They
   are `*.dbtest.ts` files, so plain `npm test` never needs a database.
-- Typecheck: `npm run typecheck -w backend` (or `-w database`). The
-  root `typecheck` script has a typo (`--worksspaces`) and doesn't work.
+- Typecheck: `npm run typecheck` from the root, or `-w backend` / `-w database`.
 - Frontend: `npm run lint -w frontend`, `npm run build -w frontend`
   (`tsc -b && vite build`).
 
@@ -68,6 +93,11 @@ Database and loader pitfalls are in `database/CLAUDE.md`.
 - **Empirical validation before schema decisions.** Don't assume
   directionality, performance, or data shape — query it, run
   `EXPLAIN (ANALYZE, BUFFERS)`, then decide.
+- **Linguistic spot-check before changing an extractor or ranking.**
+  Compare ~20 real headwords (e.g. *Entscheidung*, *Frage*, *treffen*)
+  before and after, the way #60 was decided. It catches what unit tests
+  miss: broken lemmas, separable-verb particles, wrong case, es-gibt
+  subjects (#64).
 - **Manual dependency injection**, no DI container library.
 - **Decisions are numbered and logged.** Every non-trivial choice with
   reasoning goes at the end of `docs/decisions.md` as a new numbered
@@ -104,11 +134,9 @@ Database and loader pitfalls are in `database/CLAUDE.md`.
    The production outage was caused by exactly this — `name:`
    present in `compose.yml`, missing from `compose.prod.yml`. When a
    decision names multiple files, verify each one individually.
-3. **Database and loader pitfalls** (`ON CONFLICT` vs FK violations,
-   unstable Leipzig word IDs, `DISTINCT ON` view re-aggregation) live in
-   `database/CLAUDE.md`. Any new pipeline outside `database/` that scans
-   the raw corpus (e.g. `tools/pos-tagging/`) must apply the same
-   stopword/non-alphabetic filters as `database/src/filters.ts`.
+3. **Database, loader and corpus-filter pitfalls** live in
+   `database/CLAUDE.md` — read it before touching a loader or writing a
+   new pipeline that scans the raw corpus.
 4. **Production moved from GCP to Linode; old deploy notes describe
    the wrong host.** Production is a Linode VM, reached with `ssh
    root@139.162.13.171`, with one checkout, `/root/german-collocations`,
