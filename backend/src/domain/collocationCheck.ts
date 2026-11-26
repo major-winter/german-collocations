@@ -3,6 +3,9 @@
 // Entscheidung machen" into a noun, a lab verb lemma and a verdict. Pure
 // functions; the service feeds them what the store finds.
 
+import type { CheckPhrase, CheckVerdict } from "@collocations/types";
+import { phraseNounWord, phraseOf } from "./verbNounPhrases.ts";
+
 const MIN_TOKENS = 2;
 const MAX_TOKENS = 5;
 
@@ -106,4 +109,79 @@ export function pickVerbLemma(
 
   eligible.sort((a, b) => uses.get(b)! - uses.get(a)! || a.localeCompare(b));
   return eligible[0] ?? null;
+}
+
+// A typed plain verb may match its "sich" pair only this high in the
+// noun's object list (spec: "eine Entscheidung machen" must not match
+// "sich machen", rank 44; "Mühe geben" matches "sich geben", rank 1).
+export const REFLEXIVE_TOP_N = 10;
+// The subject-error filter applies only to verbs whose object pairs make
+// up less than this share of their object + subject pair frequency
+// (spec: keeps "Bus fahren" at 0.41, drops "Entscheidung fallen" at 0.15).
+export const SUBJECT_FILTER_MAX_OBJECT_SHARE = 0.4;
+export const USUAL_SUGGESTIONS = 2;
+export const UNUSUAL_SUGGESTIONS = 3;
+
+export interface CheckPair {
+  verb: string;
+  noun: string;
+  phraseNoun: string;
+  score: number;
+  /** The same verb + noun's subject-pair score, when there is one. */
+  subjectScore: number | null;
+  /** The verb's object share; only filled in when subjectScore > score. */
+  verbObjectShare: number | null;
+}
+
+export interface Judgement {
+  verdict: CheckVerdict;
+  matched: CheckPhrase | null;
+  suggestions: CheckPhrase[];
+}
+
+export function checkPhraseOf(pair: CheckPair): CheckPhrase {
+  return {
+    phrase: phraseOf("obj", pair.verb, pair.phraseNoun, pair.noun),
+    nounWord: phraseNounWord(pair.phraseNoun),
+    verbWord: baseOf(pair.verb),
+  };
+}
+
+function isSubjectError(pair: CheckPair): boolean {
+  return (
+    pair.subjectScore !== null &&
+    pair.subjectScore > pair.score &&
+    pair.verbObjectShare !== null &&
+    pair.verbObjectShare < SUBJECT_FILTER_MAX_OBJECT_SHARE
+  );
+}
+
+/** The verdict on `verb` (a base lemma, no "sich") with a noun whose object pairs come best-first. */
+export function judge(verb: string | null, sich: boolean, pairs: CheckPair[]): Judgement {
+  const kept = pairs.filter((p) => !isSubjectError(p));
+  if (kept.length === 0) return { verdict: "noData", matched: null, suggestions: [] };
+
+  let index = -1;
+  if (verb !== null) {
+    const reflexive = kept.findIndex((p) => p.verb === REFLEXIVE_PREFIX + verb);
+    if (sich) {
+      index = reflexive;
+    } else {
+      index = kept.findIndex((p) => p.verb === verb);
+      if (index === -1 && reflexive !== -1 && reflexive < REFLEXIVE_TOP_N) index = reflexive;
+    }
+  }
+
+  if (index === -1) {
+    return {
+      verdict: "unusual",
+      matched: null,
+      suggestions: kept.slice(0, UNUSUAL_SUGGESTIONS).map(checkPhraseOf),
+    };
+  }
+  return {
+    verdict: "usual",
+    matched: checkPhraseOf(kept[index]),
+    suggestions: kept.slice(0, Math.min(index, USUAL_SUGGESTIONS)).map(checkPhraseOf),
+  };
 }
