@@ -2978,4 +2978,37 @@ the primary key: 0.65 ms for both.
     gründen*, *der SV gründen*. Club abbreviations carry no case mark, so
     the nominative filter can't catch them.
 
-Not deployed yet: tested locally first, at the user's request.
+The user tested it locally first.
+
+### Follow-up: deployed to production (2026-11-26)
+
+1. `collocation-lab` merged locally (`adb958d`; it has no remote). App
+   merged and pushed (`5ca1f6b`).
+2. Backed up the live export files to `/root/lab-export-backup-2026-11-26/`,
+   then copied the four new files (pairs, examples, genders, manifest) into
+   `/root/german-collocations/data/`.
+3. `git pull` on the live checkout (confirmed by `docker inspect`), then
+   `docker compose -f compose.prod.yml --profile manual build migrate
+   load-lab-verb-pairs backend frontend` (06:00-06:03 UTC).
+4. Migration before the new backend, since its pair query reads
+   `lab_noun_genders`: `run --rm migrate` applied 016, then `--profile
+   manual run --rm load-lab-verb-pairs` loaded 105,625 pairs, 314,305
+   examples and 7,194 noun genders, 0 malformed lines. The old backend
+   kept serving during both.
+5. `up -d backend frontend`. Both started at 06:04:26 UTC, after their
+   images were built (06:01:13 and 06:03:28). The backend logged no errors.
+
+Checked against the live site: `/api/collocations/Entscheidung` returns
+article *die* and *Entscheidungen treffen*. `/stellen` returns *einen
+Antrag stellen* with chip *der Antrag*. `/Ahnung` returns *keine Ahnung
+haben* with no article. `/Kritiken` returns 200, and its header shows no
+article because the search isn't the lemma. `/zzzqqq` returns 404 and the
+home page returns 200. The served bundle contains `chipArticle`. Repeated
+*Entscheidung* lookups took 0.23-0.27 s.
+
+Deferred minors from the final review (not fixed):
+
+- `pick_article`'s float comparison drops an article at exactly 90%.
+- Merged respelled pairs count only the winning lemma's occurrences.
+- The loader's doc comment still says "two files".
+- Hyphenated phrase nouns aren't highlighted (pre-existing).
