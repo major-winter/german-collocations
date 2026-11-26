@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #69), and add it to the index.
+(next: #70), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -45,6 +45,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#66](#66) Word-class order, labels and colours live in one frontend module (`lib/wordClass.ts`)
 - [#67](#67) Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
 - [#68](#68) Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
+- [#69](#69) Verb–noun phrases as the corpus writes them, plus the noun's article (amends #60)
 
 ---
 
@@ -2910,3 +2911,71 @@ Checked against the live site:
 The first `Kritik` lookup took 7.3 s, because building both images on the
 1 GB VM pushed the database's pages out of memory. Repeats of five lookups
 took 0.23-0.78 s, the same range as after #65.
+
+<a id="69"></a>
+## 69. Verb–noun phrases as the corpus writes them, plus the noun's article (amends #60)
+
+**Problem.** A chip pair like *Entscheidung + treffen* tells a learner
+which words go together, not how to say them: the article, the case and
+the gender were missing. #60 showed lemmas because "the app has no gender
+or conjugation data". The lab had that data and didn't export it.
+
+**Chosen: option C** of three, by the user. The design is
+`docs/superpowers/specs/2026-11-26-surface-chunks-design.md` and the plan
+is `docs/superpowers/plans/2026-11-26-surface-chunks.md`.
+
+- **A. The most common written form only.** Rejected: plural-heavy pairs
+  (*Entscheidungen* 35%, *Tore* 70%, *Fragen* 48%) would show no gender.
+- **B. Prefer the singular with an article** (*eine Entscheidung
+  treffen*). Rejected: often not what Germans usually say, and it needs a
+  hand-tuned preference rule.
+- **C. A, plus a gender label per noun.** The phrase stays honest and the
+  gender is shown wherever it's known.
+
+**What changed.**
+
+- **Lab export** (`collocation-lab` `9d4ea20`): `phrase_noun` is the most
+  common written noun phrase for all three relations, not only `obl`. An
+  object's form is chosen among its non-nominative occurrences only,
+  because passive subjects count as objects (#64): unfiltered, *Antrag
+  stellen* would read *der Antrag stellen* (18% of its uses). A third file,
+  `lab_noun_genders.tsv`, gives *der/die/das* when at least **5**
+  nominative singular definite uses agree at **90%** or more. The manifest
+  has a third line, `genders`.
+- **App**: migration 016 adds `lab_noun_genders`, loaded in the same
+  transaction as the pairs. The loader refuses a two-line manifest, so an
+  old export can't half-load. Verb-page chips read *die Frage*, *sich die
+  Frage*, *die Information (sich)* with the article muted; a noun page's
+  header reads *die Entscheidung* when the searched word is the lemma
+  itself (not for *Entscheidungen*). The open phrase highlights the noun as
+  written.
+
+**Query: a correlated subquery, not a join.** `EXPLAIN (ANALYZE, BUFFERS)`
+on the local 3M data showed `LEFT JOIN lab_noun_genders` hash-scanning all
+7,194 rows: warm, 1.3 ms for *Entscheidung* against 0.25 ms without it, and
+1.35 ms for *stellen*. A `(SELECT article ... WHERE noun = r.noun)` uses
+the primary key: 0.65 ms for both.
+
+### Verification
+
+- Lab: 175 tests pass. Export of `news-wiki-web-3M`: 105,625 pairs and
+  314,305 examples (unchanged), 7,194 noun genders.
+- App: `npm test` 36/36, `npm run test:db -w backend` 16/16, typecheck and
+  frontend build clean. `npm run lint -w frontend` crashes inside ESLint's
+  TypeScript tooling (`ts-api-utils`) on `main` too; not fixed here.
+- **Coverage**: 59.0% of the 12,191 nouns in lab pairs have an article.
+  Phrases that differ from the bare lemma: obj 36,661 of 43,348 (before:
+  0), nsubj 26,036 of 29,009 (before: 0), obl unchanged at 33,267.
+- **Spot-check of 20 headwords** through the local API: *einen Antrag
+  stellen*, *keine Ahnung haben*, *eine Rolle spielen*, *sich Mühe geben*,
+  *Kritik üben*, *Tore erzielen*, *den See umrunden*; verb-page chips *der
+  Antrag*, *die Frage*, *die Entscheidung*. Every article shown is right.
+  *Ahnung* (3 singular nominatives) and *Leute* (plural only) get none.
+- **Known, accepted**:
+  - Homonyms get the article of their more common meaning: *Teil*
+    (der 1540 : das 30) and *See* (der 329 : die 4) both get *der*.
+  - Two of 43,348 object phrases start with a masculine *der*: *der FC
+    gründen*, *der SV gründen*. Club abbreviations carry no case mark, so
+    the nominative filter can't catch them.
+
+Not deployed yet: tested locally first, at the user's request.
