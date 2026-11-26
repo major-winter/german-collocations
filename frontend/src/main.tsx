@@ -3,6 +3,8 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { Home } from './routes/Home.tsx';
 import { Word } from './routes/Word.tsx';
+import { Impressum } from './routes/Impressum.tsx';
+import { Datenschutz } from './routes/Datenschutz.tsx';
 import './index.css';
 import { Layout } from './components/Layout.tsx';
 
@@ -16,6 +18,8 @@ createRoot(container).render(
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/wort" element={<Navigate to="/" replace />} />
+          <Route path="/impressum" element={<Impressum />} />
+          <Route path="/datenschutz" element={<Datenschutz />} />
           <Route path="/wort/:word" element={<Word key={location.pathname} />} />
         </Routes>
       </Layout>

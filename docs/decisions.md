@@ -47,6 +47,8 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#68](#68) Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
 - [#69](#69) Verb–noun phrases as the corpus writes them, plus the noun's article (amends #60)
 - [#70](#70) "Passt das zusammen?": checking a typed verb–noun phrase against the lab's object pairs
+- [#71](#71) Saved lists + practice: browser-only list first, gap-fill second, accounts only after measured repeat use (proposed, not built)
+- [#72](#72) Usage baseline and legal pages: anonymous per-day counts, Impressum and Datenschutz with the operator's details kept out of git
 
 ---
 
@@ -3110,3 +3112,107 @@ Final review fixes: a two-word search without a verb (*erste Hilfe*, *gute
 Nacht*) is a plain search, not a check — it used to get "*erste* ist kein
 typisches Verb zu *Hilfe*"; punctuation around words (*Entscheidung
 treffen?*) is ignored instead of making the verb unknown.
+
+## 71. Saved lists + practice: browser-only list first, gap-fill second, accounts only after measured repeat use (proposed, not built)
+
+Evaluation: `docs/superpowers/specs/2026-11-27-saved-lists-practice-evaluation.md`
+(revision 2, after a review). Logged 2026-11-27. Direction only; each
+phase gets its own spec and decision entry when built.
+
+**Question.** Would saving collocations and practising them make the app
+worth a paid tier (~€3–5/month)?
+
+**Answer.** Not yet. Spaced retrieval with feedback helps verb–noun
+collocations in EFL studies (Yamagata et al. 2022/23; Fang et al. 2024,
+where spacing helped implicit knowledge), but nothing shows these cards
+beat Anki or Clozemaster, and DWDS already offers corpus-ranked
+collocations free. The edge is the #70 verdict plus simplicity-ranked
+examples, so practice is built on that data.
+
+**Phases, each behind a measured gate:**
+
+- **A0.** Impressum and Datenschutz pages, which the site lacks today;
+  server-side per-day counts of requests the backend already gets
+  (word-page views, checks) in an additive `usage_counts` table, with
+  nothing read from the device and no IP stored. After 2–4 weeks, the A
+  and B thresholds are set against this baseline, in devices per week,
+  each with a fail action.
+- **A1.** "Merken" on every verb–noun chip and on check results (the
+  check response gains the verb lemma and examples, since the page only
+  loads the top 10 pairs); cards keyed on `(relation, verb, prep,
+  noun)`; `/liste`; JSON backup and restore (Safari deletes storage
+  after 7 days without interaction); a web app manifest; opt-in,
+  per-device-deduplicated local counts (reading the device to measure
+  is not "unbedingt erforderlich" under §25 TDDDG); a supporter link
+  instead of an email list.
+- **B.** Gap-fill on saved object pairs. The verb is blanked and the
+  lemma shown only as a step hint. Typed answers are graded through the
+  #70 form-to-lemma mapping and its subject-error filter: the pair's
+  verb is correct, another object verb of the noun is "also usual",
+  anything else is wrong. Multiple choice only for nouns with at least
+  10 object pairs, with distractors that have no pair or window
+  co-occurrence with the noun. Particle verbs (by lemma, ~19% of object
+  examples), *sich* pairs, subject pairs and adjective + noun are
+  excluded from v1; prepositional pairs are deferred. Intervals stay
+  below 7 days with a daily review cap. A 20-headword card spot-check
+  comes first. CSV/Anki export ships here.
+- **C**, only if B's gate passes: off-box backup, accounts (additive
+  tables, magic link), sync, own domain, legal/VAT setup.
+
+**Not chosen now.** Accounts and payments first: an operational cost
+(auth, email, backups of irreplaceable data) on a VM with no restart
+policy and no off-box backup, for unproven demand. A paid whole-text
+checker: the strongest differentiator, but it needs runtime parsing
+(Python on the VM breaks the offline-only rule; an LLM API sends learner
+text to a third party). Worth its own evaluation.
+
+## 72. Usage baseline and legal pages: anonymous per-day counts, Impressum and Datenschutz with the operator's details kept out of git
+
+Spec: `docs/superpowers/specs/2026-11-27-usage-baseline-legal-pages-design.md`.
+Phase A0 of #71. Built 2026-11-27.
+
+**What.** The backend counts, per Berlin calendar day, word-page lookups
+that found the word (`word_page`) and checks that parsed (`check`), in
+`usage_counts(day, kind, count)` (migration 018, additive). Two
+application decorators, `CountingLookupCollocations` and
+`CountingCheckCollocation`, wrap the existing use cases behind a new
+outbound port `UsageCounter`; handlers and services are unchanged. New
+pages `/impressum` and `/datenschutz`, linked from the footer.
+
+**Why.** #71 gates the saved list on measured repeat use, but the app had
+no traffic numbers at all (no analytics, no Caddy access log). The
+baseline runs 2–4 weeks before Phase A1, so its thresholds are set
+against real traffic. The site also lacked the Impressum (§5 DDG) and
+Datenschutz page it needed anyway.
+
+**Privacy.** Counted on the server from requests it already receives:
+nothing is read from the device, and no IP, user agent, cookie or query
+text is stored, so there is no §25 TDDDG consent question. Counting is
+fire-and-forget: a failed count is logged and never fails or delays the
+response.
+
+**Known over-counts** (not traffic):
+- a phrase typed in the search box is checked twice, by the search box
+  and by the card on the page it opens;
+- "Erneut versuchen" refetches the lookup;
+- bots and the developer count like anyone else.
+
+**Operator details out of git.** The repo is public, so the name,
+address (lines separated by `|`) and email are `IMPRESSUM_NAME`,
+`IMPRESSUM_ADDRESS` and `IMPRESSUM_EMAIL` in the server's `.env`.
+`compose.prod.yml` passes them as frontend build args, and
+`frontend/Dockerfile.prod` **fails the build** if any is empty, because
+a production Impressum with placeholders is worse than a failed deploy.
+Local dev shows marked placeholders.
+
+**Reading the numbers** (on the VM):
+
+```sh
+docker compose -f compose.prod.yml exec db psql -U app -d collocations -c "
+SELECT date_trunc('week', day)::date AS week, kind, sum(count)
+FROM usage_counts GROUP BY 1, 2 ORDER BY 1, 2;"
+```
+
+**Not chosen.** Caddy access logs (IP addresses, rotation, manual
+parsing); in-memory counters flushed periodically (lost on restart,
+with no restart policy in production).

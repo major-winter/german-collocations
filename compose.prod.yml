@@ -56,6 +56,10 @@ services:
       dockerfile: frontend/Dockerfile.prod
       args:
         VITE_API_URL: ""
+        # Decision #72: set in the server's .env, kept out of git.
+        VITE_IMPRESSUM_NAME: ${IMPRESSUM_NAME:-}
+        VITE_IMPRESSUM_ADDRESS: ${IMPRESSUM_ADDRESS:-}
+        VITE_IMPRESSUM_EMAIL: ${IMPRESSUM_EMAIL:-}
 
   caddy:
     image: caddy:2
