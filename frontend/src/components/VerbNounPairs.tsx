@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { chipParts } from '@/lib/chipParts.ts';
 import { highlightCollocates } from '@/lib/highlight.tsx';
 import { groupPairs, headingParts, initialOpen, openAfterClick } from '@/lib/verbNounGroups.ts';
 import { wordClassStyle } from '@/lib/wordClass.ts';
@@ -35,8 +36,9 @@ function OpenPair({ pair, side, lemma, colors }: {
     lemma: string;
     colors: WordColors;
 }) {
-    const searchedWord = side === 'noun' ? lemma : lastWord(lemma);
-    const partnerWord = side === 'noun' ? lastWord(pair.partner) : pair.partner;
+    // Decision #69: the phrase writes the noun as the corpus does ("Entscheidungen"), not as its lemma.
+    const searchedWord = side === 'noun' ? pair.phraseNoun : lastWord(lemma);
+    const partnerWord = side === 'noun' ? lastWord(pair.partner) : pair.phraseNoun;
 
     return (
         <div className="rounded-lg px-2 py-1.5 space-y-1">
@@ -102,7 +104,16 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                         openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
                                     )}
                                 >
-                                    {pair.chip}
+                                    {chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
+                                        <span
+                                            key={partIndex}
+                                            className={cn(
+                                                part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'),
+                                            )}
+                                        >
+                                            {part.text}
+                                        </span>
+                                    ))}
                                 </button>
                             ))}
                         </div>

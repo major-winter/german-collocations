@@ -4,6 +4,7 @@ import {
   assertLoadable,
   assertMatchesManifest,
   parseExampleLine,
+  parseGenderLine,
   parseManifest,
   parsePairLine,
 } from './labVerbPairsTsv.ts';
@@ -56,15 +57,31 @@ test('refuses an export with no pairs', () => {
 });
 
 test('parses the manifest', () => {
-  assert.deepEqual(parseManifest('pairs\t122454\nexamples\t364370\n'), { pairs: 122454, examples: 364370 });
+  assert.deepEqual(parseManifest('pairs\t122454\nexamples\t364370\ngenders\t7194\n'), {
+    pairs: 122454,
+    examples: 364370,
+    genders: 7194,
+  });
   assert.equal(parseManifest(''), null);
   assert.equal(parseManifest('pairs\t122454\n'), null);
-  assert.equal(parseManifest('pairs\tmany\nexamples\t3\n'), null);
+  assert.equal(parseManifest('pairs\tmany\nexamples\t3\ngenders\t1\n'), null);
+});
+
+test('parseManifest refuses a manifest without genders', () => {
+  assert.equal(parseManifest('pairs\t122454\nexamples\t364370\n'), null);
+});
+
+test('parses a gender line', () => {
+  assert.deepEqual(parseGenderLine('Entscheidung\tdie'), { noun: 'Entscheidung', article: 'die' });
+  assert.equal(parseGenderLine('Entscheidung\tden'), null);
+  assert.equal(parseGenderLine('Entscheidung'), null);
+  assert.equal(parseGenderLine('\tdie'), null);
 });
 
 test('refuses files whose line counts differ from the manifest', () => {
-  const manifest = { pairs: 122454, examples: 364370 };
-  assert.doesNotThrow(() => assertMatchesManifest(manifest, 122454, 364370));
-  assert.throws(() => assertMatchesManifest(manifest, 61000, 364370), /pairs.*61,000.*122,454/);
-  assert.throws(() => assertMatchesManifest(manifest, 122454, 0), /examples.*0.*364,370/);
+  const manifest = { pairs: 122454, examples: 364370, genders: 7194 };
+  assert.doesNotThrow(() => assertMatchesManifest(manifest, 122454, 364370, 7194));
+  assert.throws(() => assertMatchesManifest(manifest, 61000, 364370, 7194), /pairs.*61,000.*122,454/);
+  assert.throws(() => assertMatchesManifest(manifest, 122454, 0, 7194), /examples.*0.*364,370/);
+  assert.throws(() => assertMatchesManifest(manifest, 122454, 364370, 0), /genders.*0.*7,194/);
 });

@@ -33,7 +33,11 @@ test('lab pairs put noun and verb in the legend, even when the collocation list 
     verbNounPairs: {
       side: 'noun',
       lemma: 'Kritik',
-      pairs: [{ relation: 'obj', partner: 'üben', chip: 'üben', phrase: 'Kritik üben', score: 1, frequency: 1, examples: [] }],
+      article: null,
+      pairs: [{
+        relation: 'obj', partner: 'üben', chip: 'üben', chipArticle: null, phrase: 'Kritik üben',
+        phraseNoun: 'Kritik', score: 1, frequency: 1, examples: [],
+      }],
     },
   };
   assert.deepEqual(new Set(legendSections(response)), new Set(['adjective', 'noun', 'verb']));

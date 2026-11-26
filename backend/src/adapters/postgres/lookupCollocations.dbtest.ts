@@ -224,5 +224,33 @@ test("a noun page never shows adjacent verbs, even with no lab pairs (#60)", asy
 
   const result = await lookup.lookup("Kritik");
   assert.deepEqual(result!.collocations, []);
-  assert.deepEqual(result!.verbNounPairs, { side: "noun", lemma: "Kritik", pairs: [] });
+  assert.deepEqual(result!.verbNounPairs, { side: "noun", lemma: "Kritik", article: null, pairs: [] });
+});
+
+test("a verb page shows each noun's article on its chip (#69)", async () => {
+  await seed.word("stellen", { pos: "VERB" });
+  await seed.labPair("stellen", "Frage", { phraseNoun: "Fragen", score: 20 });
+  await seed.labPair("stellen", "Ahnung", { score: 10 });
+  await seed.labNounGender("Frage", "die");
+
+  const pairs = (await lookup.lookup("stellen"))!.verbNounPairs!;
+  assert.deepEqual(
+    pairs.pairs.map((p) => [p.chip, p.chipArticle, p.phrase]),
+    [
+      ["die Frage", "die", "Fragen stellen"],
+      ["Ahnung", null, "Ahnung stellen"],
+    ],
+  );
+  assert.equal(pairs.article, null);
+});
+
+test("a noun page carries the headword's article and the written noun (#69)", async () => {
+  await seed.word("Entscheidung", { pos: "NOUN" });
+  await seed.labPair("treffen", "Entscheidung", { phraseNoun: "Entscheidungen" });
+  await seed.labNounGender("Entscheidung", "die");
+
+  const pairs = (await lookup.lookup("Entscheidung"))!.verbNounPairs!;
+  assert.equal(pairs.article, "die");
+  assert.equal(pairs.pairs[0].phrase, "Entscheidungen treffen");
+  assert.equal(pairs.pairs[0].phraseNoun, "Entscheidungen");
 });

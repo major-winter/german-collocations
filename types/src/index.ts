@@ -31,7 +31,9 @@ export interface VerbNounPair {
   relation: VerbNounRelation;
   partner: string;      // the other side's lemma
   chip: string;         // short label on the chip
+  chipArticle: string | null; // the article inside `chip`, to show muted; null when none (#69)
   phrase: string;       // shown when the chip is open
+  phraseNoun: string;   // the noun as written in `phrase` ("Entscheidungen"), for highlighting
   score: number;
   frequency: number;
   examples: CollocationExample[];
@@ -40,6 +42,7 @@ export interface VerbNounPair {
 export interface VerbNounPairs {
   side: 'noun' | 'verb'; // the searched word's side
   lemma: string;         // the lab lemma that matched, or the dominant lemma text when none did
+  article: string | null; // the headword's der/die/das on a noun page, when known (#69)
   pairs: VerbNounPair[]; // up to 10 per relation, each relation best-first
 }
 

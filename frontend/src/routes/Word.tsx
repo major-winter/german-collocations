@@ -108,7 +108,13 @@ export function Word() {
     return (
         <div>
             <div className="mt-6 flex items-baseline gap-3">
-                <h2 className="font-serif text-4xl font-semibold">{state.data.word}</h2>
+                <h2 className="font-serif text-4xl font-semibold">
+                    {/* Decision #69: the article, muted, only when the searched word is the lemma itself. */}
+                    {state.data.verbNounPairs?.article && state.data.verbNounPairs.lemma === state.data.word && (
+                        <span className="font-normal text-muted-foreground">{state.data.verbNounPairs.article} </span>
+                    )}
+                    {state.data.word}
+                </h2>
                 {state.data.verbNounPairs && (
                     <span className="text-sm text-muted-foreground">
                         {state.data.verbNounPairs.side === "noun" ? "Substantiv" : "Verb"}

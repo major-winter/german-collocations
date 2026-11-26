@@ -4,7 +4,10 @@ import type { CollocationResponse, VerbNounPair, VerbNounRelation } from '@collo
 import { groupHeadings, groupPairs, hasAnyResults, headingParts, initialOpen, openAfterClick } from './verbNounGroups.ts';
 
 function pair(relation: VerbNounRelation, partner: string): VerbNounPair {
-  return { relation, partner, chip: partner, phrase: partner, score: 1, frequency: 5, examples: [] };
+  return {
+    relation, partner, chip: partner, chipArticle: null, phrase: partner, phraseNoun: partner,
+    score: 1, frequency: 5, examples: [],
+  };
 }
 
 test('noun page headings', () => {
@@ -46,10 +49,10 @@ test('hasAnyResults counts lab pairs as results', () => {
   const empty: CollocationResponse = { word: 'x', collocations: [], verbNounPairs: null };
   assert.equal(hasAnyResults(empty), false);
   assert.equal(
-    hasAnyResults({ ...empty, verbNounPairs: { side: 'noun', lemma: 'x', pairs: [pair('obj', 'üben')] } }),
+    hasAnyResults({ ...empty, verbNounPairs: { side: 'noun', lemma: 'x', article: null, pairs: [pair('obj', 'üben')] } }),
     true,
   );
-  assert.equal(hasAnyResults({ ...empty, verbNounPairs: { side: 'noun', lemma: 'x', pairs: [] } }), false);
+  assert.equal(hasAnyResults({ ...empty, verbNounPairs: { side: 'noun', lemma: 'x', article: null, pairs: [] } }), false);
 });
 
 test('heading parts mark the noun, so it can be blue', () => {
