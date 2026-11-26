@@ -46,9 +46,13 @@ export function Datenschutz() {
             <section>
                 <h3>Hosting</h3>
                 <p>
-                    Der Server wird bei Akamai Technologies (Linode) betrieben. Akamai verarbeitet die
-                    Verbindungsdaten nur, um die Seite auszuliefern. Rechtsgrundlage ist unser berechtigtes
-                    Interesse an einem sicheren und funktionierenden Angebot (Art. 6 Abs. 1 lit. f DSGVO).
+                    Der Server wird bei Akamai Technologies (Linode) in einem Rechenzentrum in Singapur
+                    betrieben. Akamai verarbeitet die Verbindungsdaten nur, um die Seite auszuliefern.
+                    Rechtsgrundlage ist unser berechtigtes Interesse an einem sicheren und funktionierenden
+                    Angebot (Art. 6 Abs. 1 lit. f DSGVO). Singapur liegt außerhalb der EU, und für Singapur
+                    gibt es keinen Angemessenheitsbeschluss der EU-Kommission. Die Übermittlung ist durch
+                    die Standardvertragsklauseln der EU-Kommission abgesichert, die Teil des
+                    Auftragsverarbeitungsvertrags mit Akamai sind (Art. 46 Abs. 2 lit. c DSGVO).
                 </p>
             </section>
 
