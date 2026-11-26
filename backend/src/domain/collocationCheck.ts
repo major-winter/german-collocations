@@ -28,9 +28,25 @@ export interface SplitPhrase {
   particle: string | null;
 }
 
+// Learners type "eine Entscheidung treffen?" - the card asks a question.
+const EDGE_PUNCTUATION = /^[.,;:!?"'„“”‚‘’»«()]+|[.,;:!?"'„“”‚‘’»«()]+$/g;
+
+function tokensOf(q: string): string[] {
+  return q
+    .trim()
+    .split(/\s+/)
+    .map((t) => t.replace(EDGE_PUNCTUATION, ""))
+    .filter((t) => t !== "");
+}
+
+/** The phrase as typed, without surrounding punctuation or extra spaces. */
+export function normalisePhrase(q: string): string {
+  return tokensOf(q).join(" ");
+}
+
 /** null unless the phrase is exactly a noun and a verb once function words are gone. */
 export function splitPhrase(q: string): SplitPhrase | null {
-  const tokens = q.trim().split(/\s+/).filter((t) => t !== "");
+  const tokens = tokensOf(q);
   if (tokens.length < MIN_TOKENS || tokens.length > MAX_TOKENS) return null;
 
   // Before the determiners go: a trailing "ein" is a particle, not an article.

@@ -299,8 +299,9 @@ run migrate, `up -d`, check container start times. Log as #70.
   → *belegen*, a ranking; *Bescheid geben* → *Bescheid wissen*).
   Possible later fix: label it "Andere häufige Verben", or show an
   example sentence under each suggestion.
-- A mistyped verb (*trefen*) gets "Nicht typisch" rather than "Verb
-  nicht erkannt".
+- A mistyped verb (*trefen*) gets a plain search rather than "Verb
+  nicht erkannt" (changed in the final review, so that *erste Hilfe* is
+  not checked as a verb–noun pair).
 - An adjective or pronoun in the phrase (*eine wichtige Entscheidung
   treffen*, *ich mache…*) is not parsed; the search falls back to today.
 - A few lab verb lemmas are broken forms (*machten*, *innehatten*) and

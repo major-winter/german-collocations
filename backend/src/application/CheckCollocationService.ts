@@ -1,6 +1,7 @@
 import type { CollocationCheck } from "@collocations/types";
 import {
   judge,
+  normalisePhrase,
   pickVerbLemma,
   splitPhrase,
   type CheckPair,
@@ -46,7 +47,7 @@ export class CheckCollocationService implements CheckCollocation {
 
     return {
       parsed: true,
-      phrase: q.trim().split(/\s+/).join(" "),
+      phrase: normalisePhrase(q),
       noun,
       verbTyped: verbToken,
       verb,
@@ -65,11 +66,11 @@ export class CheckCollocationService implements CheckCollocation {
     const [a, b] = words;
     if (isCapitalised(a) !== isCapitalised(b)) {
       const [nounToken, verbToken] = isCapitalised(a) ? [a, b] : [b, a];
-      return {
-        nounToken,
-        verbToken,
-        verbCandidates: await this.#store.findVerbCandidates(verbToken.toLowerCase()),
-      };
+      const verbCandidates = await this.#store.findVerbCandidates(verbToken.toLowerCase());
+      // "erste Hilfe", "gute Nacht": no verb at all, so a plain search, not
+      // a "Nicht typisch" verdict (final review I1).
+      if (verbCandidates.length === 0) return null;
+      return { nounToken, verbToken, verbCandidates };
     }
     const [forA, forB] = await Promise.all([
       this.#store.findVerbCandidates(a.toLowerCase()),

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CheckPhrase } from '@collocations/types';
-import { judge, pickVerbLemma, splitPhrase, type CheckPair } from './collocationCheck.ts';
+import { judge, normalisePhrase, pickVerbLemma, splitPhrase, type CheckPair } from './collocationCheck.ts';
 
 test('splitPhrase drops determiners and keeps noun and verb in order', () => {
   assert.deepEqual(splitPhrase('eine Entscheidung machen'), { words: ['Entscheidung', 'machen'], sich: false, particle: null });
@@ -97,4 +97,10 @@ test('judge: no object pairs, or none left after the filter, is noData; an unkno
   assert.equal(judge('treffen', false, []).verdict, 'noData');
   assert.equal(judge('fallen', false, [pair('fallen', 627, { subjectScore: 1987, verbObjectShare: 0.15 })]).verdict, 'noData');
   assert.equal(judge(null, false, [pair('treffen', 900)]).verdict, 'unusual');
+});
+
+test('splitPhrase and normalisePhrase ignore punctuation around words (final review I2)', () => {
+  assert.deepEqual(splitPhrase('eine Entscheidung treffen?'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('„Entscheidung treffen.“'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+  assert.equal(normalisePhrase('  eine Entscheidung   treffen? '), 'eine Entscheidung treffen');
 });

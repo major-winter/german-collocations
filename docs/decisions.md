@@ -3100,6 +3100,13 @@ constants stayed at their spec values.
 
 **Known limitations** (deferred, from the spec): "Noch häufiger" can
 name a verb with another meaning (*Platz nehmen*, *Bescheid geben*); a
-mistyped verb gets "Nicht typisch", not "Verb nicht erkannt"; adjectives
-and pronouns in the phrase aren't parsed (search falls back); a few
-broken lab lemmas can appear as suggestions.
+mistyped verb (*Entscheidung trefen*) gets a plain search, not "Verb
+nicht erkannt"; adjectives and pronouns in the phrase aren't parsed
+(search falls back); a few broken lab lemmas can appear as suggestions;
+the matched phrase keeps the corpus's quantifier or negation (*keinen
+Sinn haben*, *alle Betten machen*).
+
+Final review fixes: a two-word search without a verb (*erste Hilfe*, *gute
+Nacht*) is a plain search, not a check — it used to get "*erste* ist kein
+typisches Verb zu *Hilfe*"; punctuation around words (*Entscheidung
+treffen?*) is ignored instead of making the verb unknown.

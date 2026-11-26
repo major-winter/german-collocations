@@ -107,3 +107,9 @@ test("a phrase that is not noun + verb is not parsed", async () => {
   assert.deepEqual(await service.check("Hallo Welt"), { parsed: false });
   assert.deepEqual(await service.check("Entscheidung"), { parsed: false });
 });
+
+test("an adjective + noun search is not a check (final review I1)", async () => {
+  await seed.word("Hilfe", { pos: "NOUN" });
+  await seed.labPair("leisten", "Hilfe", { score: 900 });
+  assert.deepEqual(await service.check("erste Hilfe"), { parsed: false });
+});
