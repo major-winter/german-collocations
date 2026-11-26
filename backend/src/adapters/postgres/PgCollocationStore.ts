@@ -176,7 +176,10 @@ const COLLOCATIONS_QUERY = `
 // ($1 matched against `noun`) or one verb ($1 against `verb`, plus its
 // reflexive "sich $1"). Best PER_SECTION_LIMIT per relation by LL score,
 // ranked before the examples join so it can't skew ROW_NUMBER(), then
-// up to 3 examples each, rank 1 first.
+// up to 3 examples each, rank 1 first. Decision #69: each pair's noun
+// carries its article from lab_noun_genders, null when the lab has none.
+// A correlated subquery, not a join: the join hash-scanned all of
+// lab_noun_genders (1.3 ms against 0.65 ms, EXPLAIN ANALYZE in #69).
 function buildLabVerbPairsQuery(side: PageSide): string {
   const match =
     side === "noun" ? "noun = $1" : "(verb = $1 OR verb = 'sich ' || $1)";
@@ -188,6 +191,7 @@ function buildLabVerbPairsQuery(side: PageSide): string {
       WHERE ${match}
     )
     SELECT r.relation, r.verb, r.prep, r.noun, r.phrase_noun AS "phraseNoun",
+      (SELECT g.article FROM lab_noun_genders g WHERE g.noun = r.noun) AS "nounArticle",
       r.score, r.pair_freq AS "pairFreq",
       ex.sentence, ex.verb_surface AS "verbSurface", ex.noun_surface AS "nounSurface"
     FROM ranked r
@@ -341,6 +345,7 @@ interface LabVerbPairRow {
   prep: string;
   noun: string;
   phraseNoun: string;
+  nounArticle: string | null;
   score: number;
   pairFreq: number;
   sentence: string | null;
@@ -455,6 +460,7 @@ export class PgCollocationStore implements CollocationStore {
         prep: row.prep,
         noun: row.noun,
         phraseNoun: row.phraseNoun,
+        nounArticle: row.nounArticle,
         score: row.score,
         pairFreq: row.pairFreq,
         examples: [],
