@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router";
 import type { CollocationResponse, WordSuggestion } from "@collocations/types";
 import { fetchCollocations } from "../api/collocations.ts";
 import { fetchSearch } from "../api/search.ts";
+import { Button } from "@/components/ui/button";
 import { CollocationCheckCard } from "../components/CollocationCheckCard.tsx";
 import { CollocationList } from "../components/CollocationList.tsx";
 import { PosLegend } from "../components/PosLegend.tsx";
@@ -25,6 +26,7 @@ function isAbortError(err: unknown): boolean {
 export function Word() {
     const { word } = useParams<{ word: string }>();
     const [state, setState] = useState<LookupState>({ status: "loading" });
+    const [attempt, setAttempt] = useState(0); // bumped by "Erneut versuchen" to refetch
 
     useEffect(() => {
         document.title = word ? `${word} – Wortnetz` : 'Wortnetz';
@@ -69,28 +71,41 @@ export function Word() {
         run();
 
         return () => controller.abort();
-    }, [word]);
+    }, [word, attempt]);
 
     if (state.status === "loading") {
-        return <p className="text-sm text-muted-foreground text-center">Wird geladen …</p>;
+        return (
+            <p role="status" className="mt-10 text-sm text-muted-foreground text-center">
+                Wird geladen …
+            </p>
+        );
     }
 
     if (state.status === "error") {
-        return <p role="alert" className="text-sm text-center">{state.message}</p>;
+        return (
+            <div className="mt-10 text-center space-y-3">
+                <p role="alert">{state.message}</p>
+                <Button variant="outline" className="h-10 px-4" onClick={() => setAttempt((n) => n + 1)}>
+                    Erneut versuchen
+                </Button>
+            </div>
+        );
     }
 
     if (state.status === "notFound") {
         return (
-            <div className="text-center">
-                <p>Keine Ergebnisse für „{word}“.</p>
+            <div className="mt-10 text-center space-y-4">
+                <h2 className="font-serif text-2xl font-semibold break-words hyphens-auto">
+                    Keine Ergebnisse für „{word}“
+                </h2>
                 {state.suggestions.length > 0 ? (
-                    <div>
-                        <p>Meinten Sie:</p>
-                        <ul className="flex flex-wrap justify-center gap-2 list-none">
+                    <div className="space-y-2">
+                        <p className="text-sm text-muted-foreground">Meinten Sie:</p>
+                        <ul className="flex flex-wrap justify-center gap-2 list-none p-0">
                             {state.suggestions.map((s) => (
                                 <li key={s.word}>
                                     <Link to={`/wort/${encodeURIComponent(s.word)}`}
-                                        className="inline-flex min-h-11 md:min-h-8 items-center rounded-md border px-3 py-1 text-sm
+                                        className="inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm
                                         hover:bg-accent hover:text-accent-foreground
                                         transition-colors">
                                         {s.word}
@@ -100,7 +115,7 @@ export function Word() {
                         </ul>
                     </div>
                 ) : (
-                    <p>Auch keine ähnlichen Wörter gefunden.</p>
+                    <p className="text-muted-foreground">Auch keine ähnlichen Wörter gefunden.</p>
                 )}
             </div>
         );
