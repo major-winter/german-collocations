@@ -134,8 +134,9 @@ export function CollocationCheckCard({ word, lemma, showField }: CollocationChec
     }
 
     return (
-        <section className="mt-4 rounded-xl border p-3.5" aria-label="Verbindung prüfen">
-            {check && <Verdict check={check} />}
+        <section className="mt-4 mb-3 rounded-xl border p-3.5" aria-label="Verbindung prüfen">
+            {/* Announced when a check arrives; the field the learner just used sits below it. */}
+            <div aria-live="polite">{check && <Verdict check={check} />}</div>
             <form onSubmit={handleSubmit} className={cn('flex items-center gap-2', check && 'border-t pt-3')}>
                 <label htmlFor="check-verb" className="text-sm text-muted-foreground whitespace-nowrap">
                     Verb prüfen
@@ -145,6 +146,12 @@ export function CollocationCheckCard({ word, lemma, showField }: CollocationChec
                     type="text"
                     value={verb}
                     onChange={(e) => setVerb(e.target.value)}
+                    placeholder="ein Verb"
+                    enterKeyHint="go"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
                     className="h-10 md:h-8 min-w-0 flex-1 md:text-base"
                 />
                 <Button type="submit" className="h-10 md:h-8">

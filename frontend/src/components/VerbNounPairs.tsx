@@ -85,7 +85,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                 const openIndex = openChip[relation];
                 return (
                     <div key={relation} className="py-3">
-                        <h3 className="text-[0.95rem] font-medium mb-1.5 text-muted-foreground">
+                        <h3 className="text-base font-medium mb-2 text-muted-foreground">
                             {headings[relation].map((part) => (
                                 <span key={part.text} className={cn(part.noun && cn('font-semibold', wordClassStyle('noun').text))}>
                                     {part.text}
@@ -104,16 +104,19 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                         openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
                                     )}
                                 >
-                                    {chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
-                                        <span
-                                            key={partIndex}
-                                            className={cn(
-                                                part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'),
-                                            )}
-                                        >
-                                            {part.text}
-                                        </span>
-                                    ))}
+                                    {/* One inline wrapper: as direct flex items the parts would lose their spaces ("dieEntscheidung"). */}
+                                    <span>
+                                        {chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
+                                            <span
+                                                key={partIndex}
+                                                className={cn(
+                                                    part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'),
+                                                )}
+                                            >
+                                                {part.text}
+                                            </span>
+                                        ))}
+                                    </span>
                                 </button>
                             ))}
                         </div>

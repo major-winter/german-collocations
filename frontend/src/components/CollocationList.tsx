@@ -34,32 +34,29 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                 <div className="flex flex-col gap-4">
                     {WORD_CLASS_ORDER.filter((section) => groups.has(section)).map((section) => (
                         <div key={section} className="py-3">
-                            <h3
-                                className={cn(
-                                    'text-[0.95rem] font-medium mb-1.5 text-muted-foreground',
-                                )}
-                            >
+                            <h3 className="text-base font-medium mb-2 text-muted-foreground">
                                 {wordClassStyle(section).label}
                             </h3>
-                            <div className="flex flex-col gap-1.5">
+                            <ul className="flex flex-col gap-4 list-none p-0">
                                 {groups
                                     .get(section)!
                                     .map((entry, i) => (
-                                        <div
-                                            key={`${entry.word}-${i}`}
-                                            className="rounded-lg px-2 py-1.5 hover:bg-accent/50 transition-colors space-y-1"
-                                        >
+                                        <li key={`${entry.word}-${i}`} className="px-2 space-y-1">
                                             {entry.examples.length > 0 ? (
-                                                entry.examples.map((example, i) => (
-                                                    <p key={i} className="text-base text-muted-foreground italic">
-                                                        {highlightCollocates(
-                                                            example.sentence,
-                                                            example.searchWord,
-                                                            example.collocateWord,
-                                                            wordClassStyle(section).text,
-                                                        )}
-                                                    </p>
-                                                ))
+                                                <>
+                                                    {/* The partner's lemma, so the list can be scanned without reading every sentence. */}
+                                                    <p className="font-serif text-lg">{entry.word}</p>
+                                                    {entry.examples.map((example, i) => (
+                                                        <p key={i} className="text-base text-muted-foreground italic border-l-2 pl-3">
+                                                            {highlightCollocates(
+                                                                example.sentence,
+                                                                example.searchWord,
+                                                                example.collocateWord,
+                                                                wordClassStyle(section).text,
+                                                            )}
+                                                        </p>
+                                                    ))}
+                                                </>
                                             ) : (
                                                 <p className="text-base text-muted-foreground">
                                                     <span className="font-semibold not-italic">{word}</span>{' '}
@@ -68,9 +65,9 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                                                     </span>
                                                 </p>
                                             )}
-                                        </div>
+                                        </li>
                                     ))}
-                            </div>
+                            </ul>
                         </div>
                     ))}
                 </div>
