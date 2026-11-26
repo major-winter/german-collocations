@@ -108,8 +108,9 @@ export function Word() {
 
     return (
         <div>
-            <div className="mt-6 flex items-baseline gap-3">
-                <h2 className="font-serif text-4xl font-semibold">
+            {/* Wraps and hyphenates (lang="de") so long compounds never scroll the page sideways. */}
+            <div className="mt-6 flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h2 className="min-w-0 font-serif text-3xl sm:text-4xl font-semibold break-words hyphens-auto">
                     {/* Decision #69: the article, muted, only when the searched word is the lemma itself. */}
                     {state.data.verbNounPairs?.article && state.data.verbNounPairs.lemma === state.data.word && (
                         <span className="font-normal text-muted-foreground">{state.data.verbNounPairs.article} </span>
