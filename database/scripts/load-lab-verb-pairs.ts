@@ -7,8 +7,10 @@ import {
   assertLoadable,
   assertMatchesManifest,
   parseExampleLine,
+  parseGenderLine,
   parseManifest,
   parsePairLine,
+  type LabNounGenderRow,
   type LabVerbPairExampleRow,
   type LabVerbPairRow,
 } from '../src/labVerbPairsTsv.ts';
@@ -112,18 +114,23 @@ async function run(): Promise<void> {
 
   const pairsPath = path.join(getDataDir(), 'lab_verb_pairs.tsv');
   const examplesPath = path.join(getDataDir(), 'lab_verb_pair_examples.tsv');
+  const gendersPath = path.join(getDataDir(), 'lab_noun_genders.tsv');
   const manifestPath = path.join(getDataDir(), 'lab_verb_pairs.manifest');
 
   const manifest = parseManifest(await readFile(manifestPath, 'utf8').catch(() => ''));
   if (!manifest) {
     await client.end();
-    throw new Error(`no readable manifest at ${manifestPath} - copy all three files from \`colloc export\``);
+    throw new Error(
+      `no readable manifest at ${manifestPath} - it needs pairs, examples and genders lines; ` +
+        're-export with a `colloc export` that writes lab_noun_genders.tsv and copy all four files',
+    );
   }
 
   try {
     await client.query('BEGIN');
     await client.query('DELETE FROM lab_verb_pair_examples');
     await client.query('DELETE FROM lab_verb_pairs');
+    await client.query('DELETE FROM lab_noun_genders');
 
     console.log(`loading lab verb pairs from ${pairsPath}`);
     const loadedPairKeys = new Set<string>();
@@ -169,18 +176,35 @@ async function run(): Promise<void> {
       },
     );
 
-    assertMatchesManifest(manifest, pairsRead.lines, examplesRead.lines);
-    assertLoadable(loadedPairKeys.size, pairsRead.malformed + examplesRead.malformed);
+    console.log(`loading noun genders from ${gendersPath}`);
+    let gendersLoaded = 0;
+    const gendersRead = await streamFile<LabNounGenderRow>(
+      gendersPath,
+      parseGenderLine,
+      () => true,
+      async (rows) => {
+        await insertBatch(client, 'lab_noun_genders', ['noun', 'article'], rows, (row) => [row.noun, row.article]);
+        gendersLoaded += rows.length;
+      },
+    );
+
+    assertMatchesManifest(manifest, pairsRead.lines, examplesRead.lines, gendersRead.lines);
+    assertLoadable(
+      loadedPairKeys.size,
+      pairsRead.malformed + examplesRead.malformed + gendersRead.malformed,
+    );
     await client.query('COMMIT');
 
     console.log(
       `done: ${loadedPairKeys.size.toLocaleString()} pairs and ${examplesLoaded.toLocaleString()} examples loaded, ` +
         `${examplesWithoutPair.toLocaleString()} examples skipped (pair not in the export), ` +
+        `${gendersLoaded.toLocaleString()} noun genders, ` +
         `${pairsRead.malformed.toLocaleString()} + ${examplesRead.malformed.toLocaleString()} malformed lines`,
     );
 
     await client.query('VACUUM ANALYZE lab_verb_pairs');
     await client.query('VACUUM ANALYZE lab_verb_pair_examples');
+    await client.query('VACUUM ANALYZE lab_noun_genders');
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

@@ -194,6 +194,11 @@ export function seeder(pool: Pool) {
       );
     },
 
+    /** A collocation-lab noun's article (#69). */
+    async labNounGender(noun: string, article: "der" | "die" | "das"): Promise<void> {
+      await pool.query(`INSERT INTO lab_noun_genders (noun, article) VALUES ($1, $2)`, [noun, article]);
+    },
+
     async labPairExample(
       verb: string,
       noun: string,

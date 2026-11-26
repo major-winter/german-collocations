@@ -1,16 +1,17 @@
-// Parsing for the two files `colloc export` (collocation-lab) writes -
-// decision #60, docs/decisions.md. Both are tab-separated, no header:
+// Parsing for the three files `colloc export` (collocation-lab) writes -
+// decisions #60 and #69, docs/decisions.md. All are tab-separated, no header:
 //
 //   lab_verb_pairs.tsv          relation verb prep noun phrase_noun score pair_freq
 //   lab_verb_pair_examples.tsv  relation verb prep noun rank sentence verb_surface noun_surface
+//   lab_noun_genders.tsv        noun article
 //
 // prep is empty unless relation is 'obl'. A malformed line parses to
 // null; load-lab-verb-pairs.ts counts those and refuses the whole load
 // when there are too many (assertLoadable), rather than half-replacing
 // the live pairs with a truncated or garbled export.
 //
-// lab_verb_pairs.manifest, written last by the export, holds both files'
-// line counts ("pairs\t<n>\nexamples\t<n>\n"). A file cut short at a
+// lab_verb_pairs.manifest, written last by the export, holds all three
+// files' line counts ("pairs\t<n>\nexamples\t<n>\ngenders\t<n>\n"). A file cut short at a
 // line boundary (an interrupted copy) has no malformed lines, so only
 // the manifest catches it (assertMatchesManifest).
 
@@ -36,6 +37,14 @@ export interface LabVerbPairExampleRow {
   sentence: string;
   verbSurface: string;
   nounSurface: string;
+}
+
+export const ARTICLES = ['der', 'die', 'das'] as const;
+export type Article = (typeof ARTICLES)[number];
+
+export interface LabNounGenderRow {
+  noun: string;
+  article: Article;
 }
 
 // Above this share of malformed lines the export is treated as broken.
@@ -66,6 +75,15 @@ export function parsePairLine(line: string): LabVerbPairRow | null {
   return { relation, verb, prep, noun, phraseNoun, score, pairFreq };
 }
 
+export function parseGenderLine(line: string): LabNounGenderRow | null {
+  const fields = line.split('\t');
+  if (fields.length !== 2) return null;
+
+  const [noun, article] = fields;
+  if (!noun || !(ARTICLES as readonly string[]).includes(article)) return null;
+  return { noun, article: article as Article };
+}
+
 export function parseExampleLine(line: string): LabVerbPairExampleRow | null {
   const fields = line.split('\t');
   if (fields.length !== 8) return null;
@@ -93,6 +111,7 @@ export function assertLoadable(pairCount: number, malformedCount: number): void 
 export interface LabVerbPairsManifest {
   pairs: number;
   examples: number;
+  genders: number;
 }
 
 export function parseManifest(text: string): LabVerbPairsManifest | null {
@@ -104,19 +123,22 @@ export function parseManifest(text: string): LabVerbPairsManifest | null {
   }
   const pairs = counts.get('pairs');
   const examples = counts.get('examples');
-  if (pairs === undefined || pairs === null || examples === undefined || examples === null) return null;
-  return { pairs, examples };
+  const genders = counts.get('genders');
+  if (pairs == null || examples == null || genders == null) return null;
+  return { pairs, examples, genders };
 }
 
-/** Throws unless both files have exactly the line counts the manifest records. */
+/** Throws unless all three files have exactly the line counts the manifest records. */
 export function assertMatchesManifest(
   manifest: LabVerbPairsManifest,
   pairLines: number,
   exampleLines: number,
+  genderLines: number,
 ): void {
   const mismatches = [
     ['pairs', pairLines, manifest.pairs],
     ['examples', exampleLines, manifest.examples],
+    ['genders', genderLines, manifest.genders],
   ].filter(([, read, expected]) => read !== expected);
   if (mismatches.length > 0) {
     throw new Error(
