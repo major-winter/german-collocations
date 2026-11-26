@@ -3,6 +3,7 @@ import { useParams, Link } from "react-router";
 import type { CollocationResponse, WordSuggestion } from "@collocations/types";
 import { fetchCollocations } from "../api/collocations.ts";
 import { fetchSearch } from "../api/search.ts";
+import { CollocationCheckCard } from "../components/CollocationCheckCard.tsx";
 import { CollocationList } from "../components/CollocationList.tsx";
 import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
@@ -122,6 +123,14 @@ export function Word() {
                 )}
             </div>
             <PosLegend sections={legendSections(state.data)} />
+            {/* Decision #70: "Passt das zusammen?" on noun pages. */}
+            {state.data.verbNounPairs?.side === "noun" && (
+                <CollocationCheckCard
+                    word={state.data.word}
+                    lemma={state.data.verbNounPairs.lemma}
+                    showField={state.data.verbNounPairs.pairs.some((p) => p.relation === "obj")}
+                />
+            )}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
             {state.data.verbNounPairs && (
                 <VerbNounPairs key={state.data.word} data={state.data.verbNounPairs} />

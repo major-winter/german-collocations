@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Search } from 'lucide-react';
+import { checkTarget, isPhraseQuery } from '@/lib/collocationCheck.ts';
+import { fetchCheck } from '../api/check.ts';
+import { API_BASE_URL } from '../config.ts';
 
 interface SearchBoxProps {
     initialValue: string;
@@ -16,10 +19,19 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
         setValue(decodeURIComponent(initialValue));
     }, [initialValue])
 
-    function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    async function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
         const trimmed = value.trim();
         if (!trimmed) return;
+        // Decision #70: a phrase like "eine Entscheidung machen" opens its noun
+        // page with the check; anything else (or a failed check) searches as before.
+        if (isPhraseQuery(trimmed)) {
+            const target = await fetchCheck(API_BASE_URL, trimmed).then(checkTarget, () => null);
+            if (target) {
+                navigate(target);
+                return;
+            }
+        }
         navigate(`/wort/${encodeURIComponent(trimmed)}`);
     }
 
