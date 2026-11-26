@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #70), and add it to the index.
+(next: #71), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -46,6 +46,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#67](#67) Collocation lookups tested against a real Postgres, through the `LookupCollocations` port
 - [#68](#68) Narrower `CollocationStore` port: one headword call, grouped results; governed-preposition lookup removed (amends #65, pauses #52)
 - [#69](#69) Verb–noun phrases as the corpus writes them, plus the noun's article (amends #60)
+- [#70](#70) "Passt das zusammen?": checking a typed verb–noun phrase against the lab's object pairs
 
 ---
 
@@ -3012,3 +3013,100 @@ Deferred minors from the final review (not fixed):
 - Merged respelled pairs count only the winning lemma's occurrences.
 - The loader's doc comment still says "two files".
 - Hyphenated phrase nouns aren't highlighted (pre-existing).
+
+## 70. "Passt das zusammen?": checking a typed verb–noun phrase against the lab's object pairs
+
+Spec: `docs/superpowers/specs/2026-11-26-collocation-check-design.md`
+(revised after a learner-focused review). Built 2026-11-26.
+
+**What.** A learner types *eine Entscheidung machen* in the search box,
+or a verb into a "Verb prüfen" field on a noun page, and gets "Üblich ✓",
+"Nicht typisch" or "Keine Daten", with the noun's typical verbs as the
+corpus writes them (#69). New endpoint `GET /api/check?q=`; the check
+lives in the noun page's URL (`?pruefen=`). Object pairs only; the
+response carries `relation: "obj"` so other relations can be added.
+
+**Why.** The app answered "what goes with *Entscheidung*?" but not the
+learner's actual question, "can I say this?". Interference errors (*make
+a decision*, *take a photo*, *spend time*) are exactly the pairs the lab
+lacks.
+
+**Rules** (`backend/src/domain/collocationCheck.ts`, pure, unit-tested):
+
+- Phrase: 2–5 tokens; a trailing separable particle is kept for the verb
+  (*legt eine Pause ein* → *einlegen*); articles, *kein-* and possessives
+  dropped; *sich* remembered; exactly a noun and a verb must remain.
+  With one capitalised word it is the noun; otherwise the noun is the
+  word that has no verb forms in the lab examples (phones type
+  *entscheidung*, and *Machen* is itself a noun headword).
+- Verb form → lemma via `lab_verb_pair_examples.verb_surface`, **without
+  looking at the noun**, most frequent wins, and a particle verb only
+  stands for a typed particle (*nimmt* is never *aufnehmen*). The first
+  draft preferred the lemma that pairs with the noun; the review showed
+  that turned *nimmt ein Foto* into "Üblich".
+- Reflexives: a plain verb matches its *sich* pair only within the
+  noun's top 10 (`REFLEXIVE_TOP_N`): *Mühe geben* → *sich Mühe geben*
+  (rank 1), but *eine Entscheidung machen* no longer matches *sich
+  machen* (rank 44).
+- Subject-error filter: an object pair is ignored when the same verb +
+  noun scores higher as a subject **and** the verb's object share is
+  below 0.4 (`SUBJECT_FILTER_MAX_OBJECT_SHARE`). A per-pair margin could
+  not separate *Bus fahren* (8× apart, real object) from *Entscheidung
+  fallen* (3×, parser error); the verb's object share can (*fahren*
+  0.41, *fallen* 0.15).
+- Membership in `lab_verb_pairs` (freq ≥ 5, positive LL) is the whole
+  verdict rule. Usual names up to 2 stronger verbs, not typical the top 3.
+
+**Wording.** "Nicht typisch" instead of the mockup's "Ungewöhnlich", and
+"in unseren Texten (Nachrichten, Wikipedia, Web)", with a footnote that
+everyday combinations (*Kaffee bestellen*) are sometimes missing: the data
+says "not typical in our texts", not "wrong".
+
+**Storage.** Migration 017 indexes `verb_surface` (55 ms → 1.9 ms for
+*nimmt*). Object pairs for *Frage* (209 rows, 61 obj) with the subject
+lookups: 10.6 ms. New narrow ports `CheckCollocation` /
+`CollocationCheckStore` (#65, #68); the headword query moved to
+`adapters/postgres/headword.ts`, shared by both adapters.
+
+**Spot-check** (3M data, local, 2026-11-26), verdict → matched or
+suggestions:
+
+| Typed | Verdict | Shown |
+|---|---|---|
+| eine Entscheidung machen | Nicht typisch | Entscheidungen treffen / eine Entscheidung fällen / die Entscheidung begründen |
+| macht eine Entscheidung, eine entscheidung machen | Nicht typisch | same |
+| nimmt eine Entscheidung | Nicht typisch | same |
+| Entscheidung fallen | Nicht typisch | same (filtered parser error) |
+| ein Foto nehmen, nimmt ein Foto | Nicht typisch | ein Foto posten / Fotos veröffentlichen / Fotos machen |
+| eine Frage machen, Frage fragen | Nicht typisch | Fragen beantworten / Fragen stellen / Fragen aufwerfen |
+| Aufmerksamkeit bezahlen | Nicht typisch | Aufmerksamkeit erregen / die Aufmerksamkeit lenken / Aufmerksamkeit schenken |
+| Zeit ausgeben | Nicht typisch | Zeit verbringen / sich Zeit nehmen / Zeit sparen |
+| Kaffee bestellen | Nicht typisch | Kaffee trinken / schlürfen / kochen (data gap, covered by the footnote) |
+| Sport machen | Üblich | noch häufiger: Sport treiben |
+| Mühe geben | Üblich | sich Mühe geben |
+| sich Sorgen machen | Üblich | sich Sorgen machen |
+| legt eine Pause ein | Üblich | eine Pause einlegen |
+| Bus fahren | Üblich | (kept by the share rule) |
+| Tochter heiraten | Üblich | die Tochter heiraten |
+| Druck machen | Üblich | noch häufiger: Druck ausüben / den Druck erhöhen |
+| Platz nehmen | Üblich | noch häufiger: den Platz belegen / erreichen (other meaning) |
+| Bescheid geben | Üblich | noch häufiger: Bescheid wissen (other meaning) |
+| Sinn machen, eine Rolle spielen, Kritik üben, nimmt Rücksicht, Hilfe leisten, Angst haben, Zeit verbringen, einen Fehler machen, Kaffee trinken, Hausaufgaben machen | Üblich | |
+| eine Dusche nehmen | Keine Daten | |
+
+Both bars from the spec hold: no typical learner error comes out
+"Üblich", and no "Nicht typisch" comes from our own filter. The
+constants stayed at their spec values.
+
+**Known limitations** (deferred, from the spec): "Noch häufiger" can
+name a verb with another meaning (*Platz nehmen*, *Bescheid geben*); a
+mistyped verb (*Entscheidung trefen*) gets a plain search, not "Verb
+nicht erkannt"; adjectives and pronouns in the phrase aren't parsed
+(search falls back); a few broken lab lemmas can appear as suggestions;
+the matched phrase keeps the corpus's quantifier or negation (*keinen
+Sinn haben*, *alle Betten machen*).
+
+Final review fixes: a two-word search without a verb (*erste Hilfe*, *gute
+Nacht*) is a plain search, not a check — it used to get "*erste* ist kein
+typisches Verb zu *Hilfe*"; punctuation around words (*Entscheidung
+treffen?*) is ignored instead of making the verb unknown.

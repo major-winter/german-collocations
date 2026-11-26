@@ -1,0 +1,106 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import type { CheckPhrase } from '@collocations/types';
+import { judge, normalisePhrase, pickVerbLemma, splitPhrase, type CheckPair } from './collocationCheck.ts';
+
+test('splitPhrase drops determiners and keeps noun and verb in order', () => {
+  assert.deepEqual(splitPhrase('eine Entscheidung machen'), { words: ['Entscheidung', 'machen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('  macht   keine Entscheidung '), { words: ['macht', 'Entscheidung'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Eine Entscheidung machen'), { words: ['Entscheidung', 'machen'], sich: false, particle: null });
+});
+
+test('splitPhrase remembers sich and a trailing separable particle', () => {
+  assert.deepEqual(splitPhrase('sich Mühe geben'), { words: ['Mühe', 'geben'], sich: true, particle: null });
+  assert.deepEqual(splitPhrase('legt eine Pause ein'), { words: ['legt', 'Pause'], sich: false, particle: 'ein' });
+});
+
+test('splitPhrase rejects anything that is not exactly noun + verb', () => {
+  assert.equal(splitPhrase('Entscheidung'), null);
+  assert.equal(splitPhrase('eine wichtige Entscheidung treffen'), null);
+  assert.equal(splitPhrase('a b c d e f'), null);
+  assert.equal(splitPhrase('die das'), null);
+});
+
+test('pickVerbLemma never lets a particle verb stand for the bare verb', () => {
+  const nimmt = [
+    { verb: 'nehmen', uses: 231 },
+    { verb: 'aufnehmen', uses: 59 },
+    { verb: 'abnehmen', uses: 14 },
+    { verb: 'sich nehmen', uses: 8 },
+  ];
+  assert.equal(pickVerbLemma('nimmt', null, nimmt), 'nehmen');
+  assert.equal(pickVerbLemma('nimmt', null, [{ verb: 'aufnehmen', uses: 300 }, { verb: 'nehmen', uses: 10 }]), 'nehmen');
+});
+
+test('pickVerbLemma uses a typed particle, attached or trailing', () => {
+  const legt = [{ verb: 'legen', uses: 71 }, { verb: 'festlegen', uses: 39 }, { verb: 'einlegen', uses: 5 }];
+  assert.equal(pickVerbLemma('legt', 'ein', legt), 'einlegen');
+  assert.equal(pickVerbLemma('legt', 'ein', [{ verb: 'legen', uses: 71 }]), null);
+  assert.equal(pickVerbLemma('aufnimmt', null, [{ verb: 'nehmen', uses: 10 }, { verb: 'aufnehmen', uses: 3 }]), 'aufnehmen');
+  assert.equal(pickVerbLemma('aufgenommen', null, [{ verb: 'aufnehmen', uses: 427 }]), 'aufnehmen');
+});
+
+test('pickVerbLemma strips sich, prefers a typed lemma, and gives up on nothing', () => {
+  assert.equal(pickVerbLemma('macht', null, [{ verb: 'machen', uses: 742 }, { verb: 'sich machen', uses: 41 }]), 'machen');
+  assert.equal(pickVerbLemma('fällen', null, [{ verb: 'fällen', uses: 0 }]), 'fällen');
+  assert.equal(pickVerbLemma('trefen', null, []), null);
+});
+
+function pair(verb: string, score: number, extra: Partial<CheckPair> = {}): CheckPair {
+  const noun = extra.noun ?? 'Entscheidung';
+  return { verb, noun, phraseNoun: noun, score, subjectScore: null, verbObjectShare: null, ...extra };
+}
+const phrases = (ps: CheckPhrase[]) => ps.map((p) => p.phrase);
+
+test('judge: a verb the noun does not take is unusual, with the top three instead', () => {
+  const result = judge('machen', false, [pair('treffen', 900), pair('fällen', 500), pair('begründen', 300), pair('revidieren', 100)]);
+  assert.equal(result.verdict, 'unusual');
+  assert.equal(result.matched, null);
+  assert.deepEqual(phrases(result.suggestions), ['Entscheidung treffen', 'Entscheidung fällen', 'Entscheidung begründen']);
+});
+
+test('judge: a usual pair names up to two stronger verbs, none at rank 1', () => {
+  const sport = (verb: string, score: number) => pair(verb, score, { noun: 'Sport' });
+  const result = judge('machen', false, [sport('treiben', 900), sport('machen', 500), sport('betreiben', 100)]);
+  assert.equal(result.verdict, 'usual');
+  assert.deepEqual(result.matched, { phrase: 'Sport machen', nounWord: 'Sport', verbWord: 'machen' });
+  assert.deepEqual(phrases(result.suggestions), ['Sport treiben']);
+  assert.deepEqual(judge('treiben', false, [sport('treiben', 900), sport('machen', 500)]).suggestions, []);
+});
+
+test('judge: a plain verb matches its sich pair only within the top 10', () => {
+  const mühe = judge('geben', false, [pair('sich geben', 897, { noun: 'Mühe' }), pair('haben', 177, { noun: 'Mühe' })]);
+  assert.equal(mühe.verdict, 'usual');
+  assert.deepEqual(mühe.matched, { phrase: 'sich Mühe geben', nounWord: 'Mühe', verbWord: 'geben' });
+
+  const others = Array.from({ length: 11 }, (_, i) => pair(`verb${i}`, 1000 - i));
+  assert.equal(judge('machen', false, [...others, pair('sich machen', 7)]).verdict, 'unusual');
+});
+
+test('judge: a typed sich matches only the sich pair', () => {
+  const sorge = (verb: string, score: number) => pair(verb, score, { noun: 'Sorge' });
+  assert.equal(judge('machen', true, [sorge('machen', 50), sorge('sich machen', 40)]).matched?.phrase, 'sich Sorge machen');
+  assert.equal(judge('geben', true, [pair('geben', 50)]).verdict, 'unusual');
+});
+
+test('judge: a subject misread as object is ignored only for a mostly intransitive verb', () => {
+  const fallen = pair('fallen', 627, { subjectScore: 1987, verbObjectShare: 0.15 });
+  const result = judge('fallen', false, [pair('treffen', 900), fallen]);
+  assert.equal(result.verdict, 'unusual');
+  assert.deepEqual(phrases(result.suggestions), ['Entscheidung treffen']);
+
+  const bus = pair('fahren', 117, { noun: 'Bus', subjectScore: 987, verbObjectShare: 0.41 });
+  assert.equal(judge('fahren', false, [bus]).verdict, 'usual');
+});
+
+test('judge: no object pairs, or none left after the filter, is noData; an unknown verb is unusual', () => {
+  assert.equal(judge('treffen', false, []).verdict, 'noData');
+  assert.equal(judge('fallen', false, [pair('fallen', 627, { subjectScore: 1987, verbObjectShare: 0.15 })]).verdict, 'noData');
+  assert.equal(judge(null, false, [pair('treffen', 900)]).verdict, 'unusual');
+});
+
+test('splitPhrase and normalisePhrase ignore punctuation around words (final review I2)', () => {
+  assert.deepEqual(splitPhrase('eine Entscheidung treffen?'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('„Entscheidung treffen.“'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+  assert.equal(normalisePhrase('  eine Entscheidung   treffen? '), 'eine Entscheidung treffen');
+});

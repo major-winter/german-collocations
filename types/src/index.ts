@@ -55,3 +55,26 @@ export interface CollocationResponse {
 
 export type WordSuggestion = { word: string; frequency: number; score: number };
 
+
+// Decision #70: "Passt das zusammen?" - one checked verb–noun phrase.
+export interface CheckPhrase {
+  phrase: string;   // as a learner says it ("sich Mühe geben")
+  nounWord: string; // the noun as written in `phrase`, for colouring
+  verbWord: string; // the verb as written in `phrase`, without "sich"
+}
+
+export type CheckVerdict = 'usual' | 'unusual' | 'noData';
+
+export type CollocationCheck =
+  | { parsed: false }
+  | {
+      parsed: true;
+      phrase: string;        // the query, whitespace-normalised, as typed
+      noun: string;          // the noun page to open
+      verbTyped: string;     // the verb token as typed ("macht")
+      verb: string | null;   // the lab verb lemma, null when unknown
+      relation: 'obj';
+      verdict: CheckVerdict;
+      matched: CheckPhrase | null;  // the matched pair as written, only when usual
+      suggestions: CheckPhrase[];
+    };
