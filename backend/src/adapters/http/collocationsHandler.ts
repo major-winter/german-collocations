@@ -8,6 +8,7 @@ export function createCollocationsHandler(useCase: LookupCollocations) {
 
     if (!word || word.trim() === "") {
       res.status(400).json({ error: "word parameter is required" });
+      return;
     }
     try {
       const result = await useCase.lookup(word);
