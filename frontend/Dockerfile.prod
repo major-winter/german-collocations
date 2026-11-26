@@ -13,6 +13,20 @@ COPY frontend/ frontend/
 WORKDIR /app/frontend
 ARG VITE_API_URL
 ENV VITE_API_URL=$VITE_API_URL
+# Decision #72: the Impressum details come from the server's .env, never
+# from git. A production page with placeholders is worse than a failed build.
+ARG VITE_IMPRESSUM_NAME
+ARG VITE_IMPRESSUM_ADDRESS
+ARG VITE_IMPRESSUM_EMAIL
+ENV VITE_IMPRESSUM_NAME=$VITE_IMPRESSUM_NAME \
+    VITE_IMPRESSUM_ADDRESS=$VITE_IMPRESSUM_ADDRESS \
+    VITE_IMPRESSUM_EMAIL=$VITE_IMPRESSUM_EMAIL
+RUN for v in VITE_IMPRESSUM_NAME VITE_IMPRESSUM_ADDRESS VITE_IMPRESSUM_EMAIL; do \
+      eval "val=\$$v"; \
+      if [ -z "$(echo "$val" | tr -d '[:space:]')" ]; then \
+        echo "error: ${v#VITE_} is not set in the server's .env (decision #72)" >&2; exit 1; \
+      fi; \
+    done
 RUN npm run build
 
 FROM caddy:2-alpine

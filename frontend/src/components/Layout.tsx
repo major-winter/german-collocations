@@ -40,9 +40,14 @@ export function Layout({ children }: LayoutProps) {
                 {children}
             </main>
 
-            <footer className="py-6 text-center">
+            <footer className="py-6 text-center space-y-1">
                 <p className="text-xs text-muted-foreground">
                     Daten: Leipzig Corpora Collection · sortiert nach Kollokationsstärke
+                </p>
+                <p className="text-xs text-muted-foreground">
+                    <Link to="/impressum" className="inline-block py-2 px-1.5 hover:underline">Impressum</Link>
+                    {' · '}
+                    <Link to="/datenschutz" className="inline-block py-2 px-1.5 hover:underline">Datenschutz</Link>
                 </p>
             </footer>
         </div>
