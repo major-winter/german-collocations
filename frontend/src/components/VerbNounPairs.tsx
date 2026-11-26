@@ -104,16 +104,19 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                         openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
                                     )}
                                 >
-                                    {chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
-                                        <span
-                                            key={partIndex}
-                                            className={cn(
-                                                part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'),
-                                            )}
-                                        >
-                                            {part.text}
-                                        </span>
-                                    ))}
+                                    {/* One inline wrapper: as direct flex items the parts would lose their spaces ("dieEntscheidung"). */}
+                                    <span>
+                                        {chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
+                                            <span
+                                                key={partIndex}
+                                                className={cn(
+                                                    part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'),
+                                                )}
+                                            >
+                                                {part.text}
+                                            </span>
+                                        ))}
+                                    </span>
                                 </button>
                             ))}
                         </div>
