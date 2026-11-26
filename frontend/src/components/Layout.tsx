@@ -8,7 +8,7 @@ interface LayoutProps {
 
 function Logomark() {
     return (
-        <Link to="/" className="flex items-center gap-2 shrink-0">
+        <Link to="/" className="flex items-center gap-2 shrink-0 min-h-10 min-w-10 justify-center rounded-md">
             <span className="flex items-center justify-center w-7 h-7 rounded-md bg-pos-noun text-white text-xs font-semibold">
                 WN
             </span>
