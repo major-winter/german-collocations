@@ -33,13 +33,18 @@ first version, **not** v2) has these states:
 1. **Search box (A).** Typing a phrase such as *eine Entscheidung
    machen* and pressing Enter opens the **Entscheidung** page with the
    check filled in. A single word searches as today.
-2. **Ungewöhnlich.** A card above the verb section: label
-   "Ungewöhnlich", the typed phrase struck through, "In unseren Texten
-   kommt *Entscheidung* fast nie mit *machen* vor. Üblich sind:", and up
-   to three suggestions written as the corpus writes them (#69):
-   *Entscheidungen treffen*, *eine Entscheidung fällen*, *die
-   Entscheidung begründen*.
-3. **Üblich ✓.** The phrase not struck, "Eine gängige Verbindung.", and,
+2. **Nicht typisch.** A card above the verb section: label
+   "Nicht typisch", the typed phrase struck through, "In unseren Texten
+   (Nachrichten, Wikipedia, Web) ist *machen* kein typisches Verb zu
+   *Entscheidung*. Typisch sind:", up to three suggestions written as
+   the corpus writes them (#69): *Entscheidungen treffen*, *eine
+   Entscheidung fällen*, *die Entscheidung begründen*; and a muted last
+   line: "Alltägliche Verbindungen wie *Kaffee bestellen* fehlen in
+   unseren Texten manchmal." The label changed from the mockup's
+   "Ungewöhnlich" after the learner review: the data says "not typical
+   in our texts", not "wrong".
+3. **Üblich ✓.** The phrase not struck, **written as matched** (typed
+   *Mühe geben* → "*sich Mühe geben*"), "Eine gängige Verbindung.", and,
    only if verbs rank higher, "Noch häufiger:" with up to two of them
    (*Sport machen* → *Sport treiben*).
 4. **Keine Daten.** The noun has no object pairs: "Zu *Dusche* haben wir
@@ -87,9 +92,17 @@ first version**: one verb, one verdict. See Non-goals.
 
 ## Anti-goals (a failure even if it "works")
 
-- **"Ungewöhnlich" for a pair Germans do say.** Worse than no answer.
-  Hence "Keine Daten" when the noun has no object pairs, and the
-  reflexive and surface-form handling below.
+- **"Üblich" for a typical learner error.** The worst outcome: it
+  confirms the mistake. A learner review of the first draft found
+  *eine Entscheidung machen*, *nimmt ein Foto* and *nimmt eine
+  Entscheidung* all coming out "Üblich", through a loose reflexive rule
+  and a verb-form lookup that peeked at the noun. The rules below close
+  both.
+- **"Nicht typisch" for a pair Germans do say.** Unavoidable for free
+  everyday combinations the news-heavy corpus lacks (*Kaffee bestellen*),
+  so the copy says "in unseren Texten" and never "falsch". It must not
+  happen through our own filters (*Bus fahren*, see the subject-error
+  filter).
 - **Suggesting a parser error.** E.g. *Entscheidung fallen* exists as an
   object pair (score 627) only because HDT mis-parses "die Entscheidung
   fällt" (subject pair 1987). Such pairs must not be suggested and must
@@ -118,6 +131,7 @@ type CollocationCheck = {
   verb: string | null;     // lab verb lemma, null if unknown
   relation: "obj";
   verdict: "usual" | "unusual" | "noData";
+  matched: string | null;  // the matched pair as written, e.g. "sich Mühe geben"; null unless usual
   suggestions: { phrase: string; verb: string }[]; // phraseOf(...), written form (#69)
 };
 ```
@@ -133,39 +147,83 @@ Postgres adapter and `*.dbtest.ts` tests (#67).
 **Parsing (pure domain function, unit-tested).**
 
 1. Split on whitespace; 2–5 tokens, else not parsed.
-2. Drop determiners, possessives and negation (*der, die, das, den, dem,
-   des, ein-, kein-, mein-, dein-, sein-, ihr-, unser-, euer-*) and
-   *sich*.
-3. What remains must be exactly one capitalised token (noun) and one
-   lowercase token (verb), in either order (*eine Entscheidung machen*,
-   *macht eine Entscheidung*). Anything else → not parsed.
-4. Noun → lemma with the same `lookupCandidates` order as the noun page.
+2. **Separable particle.** If the last token is a separable particle
+   (*ab, an, auf, aus, bei, ein, fest, mit, nach, vor, weg, zu,
+   zurück*) and another token precedes it, remove it and remember it
+   (*legt eine Pause ein*). This runs before step 3, so *ein* at the
+   end is never taken for an article.
+3. Drop determiners, possessives and negation (*der, die, das, den, dem,
+   des, ein-, kein-, mein-, dein-, sein-, ihr-, unser-, euer-*). Drop
+   *sich* too, but remember that it was typed.
+4. Exactly two tokens must remain, a noun and a verb, in either order
+   (*eine Entscheidung machen*, *macht eine Entscheidung*). Anything
+   else → not parsed. Which is which: a capitalised token is the noun.
+   If neither or both are capitalised (*eine entscheidung machen*, common
+   on phones), the noun is the token that resolves to a noun page
+   case-insensitively; if both or neither do → not parsed.
+5. Noun → lemma with the same `lookupCandidates` order as the noun page.
    If the word has no page in the app (the collocations lookup would
    404) → not parsed, so the search falls back to today's behaviour. A
    noun with a page but no object pairs (*Dusche*) parses and gets
    `noData`.
 
-**Verb lemma.** A lab verb lemma typed directly is used as is. Otherwise
-map the surface via `lab_verb_pair_examples.verb_surface` (9,433
-surfaces → 3,540 lemmas; 1,461 surfaces are ambiguous, e.g. *nimmt*):
-prefer the lemma that has an object pair with this noun, else the most
-frequent. No match → `verb: null`.
+**Verb lemma, resolved without looking at the noun.** The draft
+preferred "the lemma that pairs with this noun"; the review showed that
+turns errors into matches (*nimmt* + *Foto* → *aufnehmen*, "Üblich").
+Now:
 
-**Reflexives.** `X` and `sich X` count as the same verb for the verdict:
-*Mühe geben* is usual because *sich geben* is. The suggestion then shows
-the lab phrase, *sich Mühe geben*.
+1. A lab verb lemma typed directly (after `sich` is stripped from
+   reflexive lemmas for comparison) is used as is.
+2. Otherwise map the surface via `lab_verb_pair_examples.verb_surface`
+   (9,433 surfaces → 3,540 lemmas; 1,461 are ambiguous, e.g. *nimmt*).
+   Compare lemmas without their `sich`.
+3. **A particle verb only stands for a typed particle.** Keep only
+   candidates whose separable prefix was typed, attached (*aufnimmt*)
+   or as the remembered trailing particle (*legt … ein* → *einlegen*).
+   With no particle typed, *nimmt* can be *nehmen* but never *aufnehmen*
+   or *abnehmen*.
+4. Of the remaining candidates, take the one with the most example rows
+   across all nouns. None → `verb: null`.
+
+**Reflexives.** The draft counted `X` and `sich X` as one verb; that
+made *eine Entscheidung machen* "Üblich" through *sich machen* (score 7,
+10 uses, from "sich die Entscheidung nicht leicht machen"; rank 44 of
+Entscheidung's object verbs). Now:
+
+- *sich* typed: match only the `sich X` pair.
+- *sich* not typed: match the plain `X` pair. If there is none, match
+  `sich X` only when it is among the noun's **top 10** object pairs
+  (after the filter below). *Mühe geben* → *sich geben*, rank 1, usual;
+  *Sorgen machen* → *sich machen*, rank 1, usual; *Entscheidung machen*
+  → rank 44, not typical.
+- On any match, `matched` carries the pair as written (`phraseOf`), so
+  the card always shows the real form, *sich Mühe geben*.
 
 **Subject-error filter.** An object pair is ignored (for verdict and
-suggestions) when the same verb + noun has a subject pair with a higher
-score. On 2026-11-26 this affects 1,198 pairs (*Entscheidung fallen*,
-*Foto zeigen*, *Frage sich stellen*).
+suggestions) when **both**:
+
+- the same verb + noun has a subject pair with a higher score, and
+- the verb is mostly intransitive in the data: its object pairs make up
+  **less than 40%** of its object + subject pair frequency.
+
+The draft used the first condition alone and dropped real objects:
+*Bus fahren* (object 117 vs subject "Busse fahren" 987), *Tochter
+heiraten*, *Besucher erwarten*. A per-pair score margin can't separate
+these (*Bus fahren* is 8× apart, *Entscheidung fallen* only 3×); the
+verb's overall object share can. Measured 2026-11-26: *stattfinden*
+0.01, *kommen* 0.07, *fallen* 0.15, *steigen* 0.22, *beginnen* 0.26,
+*ausbrechen* 0.36 are filtered; *fahren* 0.41, *zeigen* 0.49,
+*heiraten* 0.66, *erwarten* 0.67, *sichern* 0.92 are not. 0.4 is a
+starting value; *fahren* sits close to it, so the spot-check decides
+the final constant, which lives next to the rule with a comment citing
+this spec.
 
 **Verdict.** Over the noun's object pairs after the filter:
 
 | Condition | Verdict | Suggestions |
 |---|---|---|
 | noun has no object pairs | `noData` | none |
-| verb (or `sich` + verb) is among them | `usual` | up to 2 pairs ranked above it |
+| the verb matches one of them (reflexive rules above) | `usual` | up to 2 pairs ranked above it |
 | otherwise, including `verb: null` | `unusual` | top 3 pairs |
 
 Membership in `lab_verb_pairs` is the whole rule: it already requires
@@ -187,19 +245,28 @@ frequency ≥ 5 and positive LL. No extra score threshold.
 
 ## Verification
 
-1. Unit tests for parsing (determiners, either order, *sich*, 1 or 6
-   tokens, two capitalised tokens) and for the verdict table, including
-   reflexive match and the subject-error filter. Handler test: blank `q`
-   → one 400. `*.dbtest.ts` for the store queries. `npm test`,
-   `npm run test:db -w backend`, `npm run typecheck`, frontend build.
-2. **Linguistic spot-check** (CLAUDE.md) on at least 20 phrases,
-   recorded in the decision entry: the table under Why, plus *Mühe
-   geben*, *eine Rolle spielen*, *Kritik üben*, *Entscheidung fallen*,
-   *macht eine Entscheidung*, *nimmt Rücksicht*, *Hilfe leisten*,
-   *Druck machen*, *Angst haben*, *Zeit verbringen*, *Zeit ausgeben*,
-   *einen Fehler machen*, *Platz nehmen*. Every "Ungewöhnlich" must be
-   one a German speaker would agree with; anything doubtful changes the
-   rule, not the test.
+1. Unit tests for parsing (determiners, either order, *sich* typed,
+   trailing particle, all-lowercase input, 1 or 6 tokens, two
+   capitalised tokens) and for the verdict rules: reflexive top-10 rule
+   (*Entscheidung machen* not typical, *Mühe geben* usual with
+   `matched` "sich Mühe geben"), particle-verb exclusion (*nimmt* never
+   *aufnehmen*), and the subject-error filter's two conditions. Handler
+   test: blank `q` → one 400. `*.dbtest.ts` for the store queries.
+   `npm test`, `npm run test:db -w backend`, `npm run typecheck`,
+   frontend build.
+2. **Linguistic spot-check** (CLAUDE.md) on at least 25 phrases,
+   recorded in the decision entry with verdict and suggestions: the
+   table under Why, plus *Mühe geben*, *eine Rolle spielen*, *Kritik
+   üben*, *Entscheidung fallen*, *macht eine Entscheidung*, *nimmt eine
+   Entscheidung*, *nimmt ein Foto*, *nimmt Rücksicht*, *legt eine Pause
+   ein*, *eine entscheidung machen* (lowercase), *Bus fahren*, *Tochter
+   heiraten*, *Kaffee bestellen*, *Hilfe leisten*, *Druck machen*,
+   *Angst haben*, *Zeit verbringen*, *Zeit ausgeben*, *einen Fehler
+   machen*, *Platz nehmen*, *Frage fragen*. No typical learner error may
+   come out "Üblich"; no "Nicht typisch" may come from our own filter.
+   Anything doubtful changes the rule, not the test. *Kaffee bestellen*
+   is expected to stay "Nicht typisch" (missing data, covered by the
+   copy).
 3. `EXPLAIN (ANALYZE, BUFFERS)` of the surface lookup against the 3M
    data.
 
@@ -218,10 +285,26 @@ run migrate, `up -d`, check container start times. Log as #70.
   how it was understood.
 - **The check lives in the URL** (`?pruefen=`), for back-button and
   sharing.
-- **Unknown verb → "Ungewöhnlich"**, not "Keine Daten", because the noun
-  is known and its usual verbs are still the right advice.
+- **Unknown verb → "Nicht typisch"**, not "Keine Daten", because the
+  noun is known and its usual verbs are still the right advice.
 - **A pair that is not the noun's top verb is still "Üblich"**, with
   "Noch häufiger" carrying the nuance (*Sport machen*).
+- **Reflexive cut-off at the top 10** object pairs, and the
+  subject-filter verb share at **0.4**: both chosen from the
+  2026-11-26 numbers above, both tuned by the spot-check.
+
+## Known limitations (from the learner review, deferred)
+
+- "Noch häufiger" can name a verb with another meaning (*Platz nehmen*
+  → *belegen*, a ranking; *Bescheid geben* → *Bescheid wissen*).
+  Possible later fix: label it "Andere häufige Verben", or show an
+  example sentence under each suggestion.
+- A mistyped verb (*trefen*) gets "Nicht typisch" rather than "Verb
+  nicht erkannt".
+- An adjective or pronoun in the phrase (*eine wichtige Entscheidung
+  treffen*, *ich mache…*) is not parsed; the search falls back to today.
+- A few lab verb lemmas are broken forms (*machten*, *innehatten*) and
+  can appear as suggestions.
 
 ## Left to the builder
 
