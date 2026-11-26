@@ -169,7 +169,7 @@ Expected: FAIL (`parseGenderLine` not exported; manifest shape mismatch).
 - [ ] **Step 4: Run tests, typecheck, and a real load**
 
 Run: `npm test && npm run typecheck`
-Then: `docker-compose up -d --build db migrate && docker-compose --profile manual run --build load-lab-verb-pairs` (service name per `compose.yml`).
+Then: `docker-compose up -d --build db migrate && docker-compose --profile manual run --build load-lab-verb-pairs`.
 Expected: tests PASS; loader prints a genders count matching Task 1 Step 5; `SELECT count(*) FROM lab_noun_genders` equals it.
 
 - [ ] **Step 5: Commit**
