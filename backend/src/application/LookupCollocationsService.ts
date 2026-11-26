@@ -48,9 +48,11 @@ export class LookupCollocationsService implements LookupCollocations {
     for (const candidate of candidates) {
       const pairs = await this.#store.findLabVerbPairs(side, candidate);
       if (pairs.length > 0) {
-        return { side, lemma: candidate, pairs: toVerbNounPairs(pairs, side) };
+        // On a noun page every pair's noun is the headword (#69).
+        const article = side === "noun" ? pairs[0].nounArticle : null;
+        return { side, lemma: candidate, article, pairs: toVerbNounPairs(pairs, side) };
       }
     }
-    return { side, lemma: candidates[candidates.length - 1], pairs: [] };
+    return { side, lemma: candidates[candidates.length - 1], article: null, pairs: [] };
   }
 }

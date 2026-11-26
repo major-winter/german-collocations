@@ -30,7 +30,7 @@ test("an unknown word is null", async () => {
 
 test("a word without a lemma still gets its lab pairs", async () => {
   const pair: LabVerbPair = {
-    relation: "obj", verb: "üben", prep: "", noun: "Kritik", phraseNoun: "Kritik",
+    relation: "obj", verb: "üben", prep: "", noun: "Kritik", phraseNoun: "Kritik", nounArticle: "die",
     score: 1, pairFreq: 2, examples: [],
   };
   const service = new LookupCollocationsService(
@@ -42,6 +42,7 @@ test("a word without a lemma still gets its lab pairs", async () => {
   const result = await service.lookup("Kritik");
   assert.deepEqual(result?.collocations, []);
   assert.equal(result?.verbNounPairs?.pairs[0].phrase, "Kritik üben");
+  assert.equal(result?.verbNounPairs?.article, "die");
 });
 
 test("falls back from the searched word to its lemma for lab pairs", async () => {
