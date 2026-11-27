@@ -15,6 +15,7 @@ import {
     type PartnerKind,
 } from '@/lib/collocationCheck.ts';
 import { wordClassStyle } from '@/lib/wordClass.ts';
+import { UnparsedCheckHint } from './UnparsedCheckHint.tsx';
 import { fetchCheck } from '../api/check.ts';
 import { API_BASE_URL } from '../config.ts';
 
@@ -218,9 +219,7 @@ export function CollocationCheckCard({ word, lemma, showHint, hintExample }: Col
                 {check && <Verdict check={check} />}
                 {unparsed && (
                     <p className="text-sm text-muted-foreground">
-                        Das können wir nicht prüfen. Geben Sie ein Nomen mit Verb oder Adjektiv ein, z. B.{' '}
-                        <i>Entscheidung treffen</i>, <i>starker Regen</i> oder{' '}
-                        <i>an einer Sitzung teilnehmen</i>.
+                        <UnparsedCheckHint />
                     </p>
                 )}
             </div>

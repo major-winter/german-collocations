@@ -12,6 +12,7 @@ import {
     preloadedCheck,
     historyStateWithoutCheck,
     searchFieldValue,
+    searchRoute,
     unusualReason,
     verdictLabel,
 } from './collocationCheck.ts';
@@ -43,6 +44,29 @@ const regen: CollocationCheck = {
 test('isPhraseQuery is two or more words', () => {
     assert.equal(isPhraseQuery('Entscheidung'), false);
     assert.equal(isPhraseQuery(' eine Entscheidung machen '), true);
+});
+
+test('searchRoute: a parsed phrase opens its noun page with the check (#70)', () => {
+    assert.deepEqual(searchRoute('eine Entscheidung machen', entscheidung), {
+        kind: 'check',
+        to: '/wort/Entscheidung?pruefen=eine%20Entscheidung%20machen',
+    });
+});
+
+test('searchRoute: an unparsed phrase of three or more words gets the hint, not a search (#78)', () => {
+    assert.deepEqual(searchRoute('Er hat eine Entscheidung getroffen', { parsed: false }), { kind: 'hint' });
+    assert.deepEqual(searchRoute(' es gibt  Probleme ', { parsed: false }), { kind: 'hint' });
+});
+
+test('searchRoute: a word, a two-word fallback or a failed check is a plain search', () => {
+    assert.deepEqual(searchRoute('Entscheidung', null), { kind: 'search', to: '/wort/Entscheidung' });
+    // Two words still search, as in #70: "seit langem", multiword lookups.
+    assert.deepEqual(searchRoute('seit langem', { parsed: false }), { kind: 'search', to: '/wort/seit%20langem' });
+    // The request failed: never a hint we cannot back up.
+    assert.deepEqual(searchRoute('Er hat eine Entscheidung getroffen', null), {
+        kind: 'search',
+        to: '/wort/Er%20hat%20eine%20Entscheidung%20getroffen',
+    });
 });
 
 test('searchFieldValue shows the check in the URL, else the page word (#77)', () => {
