@@ -224,6 +224,33 @@ async function populateLemmaDominantPos(client: Client): Promise<void> {
   console.log(`lemma_dominant_pos populated: ${Number(result.rows[0].count).toLocaleString()} rows`);
 }
 
+/**
+ * Decision #79: ADJ and ADV shares per lemma, for the collocation
+ * section query (an adjective is tagged ADV when it doesn't inflect).
+ * Same query as migration 019, which fills the table for a database
+ * loaded before it existed. Must run after populateWordDominantLemma.
+ */
+async function populateLemmaAdjectiveShares(client: Client): Promise<void> {
+  console.log('computing lemma_adjective_shares...');
+  await client.query('TRUNCATE lemma_adjective_shares');
+  await client.query(`
+    INSERT INTO lemma_adjective_shares (lemma_id, adj_share, adv_share)
+    SELECT lemma_id,
+      coalesce(sum(count) FILTER (WHERE pos = 'ADJ'), 0)::real / sum(count),
+      coalesce(sum(count) FILTER (WHERE pos = 'ADV'), 0)::real / sum(count)
+    FROM (
+      SELECT wdl.lemma_id, wp.pos, SUM(wp.count) AS count
+      FROM word_pos wp
+      JOIN word_dominant_lemma wdl ON wdl.word_id = wp.word_id
+      GROUP BY wdl.lemma_id, wp.pos
+    ) lemma_pos
+    GROUP BY lemma_id
+    HAVING sum(count) FILTER (WHERE pos = 'ADJ') > 0
+  `);
+  const result = await client.query<{ count: string }>('SELECT count(*) FROM lemma_adjective_shares');
+  console.log(`lemma_adjective_shares populated: ${Number(result.rows[0].count).toLocaleString()} rows`);
+}
+
 async function populateLemmaFrequency(client: Client): Promise<void> {
   console.log('computing lemma_frequency...');
   await client.query('TRUNCATE lemma_frequency');
@@ -264,6 +291,7 @@ async function run(): Promise<void> {
 
     await populateWordDominantLemma(client);
     await populateLemmaDominantPos(client);
+    await populateLemmaAdjectiveShares(client);
     await populateLemmaFrequency(client);
   } finally {
     await client.end();

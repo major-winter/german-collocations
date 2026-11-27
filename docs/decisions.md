@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #79), and add it to the index.
+(next: #80), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -55,6 +55,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#76](#76) "Passt das zusammen?" for a verb with a prepositional noun (amends #70)
 - [#77](#77) One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
 - [#78](#78) The check reads learner sentences (pronouns, adjectives, more particles); an unreadable sentence gets the hint, not "Keine Ergebnisse" (amends #70, #76, #77)
+- [#79](#79) Adjacency lists: a pair needs 3 sentences, and adjectives the tagger reads as adverbs go under "Adjektive" (amends #36, #43)
 
 ---
 
@@ -4006,3 +4007,126 @@ session), and VoiceOver.
 **Deploy.** Backend and frontend together (the frontend change only
 matters with the backend's parsing, but each works without the other).
 No migration, no data load.
+
+---
+
+<a id="79"></a>
+## 79. Adjacency lists: a pair needs 3 sentences, and adjectives the tagger reads as adverbs go under "Adjektive" (amends #36, #43)
+
+**Problem.** A quality review of the extracted collocations (2026-11-28)
+measured each reported problem class against the local 1M data and 28
+headwords. Two causes, both in the adjacency list
+(`lemma_collocations`, #44), explained most of what a learner sees:
+
+1. **Pairs from one sentence.** logDice (#43) divides by both lemmas'
+   frequency, so one sentence shared by two rare lemmas clears the 6.3
+   floor: 14 + log2(2 / 300) ≈ 6.8. 84 % of the 505,980 pairs above the
+   floor occur once. On a random 8 % sample of NOUN/VERB/ADJ headwords
+   (1,509 lemmas), the share of *shown* adjacency entries that rest on 1–2
+   sentences was 0 % for headword frequency ≥ 1,000, 66 % for 200–999,
+   93.5 % for 50–199 and 95.8 % below 50. This is where the reported
+   *angeordnet*, *empfohlen* and *Müsst* on *Bundesverfassungsgericht*
+   come from (each from 1 sentence, not from a tagging or attribute
+   error), as do *Dichter*, *Hartnäckiger* and *zartrosa* on *Nebel*
+   (1–2) and *Kraftfahrzeugrenne* on *Motorrad*.
+2. **Adjectives under "Sonstige".** spaCy tags an inflected adjective ADJ
+   (*dichter Nebel*) and an uninflected one ADV (*ist dicht*, *deutlich
+   machen*), the same fact #54 relied on. So `lemma_dominant_pos` files
+   *dicht* (ADV 0.55), *offen*, *richtig*, *endgültig* as ADV, or below the
+   #36 threshold, and `SECTION_CASE` puts them under "other". On a noun
+   page the attributive list (#54) replaces only the "adjective" section,
+   so the same adjectives showed twice: 60 repeats on 18 of the 28
+   headwords (*Entscheidung* 6, *Kritik* 6, *Frage* 5, *Wort* 5).
+
+**Decision.** Both are query-side, in `PgCollocationStore.ts`:
+- `MIN_COOCCURRENCE = 3` on adjacency pairs, applied before ranking, so a
+  one-off pair can't take a slot. Same value as
+  `MIN_ADJECTIVE_ATTRIBUTE_COUNT` (#54). A hand sample of pairs shows
+  hapaxes about half noise or broken lemmas (*erforderen*, *verwai*,
+  *löschenIdeen*); from 3 sentences up, the sample was mostly real (*Kaffee
+  trinken*, *Prüfung unterziehen*, *Termin buchen*). At 2 it was mixed
+  (*Kaffee schlürfen* next to *Fahrrad codieren*, *Prüfung summarisch*).
+- A partner lemma is an adjective when its ADJ + ADV share is ≥ 0.8 (the #36
+  threshold) and ADJ alone is ≥ 0.05 (`MIN_ADJECTIVE_TAG_SHARE`). True
+  adverbs never inflect: *sehr*, *immer*, *dort*, *heute* sit at 0.00, and
+  *weiter*/*erst* at 0.01. Adjectives used mostly predicatively start near
+  0.04 (*zufrieden*, *unklar*, *dankbar*). There is no sharp gap, so 0.05 is
+  a judgement: the band 0.02–0.05 holds *wirklich*, *unbedingt* and
+  *wahrscheinlich*, which stay under "other".
+- The shares live in a new table `lemma_adjective_shares (lemma_id,
+  adj_share, adv_share)`, migration `019`, one row per lemma with any ADJ
+  tag (39,654 rows). It is a table, not a view, for the same reason as
+  `lemma_dominant_pos` (database/CLAUDE.md pitfall 3). The migration fills
+  it from `word_pos` and `word_dominant_lemma` for an already-loaded
+  database (0.9 s locally). `load-lemmas.ts` refills it on every reload with
+  the same query (`populateLemmaAdjectiveShares`). Additive:
+  `lemma_dominant_pos` and #36's rule for every other word class are
+  unchanged.
+
+**Spot-check** (28 headwords, before = `main` against `collocations`, after
+= this branch against a copy, `collocations_extract`; lab pairs unchanged):
+adjacency entries 465 → 372; adjectives repeated under "Sonstige" 60 → 5;
+pairs from 1–2 sentences 35 → 0.
+- *Nebel*: 20 → 3 (*dicht, zäh, morgendlich*); *Dichter*, *Frost*,
+  *zäher*, *Hartnäckiger*, *Niesel*, *zartrosa* gone.
+- *Bundesverfassungsgericht*: 6 → 0; the page keeps its 6 lab subject pairs.
+- *Motorrad*: 15 → 2.
+- *Entscheidung*: "Sonstige" (*endgültig, richtig, falsch, mutig, wichtig,
+  schwierig, strategisch, klug, wegweisend*) is gone; the attributive list
+  is unchanged.
+- Verb pages gain an "Adjektive" group where "Sonstige" held them:
+  *machen* → *aufmerksam, deutlich, möglich, sichtbar, verantwortlich,
+  geltend*; *stellen* → *fest, klar, sicher*.
+- High-frequency pages (*Buch, Bus, Zeit, groß, neu, treffen*) are
+  unchanged apart from that regrouping.
+- The 5 repeats left are lemmas with a third tag (participles *zerstört*,
+  *anderer*, *zwei*).
+
+**Known costs.**
+- Rare headwords get shorter or empty adjacency lists. In the sample, the
+  headwords with at least one adjacency partner went 182 → 171 (frequency
+  200–999), 507 → 294 (50–199) and 725 → 176 (20–49). Real but rare pairs
+  go too (*Nebel lichten*, *Geduld entgegenbringen*). For nouns and verbs
+  the lab pairs (#60), which have their own floor of 5, still show.
+- On noun pages, adjacency adjectives that aren't in the attributive top
+  10 disappear rather than move (*Entscheidung*: *strategisch, klug,
+  wegweisend*).
+- *machen* still shows *deutlich* twice (one pair per direction, as #44
+  keys by pair); now under "Adjektive" instead of "Sonstige".
+
+**Measured but not fixed here.**
+- **Split umlaut plurals** (improvement idea 8). A shape rule (umlaut +
+  -e/-er/-en/-ern/-n/∅) alone matches 4,683 noun-lemma pairs, but most are
+  false (*Täter/Tat*, *Bürger/Burg*, *Wähler/Wahl*, *Bühne/Buhn*). With
+  evidence there are three groups:
+  - lemmas spaCy cut off, which the corpus never writes (*Einsatzkräft*,
+    *Waldbränd*, *Fahrräd*, *Supermärkt*): about 2,000 lemmas and 8.8k
+    tokens, mostly genuine, but with false hits (*Mück*, *Säur*, *Näs*);
+  - plural lemmas that Stanza (the lab's example surfaces) maps to the
+    singular: 148 (*Motorräder, Vögel, Töchter, Söhne*), and also wrong
+    ones (*Stürmer→Sturm*, *Böller→Boller*);
+  - spaCy's own split votes without a genitive -s form: 88.
+
+  Recall is poor: *Räder→Rad*, *Fahrräder*, *Äpfel* and *Bälle* have no
+  evidence. Of the 28 headwords only *Rad* and *Motorrad* are affected.
+  It needs a hand-reviewed exception table and a full lemma reload (#37,
+  R8), so it ranks below the two fixes above.
+- **Mojibake** ("â€ž"): in the Leipzig source itself, 1,868 of 1M
+  sentences. It reaches 750 adjacency example sentences, 797 attributive
+  examples, 99 lab examples and 1,616 lemmas.
+- **Capitalised adjectives/verbs as nouns** at sentence start (*Dichter*,
+  *Müsst*, *Lag*): 3,212 lemmas, but only 76 pairs with a noun neighbour
+  reach 3 sentences, so the new floor removes almost all of what showed.
+- **Attributive word order**: only 475 of 569,207 attributive examples
+  (0.08 %) have the adjective after its noun; not a problem worth a fix.
+
+**Rollout.** No reload and no new service: `docker compose -f
+compose.prod.yml build migrate backend`, `run --rm migrate` (019 creates
+and fills the table), then `up -d backend`. The old backend ignores the
+new table, so the order can't break anything.
+
+**Checked.** `npm test` (116), `npm run typecheck`, `npm run test:db -w
+backend` against a private `*_test` database (41, four new: the count
+floor, an ADV-tagged adjective, no repeat on a noun page, an adverb with
+stray ADJ tags staying "other"; two older tests that leaned on a
+one-sentence pair now use 3 and 5 sentences).

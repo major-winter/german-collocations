@@ -147,6 +147,14 @@ export function seeder(pool: Pool) {
       ]);
     },
 
+    /** How often a seeded lemma is tagged ADJ and ADV, as shares of all its tags (#79). */
+    async adjectiveShares(lemma: string, shares: { adj: number; adv: number }): Promise<void> {
+      await pool.query(
+        "INSERT INTO lemma_adjective_shares (lemma_id, adj_share, adv_share) VALUES ($1, $2, $3)",
+        [idOf(lemmaIds, lemma), shares.adj, shares.adv],
+      );
+    },
+
     /** Two lemmas seen next to each other, left then right. */
     async collocation(left: string, right: string, cooccurrence: number): Promise<void> {
       await pool.query(

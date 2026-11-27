@@ -35,6 +35,23 @@ const PER_SECTION_LIMIT = 10;
 // in decision #44 - see that decision for the re-verification numbers.
 const MIN_LOG_DICE = 6.3;
 
+// Decision #79: logDice normalises by both lemmas' frequency, so for a
+// rare headword one shared sentence with another rare lemma already
+// clears MIN_LOG_DICE ("Bundesverfassungsgericht" + "Müsst", "Nebel" +
+// "zartrosa"). Measured on a random sample of headwords: below corpus
+// frequency 1,000, 66-95 % of the shown pairs rested on 1-2 sentences.
+// Same value as MIN_ADJECTIVE_ATTRIBUTE_COUNT.
+const MIN_COOCCURRENCE = 3;
+
+// Decision #79: spaCy tags an inflected adjective ADJ ("dichter Nebel")
+// and an uninflected one ADV ("ist dicht", "deutlich machen"), so
+// lemma_dominant_pos files many adjectives as ADV or below the #36
+// threshold. A lemma counts as an adjective when ADJ and ADV together
+// pass DOMINANCE_THRESHOLD and ADJ alone reaches this share; true
+// adverbs (sehr, immer, dort) sit at 0.00-0.01, adjectives used mostly
+// predicatively (zufrieden, unklar) from about 0.04.
+const MIN_ADJECTIVE_TAG_SHARE = 0.05;
+
 // Decision #54 (docs/decisions.md): same light-noise-floor reasoning
 // as decision #53's MIN_ARGUMENT_COUNT (removed by #60), re-verified against the real full-corpus
 // adjective_attribute.tsv rather than assumed equal just because the
@@ -49,6 +66,8 @@ const MIN_ADJECTIVE_ATTRIBUTE_COUNT = 3;
 // a single JS constant rather than two copies that could drift.
 const SECTION_CASE = `
   CASE
+    WHEN las.adj_share >= ${MIN_ADJECTIVE_TAG_SHARE}
+      AND las.adj_share + las.adv_share >= ${DOMINANCE_THRESHOLD} THEN 'adjective'
     WHEN ldp.share IS NULL THEN 'other'
     WHEN ldp.pos = 'NOUN' THEN 'noun'
     WHEN ldp.pos IN ('VERB', 'AUX') THEN 'verb'
@@ -96,7 +115,9 @@ function buildBranchQuery(fixedSide: "left" | "right"): string {
     JOIN lemma_frequency partner_freq ON partner_freq.lemma_id = ${partnerId}
     LEFT JOIN lemma_dominant_pos ldp
       ON ldp.lemma_id = ${partnerId} AND ldp.share >= ${DOMINANCE_THRESHOLD}
+    LEFT JOIN lemma_adjective_shares las ON las.lemma_id = ${partnerId}
     WHERE ${fixedId} = $1
+      AND lc.cooccurrence >= ${MIN_COOCCURRENCE}
       -- Decision #57: a proper noun is not a collocate. Before this,
       -- SECTION_CASE's ELSE branch dropped every PROPN partner into
       -- 'other', which for a noun like "Präsident" was nothing but names
