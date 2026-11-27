@@ -149,9 +149,15 @@ test("a form mostly tagged as a verb stays a verb, even when its adjective readi
   assert.equal(check.parsed && check.relation, "obj");
 });
 
-test("the verb reading stays when the verb comes after the noun or the verb check is usual", async () => {
-  const after = await service.check("Frage bekannte");
-  assert.equal(after.parsed && after.relation, "obj");
+test("the verb-vs-adjective rule holds in either word order", async () => {
+  // The card's field sends noun + word ("Frage bekannte"); it must agree
+  // with the search box ("bekannte Frage").
+  const after = amod(await service.check("Frage bekannte"));
+  assert.equal(after.adjective, "bekannt");
+  assert.equal(after.verdict, "unusual");
+});
+
+test("the verb reading stays when the verb check is usual", async () => {
   const usual = await service.check("Sport machen");
   assert.equal(usual.parsed && usual.relation, "obj");
 });

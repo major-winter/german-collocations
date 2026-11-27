@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import type { CollocationCheck } from '@collocations/types';
 import {
     checkMatchesPage,
+    checkQueryFor,
     checkTarget,
     isPhraseQuery,
     partnerKind,
@@ -38,6 +39,16 @@ const regen: CollocationCheck = {
 test('isPhraseQuery is two or more words', () => {
     assert.equal(isPhraseQuery('Entscheidung'), false);
     assert.equal(isPhraseQuery(' eine Entscheidung machen '), true);
+});
+
+test('checkQueryFor sends a whole phrase as typed, like the search box (#75)', () => {
+    assert.equal(checkQueryFor(' schwerer  Regen ', 'Regen'), 'schwerer Regen');
+    assert.equal(checkQueryFor('eine Entscheidung treffen', 'Regen'), 'eine Entscheidung treffen');
+});
+
+test('checkQueryFor puts the page noun with a single word', () => {
+    assert.equal(checkQueryFor('schwerer', 'Regen'), 'Regen schwerer');
+    assert.equal(checkQueryFor('  ', 'Regen'), null);
 });
 
 test('checkTarget opens the noun page with the check in the URL', () => {

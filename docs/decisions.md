@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #75), and add it to the index.
+(next: #76), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -51,6 +51,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#72](#72) Usage baseline and legal pages: anonymous per-day counts, Impressum and Datenschutz with the operator's details kept out of git
 - [#73](#73) TypeScript 6 at the root for ESLint, TypeScript 7 declared where backend and database use it
 - [#74](#74) "Passt das zusammen?" for adjective + noun: attributive logDice over the #54 data (amends #70)
+- [#75](#75) One phrase field on the check card; the verb-vs-adjective rule in either word order (amends #70, #74)
 
 ---
 
@@ -3490,3 +3491,41 @@ server-side time is under the 150 ms revisit trigger; the cold start is
 above it. These checks added about 2 `check` (Sport machen, schwerer
 Regen) and about 14 `check` lookups for großer Mann from outside, plus 20
 from inside the container, plus 2 `word_page` to `usage_counts`.
+
+## 75. One phrase field on the check card; the verb-vs-adjective rule in either word order (amends #70, #74)
+
+**Problem.** The check had two inputs that built different phrases. The
+search box sends the phrase as typed (*bekannte Frage*); the card's
+"Wort prüfen" field took one word and put the page's noun in front
+(*Frage bekannte*). #74's rule ("a word before its noun that is mostly
+tagged ADJ, with a verb reading that is not usual, is the adjective")
+only fired in the first order, so the same words got an adjective
+verdict from the search box and a *bekennen* verb verdict from the card.
+
+**Decision.** (user, 2026-11-27)
+- The card's field takes a whole phrase, exactly like the search box,
+  and is pre-filled with the current check (label "Verbindung prüfen",
+  placeholder "Wort oder Verbindung"). A single word still goes with
+  the page's noun (`checkQueryFor` in `frontend/src/lib/collocationCheck.ts`).
+- A phrase about another noun typed on the card (*eine Entscheidung
+  treffen* on the *Regen* page) opens that noun's page with the check,
+  as the search box does. A phrase the server cannot parse shows a
+  short hint with two examples instead of nothing.
+- On phones the label sits above the field so the phrase fits; on
+  desktop it stays beside it.
+- `CheckCollocationService` applies the #74 rule in either word order.
+  A usual verb check still never changes.
+
+**Spot-check** (24 phrases through the dev API, noun-first and
+adjective-first, participles and plain verbs: *Frage stellen*,
+*Entscheidung getroffen*, *Entscheidung gefallen*, *Rolle spielen*,
+*Kosten gestiegen*, *Reise planen*, *Arbeit bezahlte*, *Mühe sich
+geben*, …): the only change is *Frage bekannte*, from *bekennen*
+(obj, Nicht typisch) to *bekannt* (amod, Nicht typisch).
+
+**Checked.** `npm test` (94), `test:db` (33), typecheck, frontend lint
+and build; the card at 360 px and 1280 px with device emulation: no
+horizontal overflow, the "Prüfen" button fully on screen.
+
+**Deploy.** Backend and frontend together (the field now sends phrases
+the old backend reads in the old order). No migration.

@@ -48,13 +48,14 @@ export class CheckCollocationService implements CheckCollocation {
     const adjectiveAllowed = split.particle === null && !split.sich;
     const verbCheck = await this.#verbCheck(q, split);
     if (verbCheck !== null) {
-      // Review finding: "bekannte Frage" read "bekannte" as "bekennen". A
-      // word typed before its noun, where an attributive adjective stands,
-      // is the adjective when the verb reading is not usual and the form is
-      // mostly tagged ADJ. Not when the adjective reading is merely usual:
+      // Review finding: "bekannte Frage" read "bekannte" as "bekennen". The
+      // partner is the adjective when the verb reading is not usual and the
+      // form is mostly tagged ADJ, in either word order (#75: the card's
+      // field sends "Frage bekannte", the search box "bekannte Frage", and
+      // both must agree). Not when the adjective reading is merely usual:
       // tagger errors give verbs tiny attributive totals, so high logDice
       // ("macht" -> "machen"). A usual verb check never changes.
-      if (adjectiveAllowed && verbCheck.verdict !== "usual" && split.words[0] === verbCheck.verbTyped) {
+      if (adjectiveAllowed && verbCheck.verdict !== "usual") {
         const adjectiveCheck = await this.#adjectiveCheck(q, split.words);
         if (adjectiveCheck?.mostlyAdjective) {
           return adjectiveCheck.check;
