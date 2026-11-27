@@ -116,7 +116,7 @@ test("a phrase that is not noun + verb is not parsed", async () => {
   assert.deepEqual(await service.check("Entscheidung"), { parsed: false });
 });
 
-test("an adjective + noun search is not a check (final review I1)", async () => {
+test("with no attributive data, an adjective + noun search is not a check (#70 I1, narrowed by #74)", async () => {
   await seed.word("Hilfe", { pos: "NOUN" });
   await seed.labPair("leisten", "Hilfe", { score: 900 });
   assert.deepEqual(await service.check("erste Hilfe"), { parsed: false });
@@ -162,7 +162,7 @@ test("the store counts the noun's full total and the adjective's other nouns", a
   assert.deepEqual([...byLemma.keys()].sort(), ["dicht", "heftig", "leicht", "schwer", "stark", "strömend"]);
   assert.equal(byLemma.get("stark")?.adjectiveTotal, 3030);
   assert.equal(byLemma.get("schwer")?.count, 1);
-  assert.deepEqual(await store.findAdjectiveLemma("starker"), { id: id("stark"), lemma: "stark" });
+  assert.deepEqual(await store.findAdjectiveLemma("starker"), { id: id("stark"), lemma: "stark", mostlyAdjective: true });
   assert.equal(await store.findAdjectiveLemma("regen"), null);
 });
 
@@ -213,4 +213,32 @@ test("lange Zeit: the form's attributive lemma wins over its dominant adverb lem
   assert.equal(check.adjective, "lang");
   assert.equal(check.verdict, "usual");
   assert.equal(check.matched?.phrase, "langer Zeit");
+});
+
+test("macht eine Entscheidung stays a verb check, though tagger errors give machen attributive rows", async () => {
+  await entscheidung();
+  await seed.word("macht", { lemma: "machen", pos: "VERB" });
+  for (const adjective of ["richtig", "schwer", "wichtig", "endgültig", "politisch"]) {
+    await seed.word(adjective, { pos: "ADJ" });
+    await seed.adjectiveAttribute("Entscheidung", adjective, 20);
+  }
+  await seed.adjectiveAttribute("Entscheidung", "machen", 3);
+  const check = parsed(await service.check("macht eine Entscheidung"));
+  assert.equal(check.verb, "machen");
+  assert.equal(check.verdict, "unusual");
+});
+
+test("eine bekannte Frage: a form mostly tagged ADJ is the adjective, not the verb", async () => {
+  await seed.word("Frage", { pos: "NOUN" });
+  await seed.labPair("stellen", "Frage", { score: 900 });
+  await seed.labPair("bekennen", "Schuld", { score: 50 });
+  await seed.labPairExample("bekennen", "Schuld", 1, "Er bekannte seine Schuld.", { verb: "bekannte", noun: "Schuld" });
+  await seed.word("bekannt", { pos: "ADJ" });
+  await seed.word("bekannte", { lemma: "bekannt", pos: "ADJ" });
+  for (const adjective of ["offen", "zentral", "wichtig", "entscheidend", "bekannt"]) {
+    if (adjective !== "bekannt") await seed.word(adjective, { pos: "ADJ" });
+    await seed.adjectiveAttribute("Frage", adjective, adjective === "bekannt" ? 1 : 20);
+  }
+  const check = amod(await service.check("eine bekannte Frage"));
+  assert.equal(check.adjective, "bekannt");
 });

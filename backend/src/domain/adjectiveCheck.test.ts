@@ -5,6 +5,7 @@ import {
   attributiveLogDice,
   bestWrittenForm,
   isPositiveForm,
+  positiveEnding,
   judgeAdjective,
   type AdjectiveCount,
   type AdjectiveCounts,
@@ -120,9 +121,33 @@ test("bestWrittenForm prefers the positive, then the noun's lemma form, then the
     bestWrittenForm([form("starken", "Regens", 2), form("starker", "Regen", 1)], "Regen", "stark")?.adjectiveWord,
     "starker",
   );
-  assert.equal(
-    bestWrittenForm([form("starke", "Regen", 1), form("starken", "Regen", 2)], "Regen", "stark")?.adjectiveWord,
-    "starken",
-  );
   assert.equal(bestWrittenForm([], "Regen", "stark"), null);
+});
+
+test("positiveEnding is the inflection ending after the positive stem", () => {
+  assert.equal(positiveEnding("schwerer", "schwer"), "er");
+  assert.equal(positiveEnding("hohes", "hoch"), "es");
+  assert.equal(positiveEnding("erste", "erster"), "e");
+  assert.equal(positiveEnding("leise", "leise"), "e");
+  assert.equal(positiveEnding("stark", "stark"), "");
+  assert.equal(positiveEnding("höchste", "hoch"), null);
+});
+
+test("bestWrittenForm keeps the typed ending when the examples write it", () => {
+  const form = (adjectiveWord: string, nounWord: string, examples: number) => ({ adjectiveId: 1, adjectiveWord, nounWord, examples });
+  const forms = [form("starken", "Regen", 3), form("starker", "Regen", 1)];
+  assert.equal(bestWrittenForm(forms, "Regen", "stark", "er")?.adjectiveWord, "starker");
+});
+
+test("bestWrittenForm prefers a strong ending (-er, -e, -es) over -en and -em", () => {
+  const form = (adjectiveWord: string, examples: number) => ({ adjectiveId: 1, adjectiveWord, nounWord: "Regen", examples });
+  assert.equal(bestWrittenForm([form("strömendem", 3), form("strömender", 1)], "Regen", "strömend")?.adjectiveWord, "strömender");
+  // The typed ending is from another noun's gender: still a strong form first.
+  assert.equal(bestWrittenForm([form("strömendem", 3), form("strömender", 1)], "Regen", "strömend", "e")?.adjectiveWord, "strömender");
+});
+
+test("bestWrittenForm prefers a lowercase adjective over a name's capital", () => {
+  const form = (adjectiveWord: string, examples: number) => ({ adjectiveId: 1, adjectiveWord, nounWord: "Nacht", examples });
+  assert.equal(bestWrittenForm([form("Langen", 3), form("lange", 1)], "Nacht", "lang")?.adjectiveWord, "lange");
+  assert.equal(bestWrittenForm([form("Erste", 2)], "Hilfe", "erster")?.adjectiveWord, "Erste");
 });

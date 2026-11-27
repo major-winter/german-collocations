@@ -101,26 +101,62 @@ function positiveStems(lemma: string): string[] {
   return stems;
 }
 
-/** Whether a written adjective is its lemma's positive degree ("hohes", not "höchste"). */
-export function isPositiveForm(surface: string, lemma: string): boolean {
+/**
+ * The inflection ending of a positive-degree form ("schwerer" -> "er",
+ * "hohes" -> "es"), the longest that fits; null for a comparative or
+ * superlative ("höchste") or a form of another lemma.
+ */
+export function positiveEnding(surface: string, lemma: string): string | null {
   const word = surface.toLowerCase();
-  return positiveStems(lemma.toLowerCase()).some((stem) => ENDINGS.some((ending) => word === stem + ending));
+  let best: string | null = null;
+  for (const stem of positiveStems(lemma.toLowerCase())) {
+    for (const ending of ENDINGS) {
+      if (word === stem + ending && (best === null || ending.length > best.length)) best = ending;
+    }
+  }
+  return best;
 }
 
+/** Whether a written adjective is its lemma's positive degree ("hohes", not "höchste"). */
+export function isPositiveForm(surface: string, lemma: string): boolean {
+  return positiveEnding(surface, lemma) !== null;
+}
+
+// Strong endings read right without an article ("strömender Regen",
+// "gute Chance", "starkes Interesse"); -en/-em mostly need one.
+const STRONG_ENDINGS = new Set(["er", "e", "es"]);
+
 /**
- * The form a pair is shown in: a positive adjective first (the examples
- * write "hohes Risiko" as "höchste Risiko" too), then the noun's lemma form
- * ("starker Regen" over "starken Regens"), then the most examples.
+ * The form a pair is shown in (reviewer finding: the most frequent form
+ * was often a dative or weak one, "strömendem Regen", "berechtigte
+ * Interesse"). In order: a positive adjective (not "höchste Risiko"); the
+ * ending the learner typed, when the examples write it ("starker Regen"
+ * stays "starker"); a strong ending; a lowercase adjective over a name's
+ * capital ("lange Nacht", not "Langen Nacht"; "Erste Hilfe" keeps its
+ * capital when the corpus never writes it lowercase); the noun's lemma
+ * form ("Regen", not "Regens"); then the most examples.
  */
-export function bestWrittenForm(forms: WrittenForm[], nounLemma: string, adjectiveLemma: string): WrittenPair | null {
-  const rank = (f: WrittenForm): [number, number, number] => [
-    isPositiveForm(f.adjectiveWord, adjectiveLemma) ? 0 : 1,
-    f.nounWord === nounLemma ? 0 : 1,
-    -f.examples,
-  ];
+export function bestWrittenForm(
+  forms: WrittenForm[],
+  nounLemma: string,
+  adjectiveLemma: string,
+  typedEnding: string | null = null,
+): WrittenPair | null {
+  const rank = (f: WrittenForm): number[] => {
+    const ending = positiveEnding(f.adjectiveWord, adjectiveLemma);
+    return [
+      ending === null ? 1 : 0,
+      typedEnding !== null && ending === typedEnding && f.nounWord === nounLemma ? 0 : 1,
+      ending !== null && STRONG_ENDINGS.has(ending) ? 0 : 1,
+      f.adjectiveWord[0] === f.adjectiveWord[0].toLowerCase() ? 0 : 1,
+      f.nounWord === nounLemma ? 0 : 1,
+      -f.examples,
+    ];
+  };
   const best = [...forms].sort((a, b) => {
     const [x, y] = [rank(a), rank(b)];
-    return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] || a.adjectiveWord.localeCompare(b.adjectiveWord);
+    for (let i = 0; i < x.length; i++) if (x[i] !== y[i]) return x[i] - y[i];
+    return a.adjectiveWord.localeCompare(b.adjectiveWord);
   })[0];
   return best === undefined ? null : { adjectiveId: best.adjectiveId, adjectiveWord: best.adjectiveWord, nounWord: best.nounWord };
 }

@@ -14,21 +14,26 @@ const headwords: Record<string, Headword> = {
   Kosten: { lemma: { id: 200, text: "Kosten" }, pos: "NOUN" },
   Sport: { lemma: { id: 300, text: "Sport" }, pos: "NOUN" },
   Nacht: { lemma: { id: 400, text: "Nacht" }, pos: "NOUN" },
+  Frage: { lemma: { id: 500, text: "Frage" }, pos: "NOUN" },
   Hohe: { lemma: { id: 3, text: "hoch" }, pos: "ADJ" },
   Starker: { lemma: { id: 1, text: "stark" }, pos: "ADJ" },
 };
 
 const adjectives: Record<string, AdjectiveLemma> = {
-  starker: { id: 1, lemma: "stark" },
-  stark: { id: 1, lemma: "stark" },
-  starken: { id: 1, lemma: "stark" },
-  schwerer: { id: 2, lemma: "schwer" },
-  hohe: { id: 3, lemma: "hoch" },
-  kosten: { id: 9, lemma: "kosten" }, // a tagger error in the #54 data
-  regen: { id: 8, lemma: "reg" },
+  starker: { id: 1, lemma: "stark", mostlyAdjective: true },
+  stark: { id: 1, lemma: "stark", mostlyAdjective: true },
+  starken: { id: 1, lemma: "stark", mostlyAdjective: true },
+  schwerer: { id: 2, lemma: "schwer", mostlyAdjective: true },
+  hohe: { id: 3, lemma: "hoch", mostlyAdjective: true },
+  kosten: { id: 9, lemma: "kosten", mostlyAdjective: false }, // a tagger error in the #54 data
+  regen: { id: 8, lemma: "reg", mostlyAdjective: false },
+  bekannte: { id: 5, lemma: "bekannt", mostlyAdjective: true },
+  offene: { id: 36, lemma: "offen", mostlyAdjective: false },
 };
 
-const verbs: Record<string, string> = { machen: "machen", regen: "sich regen", kosten: "kosten" };
+const verbs: Record<string, string> = {
+  machen: "machen", regen: "sich regen", kosten: "kosten", bekannte: "bekennen", stellt: "stellen", offene: "öffnen",
+};
 
 const lemmaOf = (id: number) => Object.values(adjectives).find((a) => a.id === id)?.lemma ?? `adj${id}`;
 const pair = (adjectiveId: number, count: number, adjectiveTotal: number): AdjectiveCount => ({
@@ -37,6 +42,7 @@ const pair = (adjectiveId: number, count: number, adjectiveTotal: number): Adjec
 
 // Regen: stark is typical, schwer (one use, a common adjective) is not.
 const regenPairs = [pair(1, 30, 3000), pair(2, 1, 4000), pair(11, 10, 200), pair(12, 8, 300), pair(13, 6, 100), pair(14, 5, 900)];
+const fragePairs = [pair(36, 50, 100), pair(31, 20, 300), pair(32, 10, 200), pair(33, 9, 50), pair(34, 8, 80)];
 const kostenPairs = [pair(3, 200, 2000), pair(21, 50, 800), pair(22, 20, 300), pair(23, 10, 100), pair(24, 9, 50)];
 
 function store(): CollocationCheckStore {
@@ -44,14 +50,17 @@ function store(): CollocationCheckStore {
     resolveHeadword: async (word) => headwords[word] ?? null,
     findVerbCandidates: async (surface) => (verbs[surface] ? [{ verb: verbs[surface], uses: 3 }] : []),
     findObjectPairs: async (noun) =>
-      noun === "Sport"
-        ? [{ verb: "machen", noun: "Sport", phraseNoun: "Sport", score: 10, subjectScore: null, verbObjectShare: null }]
+      noun === "Sport" || noun === "Frage"
+        ? [{
+            verb: noun === "Sport" ? "machen" : "stellen", noun, phraseNoun: noun, score: 10,
+            subjectScore: null, verbObjectShare: null,
+          }]
         : [],
     findAdjectiveLemma: async (surface) => adjectives[surface] ?? null,
     findAdjectiveCounts: async (nounLemmaId, adjectiveLemmaId) => {
-      const pairs = nounLemmaId === 100 ? regenPairs : nounLemmaId === 200 ? kostenPairs : [];
+      const pairs = { 100: regenPairs, 200: kostenPairs, 500: fragePairs }[nounLemmaId] ?? [];
       return {
-        nounTotal: nounLemmaId === 100 ? 200 : nounLemmaId === 200 ? 800 : 0,
+        nounTotal: { 100: 200, 200: 800, 500: 150 }[nounLemmaId] ?? 0,
         pairs: pairs.filter((p) => p.count >= 5 || p.adjectiveId === adjectiveLemmaId),
       };
     },
@@ -61,7 +70,7 @@ function store(): CollocationCheckStore {
         .map((id) => ({
           adjectiveId: id,
           adjectiveWord: id === 3 ? "höhere" : `${lemmaOf(id)}e`, // "hoch" only as a comparative
-          nounWord: nounLemmaId === 100 ? "Regen" : "Kosten",
+          nounWord: { 100: "Regen", 200: "Kosten", 500: "Frage" }[nounLemmaId] ?? "?",
           examples: 1,
         })),
   };
@@ -116,6 +125,33 @@ test("a separable particle or sich rules out the adjective branch", async () => 
   assert.deepEqual(await service.check("sich starker Regen"), { parsed: false });
 });
 
-test("a word that is no adjective with data is a plain search", async () => {
+test("a word with no attributive lemma is a plain search", async () => {
+  // "gute" is not in this store; with real data "gute Nacht" is an adjective check.
   assert.deepEqual(await service.check("gute Nacht"), { parsed: false });
+});
+
+test("bekannte Frage: before its noun, a form that is mostly the adjective is the adjective", async () => {
+  // The verb reading ("bekennen") is not usual, and "bekannte" is mostly tagged ADJ.
+  const check = amod(await service.check("eine bekannte Frage"));
+  assert.equal(check.adjective, "bekannt");
+  assert.equal(check.verdict, "unusual");
+});
+
+test("a verb form that is only rarely an adjective stays a verb", async () => {
+  // "regen" is mostly a verb; its adjective lemma "reg" has no pair with Frage.
+  const check = await service.check("regen Frage");
+  assert.equal(check.parsed && check.relation, "obj");
+});
+
+test("a form mostly tagged as a verb stays a verb, even when its adjective reading is usual", async () => {
+  // "offene" here is mostly a verb form; "offen Frage" would be a usual pair.
+  const check = await service.check("offene Frage");
+  assert.equal(check.parsed && check.relation, "obj");
+});
+
+test("the verb reading stays when the verb comes after the noun or the verb check is usual", async () => {
+  const after = await service.check("Frage bekannte");
+  assert.equal(after.parsed && after.relation, "obj");
+  const usual = await service.check("Sport machen");
+  assert.equal(usual.parsed && usual.relation, "obj");
 });

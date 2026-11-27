@@ -12,6 +12,7 @@ import {
   bestWrittenForm,
   isPositiveForm,
   judgeAdjective,
+  positiveEnding,
   type AdjectiveCount,
 } from "../domain/adjectiveCheck.ts";
 import { lookupCandidates, pageSide } from "../domain/verbNounPhrases.ts";
@@ -44,13 +45,28 @@ export class CheckCollocationService implements CheckCollocation {
 
     // The verb branch first, exactly as in #70; the adjective branch only
     // gets the phrases it does not parse, so no verb check changes.
+    const adjectiveAllowed = split.particle === null && !split.sich;
     const verbCheck = await this.#verbCheck(q, split);
-    if (verbCheck !== null) return verbCheck;
-    if (split.particle !== null || split.sich) return NOT_PARSED;
-    return (await this.#adjectiveCheck(q, split.words)) ?? NOT_PARSED;
+    if (verbCheck !== null) {
+      // Review finding: "bekannte Frage" read "bekannte" as "bekennen". A
+      // word typed before its noun, where an attributive adjective stands,
+      // is the adjective when the verb reading is not usual and the form is
+      // mostly tagged ADJ. Not when the adjective reading is merely usual:
+      // tagger errors give verbs tiny attributive totals, so high logDice
+      // ("macht" -> "machen"). A usual verb check never changes.
+      if (adjectiveAllowed && verbCheck.verdict !== "usual" && split.words[0] === verbCheck.verbTyped) {
+        const adjectiveCheck = await this.#adjectiveCheck(q, split.words);
+        if (adjectiveCheck?.mostlyAdjective) {
+          return adjectiveCheck.check;
+        }
+      }
+      return verbCheck;
+    }
+    if (!adjectiveAllowed) return NOT_PARSED;
+    return (await this.#adjectiveCheck(q, split.words))?.check ?? NOT_PARSED;
   }
 
-  async #verbCheck(q: string, split: Split): Promise<CollocationCheck | null> {
+  async #verbCheck(q: string, split: Split): Promise<Extract<CollocationCheck, { relation: "obj" }> | null> {
     const roles = await this.#roles(split.words);
     if (roles === null) return null;
     const { nounToken, verbToken, verbCandidates } = roles;
@@ -80,7 +96,10 @@ export class CheckCollocationService implements CheckCollocation {
   // Decision #74. With exactly one capitalised word, that word is the noun;
   // otherwise both orders are tried, the typed one first (German puts the
   // attributive adjective before its noun): "Starker Regen", "hohe kosten".
-  async #adjectiveCheck(q: string, [a, b]: [string, string]): Promise<CollocationCheck | null> {
+  async #adjectiveCheck(
+    q: string,
+    [a, b]: [string, string],
+  ): Promise<{ check: Extract<CollocationCheck, { relation: "amod" }>; mostlyAdjective: boolean } | null> {
     const orders: [string, string][] =
       isCapitalised(a) !== isCapitalised(b) ? [isCapitalised(a) ? [b, a] : [a, b]] : [[a, b], [b, a]];
     for (const [adjectiveToken, nounToken] of orders) {
@@ -93,15 +112,18 @@ export class CheckCollocationService implements CheckCollocation {
       const shown = [...(judgement.matched ? [judgement.matched] : []), ...judgement.suggestions];
       const forms =
         shown.length === 0 ? [] : await this.#store.findWrittenForms(noun.id, shown.map((p) => p.adjectiveId));
+      // The typed ending carries the noun's gender and case: "schwerer Regen"
+      // suggests "strömender Regen" when the examples write it.
+      const typedEnding = positiveEnding(adjectiveToken, adjective.lemma);
       const phraseOf = (pair: AdjectiveCount, positiveOnly = false) => {
         const own = forms.filter((f) => f.adjectiveId === pair.adjectiveId);
-        const written = bestWrittenForm(own, noun.text, pair.adjective);
+        const written = bestWrittenForm(own, noun.text, pair.adjective, typedEnding);
         if (written === null) return null;
         if (positiveOnly && !isPositiveForm(written.adjectiveWord, pair.adjective)) return null;
         return adjectiveCheckPhrase(written);
       };
 
-      return {
+      const check: Extract<CollocationCheck, { relation: "amod" }> = {
         parsed: true,
         phrase: normalisePhrase(q),
         noun: noun.text,
@@ -115,6 +137,7 @@ export class CheckCollocationService implements CheckCollocation {
         // Never a bare lemma pair ("stark Regen"): no example, no suggestion.
         suggestions: judgement.suggestions.map((p) => phraseOf(p)).filter((p) => p !== null),
       };
+      return { check, mostlyAdjective: adjective.mostlyAdjective };
     }
     return null;
   }

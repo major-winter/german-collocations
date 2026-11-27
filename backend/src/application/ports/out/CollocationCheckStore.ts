@@ -6,6 +6,8 @@ import type { Headword } from "./CollocationStore.ts";
 export interface AdjectiveLemma {
   id: number;
   lemma: string;
+  /** Whether the typed form is mostly tagged ADJ ("bekannte" yes, though also "bekennen"; "macht" no). */
+  mostlyAdjective: boolean;
 }
 
 // Driven (outbound) port for the collocation check (#70, #74). Narrow on

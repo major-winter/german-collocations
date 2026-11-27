@@ -49,10 +49,12 @@ const OBJECT_PAIRS_QUERY = `
 // "lange", but as an attribute it is "lang"). Of the lemmas that modify
 // some noun attributively, the one with the largest attributive total
 // wins; the noun is not looked at (the #70 lesson). The attributive check
-// also keeps most nouns and verbs out.
+// also keeps most nouns and verbs out. mostlyAdjective is the form's
+// dominant POS (a correlated subquery on the view, as in headword.ts).
 const ADJECTIVE_LEMMA_QUERY = `
-  SELECT id, lemma FROM (
+  SELECT id, lemma, "mostlyAdjective" FROM (
     SELECT l.id, l.lemma,
+      coalesce((SELECT wdp.pos FROM word_dominant_pos wdp WHERE wdp.word_id = w.id) = 'ADJ', false) AS "mostlyAdjective",
       (SELECT sum(aa.count) FROM adjective_attributes aa WHERE aa.adjective_lemma_id = l.id) AS total
     FROM words w
     JOIN word_lemmas wl ON wl.word_id = w.id

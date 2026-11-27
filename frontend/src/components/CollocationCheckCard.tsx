@@ -48,7 +48,9 @@ function typedPhrase(check: Parsed): CheckPhrase {
 
 function Verdict({ check }: { check: Parsed }) {
     const partner = partnerKind(check);
-    const partnerLemma = check.relation === 'amod' ? check.adjective : (check.verb ?? check.verbTyped);
+    // An adjective is named as typed: the tagger's lemmas read oddly in a
+    // sentence ("erster", "reg" for "rege").
+    const partnerLemma = check.relation === 'amod' ? check.adjectiveTyped.toLowerCase() : (check.verb ?? check.verbTyped);
     const typical = partner === 'adjective' ? 'typisches Adjektiv' : 'typisches Verb';
     return (
         <>
