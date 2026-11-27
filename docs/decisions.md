@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #74), and add it to the index.
+(next: #75), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -50,6 +50,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#71](#71) Saved lists + practice: browser-only list first, gap-fill second, accounts only after measured repeat use (proposed, not built)
 - [#72](#72) Usage baseline and legal pages: anonymous per-day counts, Impressum and Datenschutz with the operator's details kept out of git
 - [#73](#73) TypeScript 6 at the root for ESLint, TypeScript 7 declared where backend and database use it
+- [#74](#74) "Passt das zusammen?" for adjective + noun: attributive logDice over the #54 data (amends #70)
 
 ---
 
@@ -3263,3 +3264,207 @@ this deploy because of the 4 known errors. Checked against the live site:
 `/` 200, `/api/collocations/Entscheidung` 200 with *treffen*,
 `/api/collocations/zzzqqq` 404, `/api/check?q=Sport machen` 200. These
 checks added 2 `word_page` and 1 `check` to `usage_counts` for 2026-11-27.
+
+## 74. "Passt das zusammen?" for adjective + noun: attributive logDice over the #54 data (amends #70)
+
+Spec: `docs/superpowers/specs/2026-11-27-adjective-noun-check-design.md`
+(approved 2026-11-27 with the user's changes). Plan:
+`docs/superpowers/plans/2026-11-27-adjective-noun-check.md`. Built
+2026-11-27.
+
+**What.** A typed adjective + noun (*schwerer Regen*, *Regen stark*, *ein
+starker Regen*, *Starker Regen*, *hohe kosten*) gets the #70 verdicts,
+with the noun's typical adjectives as the corpus writes them. The
+response is a new `relation: "amod"` variant of `CollocationCheck`
+(`adjectiveTyped`, `adjective`); `CheckPhrase.verbWord` is now
+`partnerWord`, so backend and frontend ship in one deploy. On a noun page
+the field is "Wort prüfen" ("Verb oder Adjektiv") and shows when the noun
+has object pairs or an adjective section. The home page links a second
+example, *schwerer Regen*.
+
+**Amends #70.** #70's final review made a two-word search without a verb
+(*erste Hilfe*, *gute Nacht*) a plain search. It is now an adjective check
+when the adjective has attributive data. The verb branch still runs first
+and is unchanged for every phrase it parses, with one exception from the
+review: a word typed **before** its noun whose form is mostly tagged ADJ
+(`word_dominant_pos`) is the adjective when the verb reading is not
+"Üblich" (*eine bekannte Frage* was read as *bekennen*). A "Üblich" verb
+check never changes, and *macht/fällt eine Entscheidung* stay verb checks
+(their forms are mostly VERB). Using "the adjective reading is usual" as
+the signal was tried and dropped: tagger errors give *machen* an
+attributive total of 3, which gives a high logDice.
+
+**Verdict rule.** "Üblich" when the attributive logDice is at least
+`MIN_ADJECTIVE_CHECK_LOGDICE = 6`, where logDice = 14 + log2(2c / (f_noun +
+f_adj)). c is the pair's count in `adjective_attributes`; f_noun is the
+noun's attributive total over all its adjectives, with no floor; f_adj is
+the adjective's attributive total over all nouns. **This logDice is
+computed within the attributive relation only**. It is not the window
+logDice of `lemma_collocations` (#43, #44), and the two are never merged or
+ranked together. Thin-noun gate: a noun with fewer than 5 adjectives of
+count ≥ 5 gets "Keine Daten". Suggestions ("Typisch sind" and "Noch
+häufiger", 3 and 2 as in #70) are usual pairs themselves: count ≥ 5 and
+logDice ≥ 6 (builder choice), so no hapax adjective and never a pair the
+card rejects. Among those they are **ordered by count**, logDice breaking
+ties (user, 2026-11-27): logDice decides *whether* a pair is usual, count
+decides which comes first, so the phrase a learner would most likely use
+leads (*schwerer Regen* → *starker Regen*, 31 uses, not *strömender*, 16).
+"Noch häufiger" names only pairs with a higher count than the typed one,
+so it is literally true. Ordering by logDice, as first built, put
+specific adjectives (*strömend*, *gefrierend*) ahead of the common one.
+
+Evidence (the main session, on the spec's 64 hand-labelled pairs, same gate):
+
+| Rule | Errors caught (of 23) | Correct passed (of 34) |
+|---|---|---|
+| B (draft): count ≥ 5 and share ≥ 1% | 20 | 32 |
+| logDice ≥ 6 (chosen) | 21 | 32 |
+
+logDice misclassifies only *schwere Arbeit* (correct, "Nicht typisch") and
+*warme Temperatur* (error, "Üblich"). The API spot-check below shows the
+same result.
+
+**Adjective form → lemma.** Through `word_lemmas`, not only the dominant
+lemma, picking the lemma with the largest attributive total and never
+looking at the noun (the #70 lesson). *lange* is mostly the adverb
+*lange*, but as an attribute it is *lang*. With the dominant lemma alone,
+*lange Zeit* came out "Nicht typisch" while suggesting *lange Zeit*.
+
+**Written forms** (from `adjective_attribute_examples`, ≤ 3 per pair;
+ranking in the pure `bestWrittenForm`):
+1. a positive-degree adjective (`isPositiveForm`; the examples write
+   *hohes Risiko* as *höchste Risiko* too);
+2. the ending the learner typed, which carries the noun's gender
+   (*schwerer Regen* → *strömender Regen*);
+3. a strong ending (-er/-e/-es) over -en/-em;
+4. a lowercase adjective over a capital (a sentence-initial capital is
+   lowercased in SQL);
+5. the noun's lemma form;
+6. the most examples.
+
+A suggestion without an example is dropped. Locally none of the 20,946
+pairs with count ≥ 5 lacks one. A matched pair with no positive written
+form (*hoher Preis* is only written *höhere Preise*) shows the phrase as
+typed. The "Nicht typisch" sentence names the adjective as typed,
+lowercased, because tagger lemmas read oddly (*erster*, *reg*).
+
+**Cost** (local, warm, `EXPLAIN (ANALYZE, BUFFERS)`). f_adj alone:
+- *neu*: 10,016 rows, 6.0 ms;
+- *groß*: 6,505 rows, 4.6 ms;
+- *hoch*: 2,655 rows, 2.8 ms.
+
+Each is a bitmap heap scan on `idx_adjective_attributes_adjective`
+touching about 1.4–2.3k buffers.
+
+A noun's candidate pairs with each f_adj as a correlated subquery:
+- *Mann*, the largest with 118 candidates: 18–24 ms;
+- *Zeit*: 23–31 ms (47 ms on the first run, ~47k buffer hits);
+- *Regen*: 4 ms.
+
+The form → lemma query takes 2–9 ms. Whole `/api/check` round trips in
+the spot-check: 2–20 ms, 40–60 ms on the first request.
+
+The table is 19 MB and stays cached. Decision: the plain query, with no
+precomputed totals table and no migration. **Trigger to revisit:** the
+check's p95 above ~150 ms on the VM, or a cold-cache `EXPLAIN` there for
+*Mann* above ~100 ms. The fix is then an index on `(adjective_lemma_id)
+INCLUDE (count)` or an `adjective_totals` table filled by the
+adjective-attributes loader.
+
+**Usage counting.** A parsed adjective check counts as `check_adj` in
+`usage_counts`; `check` stays verb checks only, so the A0 baseline (#71,
+#72) stays comparable. The reading query in #72 groups by kind, so it
+shows `check_adj` as its own row. The Datenschutz page is unchanged: it
+says the server counts "wie oft eine Verbindung geprüft wurde", which
+still holds. What is stored is still a day, a kind and a number, so this
+is no change in substance.
+
+**Data.** The #54 data (1M corpus, spaCy) as loaded. Moving the adjective
+extraction into `collocation-lab` is a later increment. **Trigger:** a
+broken adjective lemma shown in a 20-headword spot-check, or too many
+"Keine Daten" verdicts (e.g. *Raucher*, *Kaffee* below).
+
+**Spot-check** (local, 2026-11-27, through `/api/check`). Before: every
+adjective + noun phrase was a plain search (`parsed: false`).
+
+The table below was taken with suggestions ordered by logDice; after the
+switch to count order the suggestions read: *schwerer Regen* → starker /
+leichter / strömender Regen; *starker Regen* → Üblich, nothing more
+frequent; *hohe Chance* → gute / große / neue Chance; *große Kosten* →
+hohe / steigende / zusätzliche Kosten; *hohe Kosten* → Üblich, nothing
+more frequent. Verdicts are unchanged.
+
+| Typed | Verdict | Shown |
+|---|---|---|
+| schwerer Regen | Nicht typisch | strömender / gefrierender / einsetzender Regen |
+| starker Regen, Regen stark | Üblich | starker Regen; noch häufiger: strömender / gefrierender Regen |
+| hohe Chance | Nicht typisch | gute / realistische / vergebenen Chance |
+| große Chance | Üblich | noch häufiger: gute / realistische Chance |
+| große Kosten | Nicht typisch | steigende / gestiegene / hohe Kosten |
+| hohe Kosten | Üblich | noch häufiger: steigende / gestiegene Kosten |
+| teurer Preis | Nicht typisch | günstiger Preis / steigende Preise / niedrigen Preisen |
+| hoher Preis | Üblich | (typed phrase); noch häufiger: günstiger Preis / steigende Preise |
+| schnelle Geschwindigkeit | Nicht typisch | überhöhte / angepasster / angepasste Geschwindigkeit |
+| hohe Geschwindigkeit | Üblich | noch häufiger: überhöhte / angepasster Geschwindigkeit |
+| starke Meinung | Nicht typisch | abweichende / geteilter / einhellige Meinung |
+| hohe Mehrheit | Nicht typisch | absolute / überwiegende / knappe Mehrheit |
+| breite Mehrheit | Üblich | noch häufiger: absolute / überwiegende Mehrheit |
+| schwerer Verkehr | Nicht typisch | stockendem / fließenden / dichter Verkehr |
+| dichter Verkehr | Üblich | noch häufiger: stockendem / fließenden Verkehr |
+| große Temperatur | Nicht typisch | sommerliche Temperaturen / niedriger Temperatur / milden Temperaturen |
+| warme Temperatur | **Üblich** (labelled error) | warme Temperaturen |
+| hoher Erfolg | Nicht typisch | sportliche / großer / beruflicher Erfolg |
+| großer Erfolg | Üblich | noch häufiger: sportliche Erfolg |
+| hohe Rolle | Nicht typisch | zentrale / entscheidende / wichtige Rolle |
+| große Rolle | Üblich | noch häufiger: zentrale / entscheidende Rolle |
+| naher Freund | Nicht typisch | engen / langjähriger / guter Freund |
+| enger Freund | Üblich | engen Freund |
+| starkes Risiko | Nicht typisch | erhöhtes / gesundheitliche Risiko / erhebliche Risiken |
+| hohes Risiko | Üblich | hohe Risiken; noch häufiger: erhöhtes / gesundheitliche Risiko |
+| hohe Frage | Nicht typisch | offene Fragen / entscheidende / zentrale Frage |
+| offene Frage | Üblich | offene Fragen |
+| (eine) bekannte Frage | Nicht typisch (amod; was obj *bekennen*) | offene Fragen / entscheidende / zentrale Frage |
+| schwerer / starker Raucher | Keine Daten | |
+| starke Kritik | Nicht typisch | scharfe / heftige / harsche Kritik |
+| scharfe Kritik | Üblich | |
+| hohes Interesse | Nicht typisch | berechtigtes / öffentliches Interesse / nationale Interessen |
+| starkes Interesse | Üblich | noch häufiger: berechtigtes / öffentliches Interesse |
+| große Entscheidung | Nicht typisch (unsure in the probe) | endgültige / richtige / mutige Entscheidung |
+| schwere Entscheidung | Üblich | schwere Entscheidungen; noch häufiger: endgültige / richtige |
+| schwere Arbeit | **Nicht typisch** (labelled correct) | harte / tägliche / hervorragende Arbeit |
+| harte Arbeit | Üblich | |
+| starker Kaffee | Keine Daten | |
+| erste Hilfe | Üblich | Erste Hilfe; noch häufiger: humanitäre / professionelle Hilfe |
+| gute Nacht | Nicht typisch | schlaflose Nächte / Langen Nacht / unruhige Nacht |
+| hohe Gefahr | Nicht typisch | akute / unmittelbare Gefahr / potenziellen Gefahren |
+| große Gefahr | Üblich | noch häufiger: akute / unmittelbare Gefahr |
+| lange Zeit | Üblich | noch häufiger: kurzer Zeit |
+
+Verb checks are unchanged against #70's table: *Sport machen*, *eine
+Entscheidung machen*, *macht / fällt eine Entscheidung*, *nimmt ein
+Foto*, *legt eine Pause ein*, *sich Mühe geben*, *Bus fahren*.
+
+**Known limitations.**
+- *gute Nacht* (greeting) and *hohe Chance* (defensible) come out
+  "Nicht typisch": *gut* and *hoch* have huge totals, and the corpus is
+  news-heavy. The footnote covers this.
+- Some written forms are dative or weak forms that read oddly without an
+  article (*stockendem Verkehr*, *sportliche Erfolg*, *gesundheitliche
+  Risiko*), because there are only 3 examples per pair.
+- A name's capital stays when the pair is never written lowercase
+  (*Langen Nacht*).
+- *STARKER REGEN* in capitals is not parsed (the same as the verb check).
+
+**Review** (one fresh-context `general-purpose` reviewer). Fixed:
+- dative and weak written forms, and a correct typed form rewritten
+  (*starker* → *starken*): the ending ranking above;
+- a capital from a name preferred over a lowercase form;
+- tagger lemmas in the copy;
+- *bekannte Frage* read as a verb;
+- two test names that described the old behaviour;
+- missing tests for each of these.
+
+Left open: the frontend component copy has no unit test (the frontend
+tests only `lib/`), and the VM cold-cache measurement belongs to the
+deploy.
+

@@ -46,7 +46,9 @@ export class CountingCheckCollocation implements CheckCollocation {
 
   async check(q: string): Promise<CollocationCheck> {
     const result = await this.#inner.check(q);
-    if (result.parsed) countInBackground(this.#counter, "check", this.#log);
+    if (result.parsed) {
+      countInBackground(this.#counter, result.relation === "amod" ? "check_adj" : "check", this.#log);
+    }
     return result;
   }
 }

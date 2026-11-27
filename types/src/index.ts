@@ -56,11 +56,11 @@ export interface CollocationResponse {
 export type WordSuggestion = { word: string; frequency: number; score: number };
 
 
-// Decision #70: "Passt das zusammen?" - one checked verb–noun phrase.
+// Decisions #70, #74: "Passt das zusammen?" - one checked phrase.
 export interface CheckPhrase {
-  phrase: string;   // as a learner says it ("sich Mühe geben")
-  nounWord: string; // the noun as written in `phrase`, for colouring
-  verbWord: string; // the verb as written in `phrase`, without "sich"
+  phrase: string;      // as a learner says it ("sich Mühe geben", "starker Regen")
+  nounWord: string;    // the noun as written in `phrase`, for colouring
+  partnerWord: string; // the verb (without "sich") or adjective as written in `phrase`
 }
 
 export type CheckVerdict = 'usual' | 'unusual' | 'noData';
@@ -76,5 +76,17 @@ export type CollocationCheck =
       relation: 'obj';
       verdict: CheckVerdict;
       matched: CheckPhrase | null;  // the matched pair as written, only when usual
+      suggestions: CheckPhrase[];
+    }
+  // Decision #74: adjective + noun ("schwerer Regen"), from the #54 data.
+  | {
+      parsed: true;
+      phrase: string;          // the query, whitespace-normalised, as typed
+      noun: string;            // the noun page to open (the noun's lemma)
+      adjectiveTyped: string;  // the adjective token as typed ("schwerer")
+      adjective: string;       // its lemma ("schwer")
+      relation: 'amod';
+      verdict: CheckVerdict;
+      matched: CheckPhrase | null;
       suggestions: CheckPhrase[];
     };

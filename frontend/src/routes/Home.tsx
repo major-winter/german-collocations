@@ -39,7 +39,7 @@ export function Home() {
                     ))}
                 </ul>
             </div>
-            {/* Decision #70: the search box also checks a whole phrase. */}
+            {/* Decisions #70, #74: the search box also checks a whole phrase. */}
             <p className="text-sm text-muted-foreground">
                 Sie können auch eine ganze Verbindung prüfen, z.&nbsp;B.{' '}
                 <Link
@@ -47,6 +47,13 @@ export function Home() {
                     className="text-foreground underline underline-offset-4 hover:decoration-2"
                 >
                     eine Entscheidung machen
+                </Link>{' '}
+                oder{' '}
+                <Link
+                    to={`/wort/Regen?pruefen=${encodeURIComponent('schwerer Regen')}`}
+                    className="text-foreground underline underline-offset-4 hover:decoration-2"
+                >
+                    schwerer Regen
                 </Link>
                 .
             </p>

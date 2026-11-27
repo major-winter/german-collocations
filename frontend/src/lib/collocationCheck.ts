@@ -1,7 +1,20 @@
 import type { CheckPhrase, CheckVerdict, CollocationCheck } from '@collocations/types';
 
-// Decision #70: "Passt das zusammen?" - the pure parts of the check card
-// and of the search box's phrase routing.
+// Decisions #70, #74: "Passt das zusammen?" - the pure parts of the check
+// card and of the search box's phrase routing.
+
+type Parsed = Extract<CollocationCheck, { parsed: true }>;
+export type PartnerKind = 'verb' | 'adjective';
+
+/** The word class of the checked partner: a verb (#70) or an adjective (#74). */
+export function partnerKind(check: Parsed): PartnerKind {
+    return check.relation === 'amod' ? 'adjective' : 'verb';
+}
+
+/** The partner token as the learner typed it ("macht", "schwerer"). */
+export function partnerTyped(check: Parsed): string {
+    return check.relation === 'amod' ? check.adjectiveTyped : check.verbTyped;
+}
 
 /** Two or more words: worth asking the check before a plain search. */
 export function isPhraseQuery(q: string): boolean {
@@ -31,15 +44,15 @@ export function verdictLabel(verdict: CheckVerdict): string {
 
 export interface PhrasePart {
     text: string;
-    kind: 'noun' | 'verb' | 'plain';
+    kind: 'noun' | PartnerKind | 'plain';
 }
 
-/** The phrase split so the noun and verb words can carry their word-class colour (#63). */
-export function phraseParts(p: CheckPhrase): PhrasePart[] {
+/** The phrase split so the noun and its partner can carry their word-class colour (#63). */
+export function phraseParts(p: CheckPhrase, partner: PartnerKind): PhrasePart[] {
     const parts: PhrasePart[] = [];
     for (const text of p.phrase.split(/(\s+)/)) {
         if (text === '') continue;
-        const kind = text === p.nounWord ? 'noun' : text === p.verbWord ? 'verb' : 'plain';
+        const kind = text === p.nounWord ? 'noun' : text === p.partnerWord ? partner : 'plain';
         const last = parts.at(-1);
         if (kind === 'plain' && last?.kind === 'plain') last.text += text;
         else parts.push({ text, kind });

@@ -1,7 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationCheck } from '@collocations/types';
-import { checkMatchesPage, checkTarget, isPhraseQuery, phraseParts, verdictLabel } from './collocationCheck.ts';
+import {
+    checkMatchesPage,
+    checkTarget,
+    isPhraseQuery,
+    partnerKind,
+    partnerTyped,
+    phraseParts,
+    verdictLabel,
+} from './collocationCheck.ts';
 
 const entscheidung: CollocationCheck = {
     parsed: true,
@@ -10,6 +18,18 @@ const entscheidung: CollocationCheck = {
     verbTyped: 'machen',
     verb: 'machen',
     relation: 'obj',
+    verdict: 'unusual',
+    matched: null,
+    suggestions: [],
+};
+
+const regen: CollocationCheck = {
+    parsed: true,
+    phrase: 'schwerer Regen',
+    noun: 'Regen',
+    adjectiveTyped: 'schwerer',
+    adjective: 'schwer',
+    relation: 'amod',
     verdict: 'unusual',
     matched: null,
     suggestions: [],
@@ -38,14 +58,30 @@ test('verdictLabel uses the spec\'s German labels', () => {
 });
 
 test('phraseParts marks the noun and the verb as whole words', () => {
-    assert.deepEqual(phraseParts({ phrase: 'sich Mühe geben', nounWord: 'Mühe', verbWord: 'geben' }), [
+    assert.deepEqual(phraseParts({ phrase: 'sich Mühe geben', nounWord: 'Mühe', partnerWord: 'geben' }, 'verb'), [
         { text: 'sich ', kind: 'plain' },
         { text: 'Mühe', kind: 'noun' },
         { text: ' ', kind: 'plain' },
         { text: 'geben', kind: 'verb' },
     ]);
-    assert.deepEqual(phraseParts({ phrase: 'Entscheidungen treffen', nounWord: 'Entscheidung', verbWord: 'treffen' }), [
+    assert.deepEqual(phraseParts({ phrase: 'Entscheidungen treffen', nounWord: 'Entscheidung', partnerWord: 'treffen' }, 'verb'), [
         { text: 'Entscheidungen ', kind: 'plain' },
         { text: 'treffen', kind: 'verb' },
     ]);
+});
+
+test('phraseParts colours an adjective partner as an adjective (#74)', () => {
+    assert.deepEqual(phraseParts({ phrase: 'starker Regen', nounWord: 'Regen', partnerWord: 'starker' }, 'adjective'), [
+        { text: 'starker', kind: 'adjective' },
+        { text: ' ', kind: 'plain' },
+        { text: 'Regen', kind: 'noun' },
+    ]);
+});
+
+test('partnerKind and partnerTyped follow the relation', () => {
+    assert.equal(partnerKind(entscheidung), 'verb');
+    assert.equal(partnerKind(regen), 'adjective');
+    assert.equal(partnerTyped(entscheidung), 'machen');
+    assert.equal(partnerTyped(regen), 'schwerer');
+    assert.equal(checkTarget(regen), '/wort/Regen?pruefen=schwerer%20Regen');
 });

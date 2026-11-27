@@ -63,7 +63,7 @@ test('judge: a usual pair names up to two stronger verbs, none at rank 1', () =>
   const sport = (verb: string, score: number) => pair(verb, score, { noun: 'Sport' });
   const result = judge('machen', false, [sport('treiben', 900), sport('machen', 500), sport('betreiben', 100)]);
   assert.equal(result.verdict, 'usual');
-  assert.deepEqual(result.matched, { phrase: 'Sport machen', nounWord: 'Sport', verbWord: 'machen' });
+  assert.deepEqual(result.matched, { phrase: 'Sport machen', nounWord: 'Sport', partnerWord: 'machen' });
   assert.deepEqual(phrases(result.suggestions), ['Sport treiben']);
   assert.deepEqual(judge('treiben', false, [sport('treiben', 900), sport('machen', 500)]).suggestions, []);
 });
@@ -71,7 +71,7 @@ test('judge: a usual pair names up to two stronger verbs, none at rank 1', () =>
 test('judge: a plain verb matches its sich pair only within the top 10', () => {
   const mühe = judge('geben', false, [pair('sich geben', 897, { noun: 'Mühe' }), pair('haben', 177, { noun: 'Mühe' })]);
   assert.equal(mühe.verdict, 'usual');
-  assert.deepEqual(mühe.matched, { phrase: 'sich Mühe geben', nounWord: 'Mühe', verbWord: 'geben' });
+  assert.deepEqual(mühe.matched, { phrase: 'sich Mühe geben', nounWord: 'Mühe', partnerWord: 'geben' });
 
   const others = Array.from({ length: 11 }, (_, i) => pair(`verb${i}`, 1000 - i));
   assert.equal(judge('machen', false, [...others, pair('sich machen', 7)]).verdict, 'unusual');

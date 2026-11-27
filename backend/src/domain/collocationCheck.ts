@@ -159,7 +159,7 @@ export function checkPhraseOf(pair: CheckPair): CheckPhrase {
   return {
     phrase: phraseOf("obj", pair.verb, pair.phraseNoun, pair.noun),
     nounWord: phraseNounWord(pair.phraseNoun),
-    verbWord: baseOf(pair.verb),
+    partnerWord: baseOf(pair.verb),
   };
 }
 

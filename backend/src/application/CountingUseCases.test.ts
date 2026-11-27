@@ -42,6 +42,20 @@ test("a parsed check is counted once; an unparsed one is not", async () => {
   assert.deepEqual(kinds, ["check"]);
 });
 
+test("an adjective check is counted as check_adj, keeping the verb-check baseline (#74)", async () => {
+  const { counter, kinds } = recorder();
+  const adjective = { parsed: true, relation: "amod" } as unknown as CollocationCheck;
+  const verb = { parsed: true, relation: "obj" } as unknown as CollocationCheck;
+  const check = new CountingCheckCollocation(
+    { check: async (q) => (q === "schwerer Regen" ? adjective : verb) },
+    counter,
+    quiet,
+  );
+  await check.check("schwerer Regen");
+  await check.check("Sport machen");
+  assert.deepEqual(kinds, ["check_adj", "check"]);
+});
+
 test("a failing counter is logged and never fails the request", async () => {
   const { counter } = recorder("reject");
   const errors: unknown[] = [];
