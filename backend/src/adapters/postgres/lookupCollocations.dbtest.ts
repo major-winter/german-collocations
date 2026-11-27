@@ -57,12 +57,64 @@ test("a proper noun is never a partner (#57)", async () => {
 
 test("a partner below the logDice floor is left out (#43)", async () => {
   await seed.word("Kritik", { pos: "NOUN" });
-  // logDice = 14 + log2(2 * 1 / (100 + 100000)) ≈ 1.6, far below 6.3
+  // logDice = 14 + log2(2 * 5 / (100 + 100000)) ≈ 0.7, far below 6.3
   await seed.word("selten", { pos: "ADJ", frequency: 100000 });
-  await seed.collocation("selten", "Kritik", 1);
+  await seed.collocation("selten", "Kritik", 5);
 
   const result = await lookup.lookup("Kritik");
   assert.deepEqual(result!.collocations, []);
+});
+
+test("a partner seen next to the headword fewer than 3 times is left out (#79)", async () => {
+  // Two rare lemmas: one shared sentence already gives a high logDice
+  // (14 + log2(2 / (50 + 3)) ≈ 9.3), so only a count floor stops it.
+  await seed.word("Nebel", { pos: "NOUN", frequency: 50 });
+  await seed.word("zartrosa", { pos: "ADJ", frequency: 3 });
+  await seed.word("Niesel", { pos: "NOUN", frequency: 3 });
+  await seed.word("Frost", { pos: "NOUN", frequency: 40 });
+  await seed.collocation("zartrosa", "Nebel", 1);
+  await seed.collocation("Nebel", "Niesel", 2);
+  await seed.collocation("Nebel", "Frost", 3);
+
+  const result = await lookup.lookup("Nebel");
+  assert.deepEqual(partners(result!.collocations), [["Frost", "noun"]]);
+});
+
+test("an adjective the tagger often reads as an adverb still goes under 'adjective' (#79)", async () => {
+  // "dicht": attributive "dichter Nebel" is ADJ, predicative "ist dicht" is ADV.
+  await seed.word("Nebel", { pos: "NOUN" });
+  await seed.word("dicht", { pos: "ADV", posShare: 0.55 });
+  await seed.adjectiveShares("dicht", { adj: 0.41, adv: 0.55 });
+  await seed.collocation("dicht", "Nebel", 19);
+
+  const result = await lookup.lookup("Nebel");
+  assert.deepEqual(partners(result!.collocations), [["dicht", "adjective"]]);
+});
+
+test("so on a noun page it is replaced by the attributive adjectives, not repeated under 'other' (#79)", async () => {
+  await seed.word("Nebel", { pos: "NOUN" });
+  await seed.word("dicht", { pos: "ADV", posShare: 0.55 });
+  await seed.adjectiveShares("dicht", { adj: 0.41, adv: 0.55 });
+  await seed.collocation("dicht", "Nebel", 19);
+  await seed.adjectiveAttribute("Nebel", "dicht", 19);
+
+  const result = await lookup.lookup("Nebel");
+  assert.deepEqual(
+    result!.collocations.map((c) => [c.word, c.section, c.cooccurrence]),
+    [["dicht", "adjective", 19]],
+  );
+  // the attribute entry (share-ranked), not the adjacency one (logDice-ranked)
+  assert.ok(result!.collocations[0].significance <= 1);
+});
+
+test("a real adverb stays under 'other', even with a few stray ADJ tags (#79)", async () => {
+  await seed.word("Regen", { pos: "NOUN" });
+  await seed.word("zeitweise", { pos: "ADV", posShare: 0.97 });
+  await seed.adjectiveShares("zeitweise", { adj: 0.03, adv: 0.97 });
+  await seed.collocation("zeitweise", "Regen", 10);
+
+  const result = await lookup.lookup("Regen");
+  assert.deepEqual(partners(result!.collocations), [["zeitweise", "other"]]);
 });
 
 test("at most 10 partners per word class, so one class can't crowd out another", async () => {
@@ -72,7 +124,7 @@ test("at most 10 partners per word class, so one class can't crowd out another",
     await seed.collocation(`adjektiv${i}`, "Kritik", 10 + i);
   }
   await seed.word("auch", { pos: "ADV" });
-  await seed.collocation("Kritik", "auch", 1);
+  await seed.collocation("Kritik", "auch", 3);
 
   const result = await lookup.lookup("Kritik");
   const adjectives = result!.collocations.filter((c) => c.section === "adjective").map((c) => c.word);
