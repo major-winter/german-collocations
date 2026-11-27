@@ -243,3 +243,45 @@ test("eine bekannte Frage: a form mostly tagged ADJ is the adjective, not the ve
   const check = amod(await service.check("eine bekannte Frage"));
   assert.equal(check.adjective, "bekannt");
 });
+
+// Decision #76: a verb with a prepositional noun, from the lab's obl pairs.
+function oblCheck(check: CollocationCheck) {
+  assert.equal(check.parsed && check.relation, "obl");
+  return check as Extract<CollocationCheck, { relation: "obl" }>;
+}
+
+test("an einer Sitzung teilnehmen is usual (#76)", async () => {
+  await seed.word("Sitzung", { pos: "NOUN" });
+  await seed.labPair("teilnehmen", "Sitzung", { relation: "obl", prep: "an", phraseNoun: "an den Sitzungen", score: 1201 });
+  await seed.labPair("einladen", "Sitzung", { relation: "obl", prep: "zu", phraseNoun: "zu den Sitzungen", score: 241 });
+  const check = oblCheck(await service.check("an einer Sitzung teilnehmen"));
+  assert.equal(check.noun, "Sitzung");
+  assert.equal(check.verdict, "usual");
+  assert.equal(check.matched?.phrase, "an den Sitzungen teilnehmen");
+});
+
+test("in Einsatz kommen is not typical and suggests zum Einsatz kommen", async () => {
+  await seed.word("Einsatz", { pos: "NOUN" });
+  await seed.labPair("kommen", "Einsatz", { relation: "obl", prep: "zu", phraseNoun: "zum Einsatz", score: 18761 });
+  await seed.labPair("kommen", "Einsatz", { relation: "obl", prep: "in", phraseNoun: "in Einsatz", score: 1 });
+  const check = oblCheck(await service.check("in Einsatz kommen"));
+  assert.equal(check.verdict, "unusual");
+  assert.equal(check.otherPreposition, true);
+  assert.deepEqual(phrases(check), ["zum Einsatz kommen"]);
+});
+
+test("obj pairs do not answer an obl check", async () => {
+  await seed.word("Sitzung", { pos: "NOUN" });
+  await seed.labPair("leiten", "Sitzung", { score: 500 });
+  const check = oblCheck(await service.check("an der Sitzung leiten"));
+  assert.equal(check.verdict, "noData");
+});
+
+test("legt eine Pause ein still takes the object check", async () => {
+  await seed.word("Pause", { pos: "NOUN" });
+  await seed.labPair("einlegen", "Pause", { score: 900 });
+  await seed.labPairExample("einlegen", "Pause", 1, "Er legt eine Pause ein.", { verb: "legt", noun: "Pause" });
+  const check = parsed(await service.check("legt eine Pause ein"));
+  assert.equal(check.verb, "einlegen");
+  assert.equal(check.verdict, "usual");
+});
