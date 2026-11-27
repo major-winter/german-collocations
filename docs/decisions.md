@@ -3673,7 +3673,10 @@ was the first chip on the same page.
   (`checkHintExample`), and is a link that runs that check.
 - The search box passes the check it fetched in the navigation state;
   the card uses it when phrase and page match (`preloadedCheck`), so a
-  phrase search costs one request. A direct link or reload still fetches.
+  phrase search costs one request. The card then drops the check from the
+  browser's history entry (`historyStateWithoutCheck`), because the browser
+  keeps that state across a reload; a direct link, reload or back/forward
+  fetches again.
 - `checkQueryFor` (the single-word shortcut) is removed.
 
 **Cost.** The one-word shortcut is gone: to check *leiten* with *Sitzung*
@@ -3687,4 +3690,11 @@ hint shows only for such a phrase in the URL. A bare verb typed with its
 noun (*Sitzung teilnehmen*) is still checked only as an object, not
 against the prepositional pairs (backend, a separate step).
 
-**Checked.** `npm test` (115), typecheck, frontend lint and build.
+**Checked.** `npm test` (116), typecheck, frontend lint and build. In
+headless Chrome at 360 and 1280 px, light and dark (ui-ux-designer):
+hint and its link, correcting *bei* to *an* in the header, a phrase from
+`/wort/treffen` (one check request), single-word lookup, the unparsed
+hint, back/forward, tab order, no sideways scroll, the hint without
+"z. B." on *Nebel*. The first run found that a reload reused the passed
+check; fixed, and re-checked (one request on a header search, a fetch
+on reload). Not checked: VoiceOver on iOS, a phone's keyboard.

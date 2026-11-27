@@ -8,6 +8,7 @@ import {
     partnerKind,
     partnerTyped,
     phraseParts,
+    historyStateWithoutCheck,
     preloadedCheck,
     unusualReason,
     verdictLabel,
@@ -160,6 +161,13 @@ export function CollocationCheckCard({ word, lemma, showHint, hintExample }: Col
     const unparsed = !preloaded && current !== null && current.check === null;
     const navigate = useNavigate();
     const hasPreloaded = preloaded !== null;
+
+    // Used once: drop it from the history entry, so a reload or a later
+    // back/forward asks the server again. Not through the router, which
+    // would re-render without it and fetch now.
+    useEffect(() => {
+        if (hasPreloaded) window.history.replaceState(historyStateWithoutCheck(window.history.state), '');
+    }, [hasPreloaded]);
 
     useEffect(() => {
         if (!query || hasPreloaded) return;

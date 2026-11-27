@@ -58,6 +58,16 @@ export function preloadedCheck(state: unknown, query: string | null, word: strin
     return check;
 }
 
+/**
+ * The browser's history entry without the passed check (#77). The browser
+ * keeps `history.state` across a reload; without this, a reload would show
+ * the stored verdict instead of asking the server again.
+ */
+export function historyStateWithoutCheck(state: unknown): Record<string, unknown> {
+    const rest = typeof state === 'object' && state !== null ? state : {};
+    return { ...rest, usr: null };
+}
+
 /** The phrase the card's hint offers to check (#77): the best object pair, else the best prepositional one. */
 export function checkHintExample(pairs: Pick<VerbNounPair, 'relation' | 'phrase'>[]): string | null {
     return (pairs.find((p) => p.relation === 'obj') ?? pairs.find((p) => p.relation === 'obl'))?.phrase ?? null;

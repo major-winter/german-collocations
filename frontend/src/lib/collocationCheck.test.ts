@@ -10,6 +10,7 @@ import {
     partnerTyped,
     phraseParts,
     preloadedCheck,
+    historyStateWithoutCheck,
     searchFieldValue,
     unusualReason,
     verdictLabel,
@@ -148,4 +149,9 @@ test('unusualReason tells another preposition from another verb or adjective (#7
     assert.equal(unusualReason({ ...sitzung, otherPreposition: false }), 'verb');
     assert.equal(unusualReason(entscheidung), 'verb');
     assert.equal(unusualReason(regen), 'adjective');
+});
+
+test('historyStateWithoutCheck drops the passed check so a reload fetches again (#77)', () => {
+    assert.deepEqual(historyStateWithoutCheck({ usr: { check: entscheidung }, key: 'k1', idx: 3 }), { usr: null, key: 'k1', idx: 3 });
+    assert.deepEqual(historyStateWithoutCheck(null), { usr: null });
 });
