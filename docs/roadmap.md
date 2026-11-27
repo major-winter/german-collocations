@@ -15,7 +15,7 @@ Last ranked: 2026-11-27 (product-builder, propose mode).
    differentiator and today answers only verb + noun; adjective + noun is
    the other classic interference error (*heavy rain*, *high chance*,
    *big costs*). Size **M**. Builds on #70 and the #54 data; no migration
-   expected. Status: `approved` (2026-11-27, logDice rule), spec
+   expected. Status: `built` (#74), spec
    `docs/superpowers/specs/2026-11-27-adjective-noun-check-design.md`.
 2. **Check results lead somewhere**: each suggestion in the check card
    opens that chip with its examples, and a verb the lab does not know

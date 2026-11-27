@@ -109,3 +109,14 @@ below the floor; f_adj counts the adjective's other nouns.
 All green (`npm test`, typecheck, lint, build, `test:db`); the
 ~20-headword spot-check through `/api/check`; one reviewer; decision
 #74; roadmap → `built`.
+
+## Changes during the build (see decision #74)
+
+- Adjective lemma via `word_lemmas` (largest attributive total), not only
+  the dominant lemma: *lange Zeit*.
+- Written forms ranked in the domain (`bestWrittenForm`): positive degree,
+  typed ending, strong ending, lowercase, lemma noun form, examples. The
+  store returns all forms with counts (`findWrittenForms`).
+- A matched pair with no positive written form shows the typed phrase.
+- After the review: a word before its noun that is mostly tagged ADJ wins
+  over a verb reading that is not "Üblich" (*bekannte Frage*).
