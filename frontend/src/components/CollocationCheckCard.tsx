@@ -104,17 +104,20 @@ interface CollocationCheckCardProps {
 export function CollocationCheckCard({ word, lemma, showField }: CollocationCheckCardProps) {
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get(PARAM);
-    const [check, setCheck] = useState<Parsed | null>(null);
+    // The last parsed check, tagged with the query and page it was for, so a
+    // new query hides the old verdict without resetting state in the effect.
+    const key = `${query}\u0000${word}\u0000${lemma}`;
+    const [result, setResult] = useState<{ key: string; check: Parsed } | null>(null);
+    const check = result?.key === key ? result.check : null;
     const [verb, setVerb] = useState('');
 
     useEffect(() => {
-        setCheck(null);
         if (!query) return;
         const controller = new AbortController();
         fetchCheck(API_BASE_URL, query, controller.signal)
             .then((result) => {
                 if (result.parsed && checkMatchesPage(result, word, lemma)) {
-                    setCheck(result);
+                    setResult({ key, check: result });
                     setVerb(result.verbTyped);
                 }
             })
@@ -122,7 +125,7 @@ export function CollocationCheckCard({ word, lemma, showField }: CollocationChec
                 // A failed check shows the page without a card, never an error.
             });
         return () => controller.abort();
-    }, [query, word, lemma]);
+    }, [query, word, lemma, key]);
 
     if (!check && !showField) return null;
 

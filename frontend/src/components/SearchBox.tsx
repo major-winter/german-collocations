@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,16 @@ interface SearchBoxProps {
 }
 
 export function SearchBox({ initialValue }: SearchBoxProps) {
-    const [value, setValue] = useState(initialValue);
+    const [value, setValue] = useState(() => decodeURIComponent(initialValue));
+    // When the page's word changes (navigation), show it in the field:
+    // adjusting state during render, React's alternative to an effect.
+    const [shownInitial, setShownInitial] = useState(initialValue);
+    if (initialValue !== shownInitial) {
+        setShownInitial(initialValue);
+        setValue(decodeURIComponent(initialValue));
+    }
     const [checking, setChecking] = useState(false); // a phrase is being sent to /api/check
     const navigate = useNavigate();
-
-    useEffect(() => {
-        setValue(decodeURIComponent(initialValue));
-    }, [initialValue])
 
     async function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();

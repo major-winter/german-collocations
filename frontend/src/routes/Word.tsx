@@ -25,8 +25,13 @@ function isAbortError(err: unknown): boolean {
 
 export function Word() {
     const { word } = useParams<{ word: string }>();
-    const [state, setState] = useState<LookupState>({ status: "loading" });
     const [attempt, setAttempt] = useState(0); // bumped by "Erneut versuchen" to refetch
+    // The last finished lookup, tagged with the word and attempt it was for.
+    // Anything else is still loading, so a new word shows "Wird geladen" at
+    // once without resetting state inside the effect.
+    const key = `${word}\u0000${attempt}`;
+    const [result, setResult] = useState<{ key: string; state: LookupState } | null>(null);
+    const state: LookupState = result?.key === key ? result.state : { status: "loading" };
 
     useEffect(() => {
         document.title = word ? `${word} – Wortnetz` : 'Wortnetz';
@@ -36,7 +41,7 @@ export function Word() {
         if (!word) return;
 
         const controller = new AbortController();
-        setState({ status: "loading" });
+        const setState = (next: LookupState) => setResult({ key, state: next });
 
         async function run() {
             try {
@@ -71,7 +76,7 @@ export function Word() {
         run();
 
         return () => controller.abort();
-    }, [word, attempt]);
+    }, [word, key]);
 
     if (state.status === "loading") {
         return (
