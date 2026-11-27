@@ -3698,3 +3698,18 @@ hint, back/forward, tab order, no sideways scroll, the hint without
 "z. B." on *Nebel*. The first run found that a reload reused the passed
 check; fixed, and re-checked (one request on a header search, a fetch
 on reload). Not checked: VoiceOver on iOS, a phone's keyboard.
+
+### Follow-up: deployed to production (2026-11-27)
+
+Merge commits `da053b3` (`frontend-feature-single-search-field`) and
+`722ea87` (`docs-feature-ui-audit-2026-11-27`). The server went from
+`b13faa4` (PREV) to `722ea87`. Built and restarted `frontend` only; no
+backend change, no migration, no data load. Image built 16:50:26 UTC,
+container started 16:50:28 UTC (`up -d --no-deps`). Backend log clean.
+
+Live checks: `/` 200; `/api/collocations/Entscheidung` 200 with
+*treffen*; `/api/collocations/zzzqqq` 404; `/api/check?q=Sport machen`
+200; *an einer Sitzung teilnehmen* still usual. The served bundle
+`index-DeYeovHz.js` contains "Wort oder Verbindung" and "Passt ein Wort
+zu", and no `check-phrase` or "Prüfen". The smoke run made 2 lookups and
+3 checks (counted in `usage_counts`).
