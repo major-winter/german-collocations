@@ -1,6 +1,6 @@
 import type { CheckPhrase, CheckVerdict, CollocationCheck } from '@collocations/types';
 
-// Decisions #70, #74: "Passt das zusammen?" - the pure parts of the check
+// Decisions #70, #74, #76: "Passt das zusammen?" - the pure parts of the check
 // card and of the search box's phrase routing.
 
 type Parsed = Extract<CollocationCheck, { parsed: true }>;
@@ -14,6 +14,16 @@ export function partnerKind(check: Parsed): PartnerKind {
 /** The partner token as the learner typed it ("macht", "schwerer"). */
 export function partnerTyped(check: Parsed): string {
     return check.relation === 'amod' ? check.adjectiveTyped : check.verbTyped;
+}
+
+/**
+ * Why an unusual check is unusual, for the card's wording: the verb takes
+ * another preposition with this noun (#76), the verb is not typical, or
+ * the adjective is not.
+ */
+export function unusualReason(check: Parsed): 'preposition' | 'verb' | 'adjective' {
+    if (check.relation === 'amod') return 'adjective';
+    return check.relation === 'obl' && check.otherPreposition ? 'preposition' : 'verb';
 }
 
 /** Two or more words: worth asking the check before a plain search. */

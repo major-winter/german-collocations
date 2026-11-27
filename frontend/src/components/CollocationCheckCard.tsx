@@ -11,6 +11,7 @@ import {
     partnerKind,
     partnerTyped,
     phraseParts,
+    unusualReason,
     verdictLabel,
     type PartnerKind,
 } from '@/lib/collocationCheck.ts';
@@ -21,7 +22,8 @@ import { API_BASE_URL } from '../config.ts';
 // Decision #70: "Passt das zusammen?" on a noun page. The check lives in
 // the URL (?pruefen=…), so the back button and shared links work. #74 adds
 // adjective + noun: the same card, with the partner's word class. #75: the
-// field takes a whole phrase, like the search box, so both agree.
+// field takes a whole phrase, like the search box, so both agree. #76 adds
+// a verb with a prepositional noun ("an einer Sitzung teilnehmen").
 
 const PARAM = 'pruefen';
 
@@ -78,17 +80,35 @@ function Verdict({ check }: { check: Parsed }) {
                 {check.verdict === 'usual' && (
                     <>Eine gängige Verbindung.{check.suggestions.length > 0 && ' Noch häufiger:'}</>
                 )}
-                {check.verdict === 'unusual' && (
-                    <>
-                        In unseren Texten (Nachrichten, Wikipedia, Web) ist <i>{partnerLemma}</i> kein {typical} zu{' '}
-                        <i>{check.noun}</i>.{check.suggestions.length > 0 && ' Typisch sind:'}
-                    </>
-                )}
+                {check.verdict === 'unusual' &&
+                    (unusualReason(check) === 'preposition' ? (
+                        <>
+                            Mit <i>{partnerLemma}</i> steht bei <i>{check.noun}</i> meist eine andere Präposition.
+                            {check.suggestions.length > 0 && ' Typisch sind:'}
+                        </>
+                    ) : check.relation === 'obl' ? (
+                        <>
+                            In unseren Texten (Nachrichten, Wikipedia, Web) ist <i>{partnerLemma}</i> mit{' '}
+                            <i>
+                                {check.prepositionTyped.toLowerCase()} … {check.noun}
+                            </i>{' '}
+                            keine typische Verbindung.{check.suggestions.length > 0 && ' Typisch sind:'}
+                        </>
+                    ) : (
+                        <>
+                            In unseren Texten (Nachrichten, Wikipedia, Web) ist <i>{partnerLemma}</i> kein {typical} zu{' '}
+                            <i>{check.noun}</i>.{check.suggestions.length > 0 && ' Typisch sind:'}
+                        </>
+                    ))}
                 {check.verdict === 'noData' && (
                     <>
                         Zu <i>{check.noun}</i> haben wir in unseren Texten{' '}
-                        {partner === 'adjective' ? 'zu wenige Adjektive' : 'keine Verben'} gefunden. Das heißt nicht,
-                        dass die Verbindung falsch ist – wir können sie nur nicht prüfen.
+                        {partner === 'adjective'
+                            ? 'zu wenige Adjektive'
+                            : check.relation === 'obl'
+                              ? 'keine Verben mit Präposition'
+                              : 'keine Verben'}{' '}
+                        gefunden. Das heißt nicht, dass die Verbindung falsch ist – wir können sie nur nicht prüfen.
                     </>
                 )}
             </p>
@@ -177,7 +197,8 @@ export function CollocationCheckCard({ word, lemma, showField }: CollocationChec
                 {unparsed && (
                     <p className="text-sm text-muted-foreground mb-3">
                         Das können wir nicht prüfen. Geben Sie ein Nomen mit Verb oder Adjektiv ein, z. B.{' '}
-                        <i>Entscheidung treffen</i> oder <i>starker Regen</i>.
+                        <i>Entscheidung treffen</i>, <i>starker Regen</i> oder{' '}
+                        <i>an einer Sitzung teilnehmen</i>.
                     </p>
                 )}
             </div>

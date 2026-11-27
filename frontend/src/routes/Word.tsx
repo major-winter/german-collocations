@@ -144,13 +144,13 @@ export function Word() {
                 )}
             </div>
             <PosLegend sections={legendSections(state.data)} />
-            {/* Decisions #70, #74: "Passt das zusammen?" on noun pages, for verbs and adjectives. */}
+            {/* Decisions #70, #74, #76: "Passt das zusammen?" on noun pages, for verbs, adjectives and prepositional verbs. */}
             {state.data.verbNounPairs?.side === "noun" && (
                 <CollocationCheckCard
                     word={state.data.word}
                     lemma={state.data.verbNounPairs.lemma}
                     showField={
-                        state.data.verbNounPairs.pairs.some((p) => p.relation === "obj") ||
+                        state.data.verbNounPairs.pairs.some((p) => p.relation === "obj" || p.relation === "obl") ||
                         state.data.collocations.some((c) => c.section === "adjective")
                     }
                 />
