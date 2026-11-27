@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #76), and add it to the index.
+(next: #79), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -54,6 +54,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#75](#75) One phrase field on the check card; the verb-vs-adjective rule in either word order (amends #70, #74)
 - [#76](#76) "Passt das zusammen?" for a verb with a prepositional noun (amends #70)
 - [#77](#77) One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
+- [#78](#78) The check reads learner sentences (pronouns, adjectives, more particles); an unreadable sentence gets the hint, not "Keine Ergebnisse" (amends #70, #76, #77)
 
 ---
 
@@ -3698,3 +3699,295 @@ hint, back/forward, tab order, no sideways scroll, the hint without
 "z. B." on *Nebel*. The first run found that a reload reused the passed
 check; fixed, and re-checked (one request on a header search, a fetch
 on reload). Not checked: VoiceOver on iOS, a phone's keyboard.
+
+---
+
+<a id="78"></a>
+## 78. The check reads learner sentences (pronouns, adjectives, more particles); an unreadable sentence gets the hint, not "Keine Ergebnisse" (amends #70, #76, #77)
+
+**Date.** 2026-11-28. Branch `backend-feature-learner-phrases`, from
+`485b040` (#77). Plan: `docs/superpowers/plans/2026-11-28-learner-phrases.md`.
+Approved by the user in the dispatch (no spec file).
+
+**Problem.** Learners type sentences and fuller phrases. *Ich nehme an der
+Sitzung teil*, *wir treffen eine Entscheidung*, *eine schwere
+Entscheidung treffen*, *an einer wichtigen Sitzung teilnehmen* and *nimmt
+an der Sitzung teil* all came back `{"parsed": false}` (#70's and #76's
+known limits), and the header then searched the whole sentence and ended
+on "Keine Ergebnisse für „…“".
+
+**Decision, parsing** (`backend/src/domain/collocationCheck.ts`,
+`prepositionCheck.ts`, pure, unit-tested; no new data, no query, no
+migration):
+
+- **Readings, in order** (`readingsOf`). First the phrase as #70 read it,
+  so the phrases #70, #74 and #76 parsed keep their parse (the four
+  exceptions are under "Spot-check"); then the same without popping a
+  trailing word that is also a particle; then the learner readings.
+- **A particle is popped only when typed in lowercase** (amends #70,
+  which popped case-insensitively). A capitalised last word is a noun:
+  *feiert ein Fest*, *ebnet den Weg*, *Ich lese den ersten Teil*. Before,
+  those lost their noun to the particle list and were not parsed. `splitPhrase` and `splitPrepositionalPhrase` take
+  the first reading that leaves exactly a noun and a verb (plus one
+  preposition). The verb branch, the adjective branch (#74, #75) and the
+  obl branch (#76) run as before on the result.
+- **Learner reading.** Drops the subject pronoun (*ich, du, er, sie, es,
+  wir, ihr, Sie, man*), and a reflexive that agrees with it (*ich … mir /
+  mich, du … dir / dich, wir … uns, ihr … euch*). Drops demonstratives and
+  quantifiers like articles (*dies-, jed-, jen-, manch-, welch-, solch-,
+  viel-, wenig-, mehrer-, all-, beid-*), when lowercase or the first word
+  (a capitalised *All* elsewhere is the noun, *ins All fliegen*); not
+  *einig-*, which is also the verb *einigen*. Drops the lowercase words
+  between a determiner, one of those words or a preposition and the
+  capitalised noun after them (*eine (sehr) schwere Entscheidung*, *an
+  wichtigen Sitzungen*), **only when each looks attributive**: an
+  adjective ending (*-e, -en, -er, -es, -em*) or an intensifier (*sehr,
+  ganz, besonders, wirklich, ziemlich, total, echt, so, extrem, recht,
+  richtig, äußerst*). A preposition or contraction is never dropped, in
+  either branch (*bis zum Ende*, *das in Kauf nehmen*), and neither is a
+  verb after a demonstrative *das* (*Ich denke das macht Sinn*). The
+  prepositions moved from `prepositionCheck.ts` to `collocationCheck.ts`
+  (`prepositionOf`) for this. A second learner reading keeps those words.
+  Since the #74 reading comes first, *ein starker Regen*, *schwerer Regen*
+  and *viele Fragen* stay adjective checks.
+- **An agreeing reflexive is dropped, not read as a typed *sich*.** *mir,
+  uns* are often free datives: *Ich mache mir einen Kaffee* would be
+  "Nicht typisch" against *sich Kaffee machen*, while *Kaffee machen* is a
+  pair. The plain verb is tried first; then the *sich* pair counts at any
+  rank (`reflexiveDropped`, skipping #70's top-10 limit, which is for a
+  learner who typed no reflexive at all): *Ich hole mir Unterstützung* →
+  *sich Unterstützung holen*, rank 11. A typed *sich* still means only the
+  *sich* pair (#70). #76's obl judgement already finds the *sich* pair at
+  any rank.
+- **Existential *es gibt*** gets no learner reading: the lab extracts no
+  objects for it (#64), so *es gibt keine Lösung* would be judged as
+  *Lösung geben*.
+- **Token bound** 5 → 8 (*Ich nehme an einer wichtigen Sitzung teil* is 7).
+- **Particles.** Added every particle the lab examples write split from
+  its verb at least 50 times (rows of `lab_verb_pair_examples` whose
+  lemma starts with the particle and whose `verb_surface` does not
+  contain it): *dar* 586, *zusammen* 567, *teil* 482, *her* 465, *hin*
+  416, *durch* 400, *um* 228, *bereit* 203, *fort* 195, *weiter* 188,
+  *hervor* 181, *heraus* 166, *über* 138, *hinzu* 115, *entgegen* 100,
+  *wahr* 80, *auseinander* 79, *nieder* 78, *voran* 77, *offen* 69, *frei*
+  57. Left out: *statt* (3,850, but the noun of *stattfinden* is its
+  subject, which the check does not judge) and everything under 50
+  (*hinaus, nahe, unter, hoch, los, vorbei, …*).
+
+**Decision, verb lemma** (`CheckCollocationService#verbLemma`):
+
+- **A split particle only follows a verb that comes before its noun**
+  (*legt eine Pause ein*, *nehme … teil*). After a verb-final phrase, the
+  last word is a dangling preposition: *eine Entscheidung treffen über* is
+  not *übertreffen*, and *Angst haben vor* is not *vorhaben*. Such a phrase
+  is not parsed.
+- #70's `pickVerbLemma` first, unchanged. When a particle was typed and
+  no particle verb is a candidate for the form, **particle + the form's
+  own lemma** is the particle verb, if the lab has that verb. The
+  examples are news-heavy: *nehme* is never written for *aufnehmen*, so
+  *Ich nehme ein Foto auf* needs this to become *aufnehmen*. One extra
+  `findVerbCandidates` call (the indexed #70 query), only in that case.
+- **A trailing particle with no particle verb is not parsed** (amends
+  #70, where it gave verb `null` and "Nicht typisch"). It is more often a
+  predicative adjective or a word we cannot read than a wrong verb: *Die
+  Frage ist offen*, *Der Platz ist frei* must not say "*ist* ist kein
+  typisches Verb zu *Frage*". None of the phrases in the #70, #74 or #76
+  spot-checks hit this rule or the verb-before-noun rule.
+
+**Decision, the hint** (amends #77's "left out"; `searchRoute` in
+`frontend/src/lib/collocationCheck.ts`, `SearchBox.tsx`):
+
+- A phrase of **three or more words** that `/api/check` returns unparsed
+  shows the card's "Das können wir nicht prüfen" hint **under the header
+  search box, on whatever page the learner is on**, and does not
+  navigate. It stays while the field holds that phrase; editing it or
+  navigating hides it. The text is one component (`UnparsedCheckHint`),
+  shared with the card, which still shows it for an unparsed `?pruefen=`
+  in a URL.
+- One word, a **two-word fallback** (*seit langem*, multiword lookups) and
+  a **failed request** are plain searches, as in #70.
+- Why there: one place for every page (home, noun, verb, not-found), no
+  new URL state and no card on pages that have none. The boring form-field
+  message. Considered and not chosen: staying on a word page with
+  `?pruefen=` (the card exists only on noun pages, so verb pages and the
+  home page would need a second place anyway).
+
+**Spot-check** (local dev database, 2026-11-28, 111 phrases through
+`CheckCollocationService` on `485b040` and on this branch, after the
+review fixes). **Four phrases that parsed before changed, all on
+purpose:** *Angst haben vor, Lust haben auf, Interesse haben an, Kontakt
+aufnehmen mit*. Each was obj, verb `null`, "Nicht typisch", and listed the
+typed pair itself among the suggestions (*Angst haben*). Each is now not
+parsed, so the learner gets the hint. The review's cases that must not
+change kept their #76 result: *das in Kauf nehmen, das zur Verfügung
+stellen, das in Ordnung bringen* (obl, Üblich). These kept relation,
+lemma, verdict, matched phrase and suggestions: *legt eine Pause ein, nimmt ein Foto auf, schwerer Regen,
+Regen schwerer, ein starker Regen, eine bekannte Frage, sich Mühe geben,
+Mühe geben, sich Sorgen machen, das macht Sinn, Sport machen, macht eine
+Entscheidung, Entscheidung fallen, Bus fahren, Platz nehmen, bekommt
+einen Teil, eine Entscheidung treffen, an der Sitzung teilnehmen, bei
+einer Sitzung teilnehmen, an der Diskussion beteiligen, zur Verfügung
+stellen, in Frage stellen, kommt zum Einsatz, eine schwere Entscheidung,
+eine wichtige Frage, viele Fragen, eine Dusche nehmen, Kaffee
+bestellen*. Before, every row below was "not parsed".
+
+| Typed | Read as | Verdict | Shown |
+|---|---|---|---|
+| Ich nehme an der Sitzung teil | obl an teilnehmen | Üblich | an den Sitzungen teilnehmen (= *an der Sitzung teilnehmen*) |
+| nimmt an der Sitzung teil | obl an teilnehmen | Üblich | same |
+| an einer wichtigen Sitzung teilnehmen | obl an teilnehmen | Üblich | same |
+| Wir nehmen an der Diskussion teil | obl an teilnehmen | Üblich | an der Diskussion teilnehmen |
+| du nimmst bei der Sitzung teil | not parsed | | (*nimmst* is never written for *nehmen* in the examples) |
+| wir treffen eine Entscheidung | obj treffen | Üblich | Entscheidungen treffen (= *eine Entscheidung treffen*) |
+| eine schwere Entscheidung treffen | obj treffen | Üblich | same |
+| Wir treffen eine wichtige Entscheidung | obj treffen | Üblich | same |
+| Ich treffe eine falsche Entscheidung | obj treffen | Üblich | same |
+| diese Entscheidung treffen | obj treffen | Üblich | same |
+| Ich mache eine Entscheidung | obj machen | Nicht typisch | Entscheidungen treffen / eine Entscheidung fällen / die Entscheidung begründen |
+| Er macht ein Foto | obj machen | Üblich | Fotos machen; noch häufiger: ein Foto posten / Fotos veröffentlichen |
+| sie nimmt ein Foto, Ich nehme ein Foto | obj nehmen | Nicht typisch | ein Foto posten / Fotos veröffentlichen / Fotos machen |
+| Ich nehme ein Foto auf | obj aufnehmen (composed) | Üblich | Fotos aufnehmen |
+| Er legt / Ich lege eine Pause ein | obj einlegen | Üblich | eine Pause einlegen |
+| Er stellt das neue Produkt vor | obj vorstellen | Üblich | Produkte vorstellen |
+| Er führt eine Studie durch | obj durchführen | Üblich | eine Studie durchführen |
+| Sie nimmt die Chance wahr | obj wahrnehmen | Üblich | die Chance wahrnehmen |
+| Er hängt von der Situation ab | obl von abhängen | Üblich | von der Situation abhängen |
+| Ich mache mir Sorgen | obj machen | Üblich | Sorgen machen; noch häufiger: sich Sorgen machen / Sorgen bereiten |
+| Ich gebe mir Mühe | obj geben | Üblich | sich Mühe geben |
+| Ich nehme mir Zeit | obj nehmen | Üblich | Zeit nehmen; noch häufiger: Zeit verbringen / sich Zeit nehmen |
+| Ich mache mir einen Kaffee | obj machen | Üblich | Kaffee machen (a forced *sich* would say Nicht typisch) |
+| Ich freue mich auf den Besuch | obl auf sich freuen | Üblich | sich auf ihren Besuch freuen |
+| Wir freuen uns über den Besuch | obl über sich freuen | Üblich | noch häufiger: sich auf ihren Besuch freuen |
+| Ich interessiere mich für Musik | obl für | Üblich | sich für Musik interessieren |
+| Ich interessiere mich an Musik | obl an (other prep) | Nicht typisch | sich für Musik interessieren |
+| Wir einigen uns auf einen Kompromiss | obl auf sich einigen | Üblich | sich auf einen Kompromiss einigen |
+| Ich warte auf eine schnelle Antwort | obl auf warten | Üblich | auf eine Antwort warten |
+| Ich warte für eine Antwort | obl für (other prep) | Nicht typisch | auf eine Antwort warten |
+| Ich denke an die Zukunft | obl an denken | Üblich | an die Zukunft denken |
+| Ich denke über die Zukunft | obl über (other prep) | Nicht typisch | an die Zukunft denken |
+| Sie stellen / Ich stelle eine wichtige / dumme Frage | obj stellen | Üblich | Fragen stellen |
+| Ich stelle mir die Frage | obj stellen | Üblich | Fragen stellen |
+| Man spielt / Das spielt / Sie spielen eine wichtige / große Rolle | obj spielen | Üblich | eine Rolle spielen |
+| Es macht Spaß | obj machen | Üblich | Spaß machen |
+| Ich verbringe viel Zeit | obj verbringen | Üblich | Zeit verbringen |
+| Wir stellen / Ich stelle den Antrag | obj stellen | Üblich | einen Antrag stellen |
+| Ich treffe meine Freunde | obj treffen | Üblich | Freunde treffen |
+| Wir nehmen Rücksicht, Ich habe Angst, Er gibt eine Antwort | obj | Üblich | |
+| Ich bezahle Aufmerksamkeit | obj bezahlen | Nicht typisch | Aufmerksamkeit erregen / lenken / schenken |
+| Ich bestelle einen Kaffee | obj bestellen | Nicht typisch | (data gap, as #70's *Kaffee bestellen*) |
+| Ich nehme eine Dusche | obj nehmen | Keine Daten | (as #70's *eine Dusche nehmen*) |
+| feiert ein Fest | obj feiern | Üblich | ein Fest feiern (was not parsed: *fest* was popped as a particle) |
+| es gibt keine Lösung, es gibt viele Probleme | not parsed | | existential (#64) |
+| Die Frage ist offen, Der Platz ist frei | not parsed | | stray particle rule |
+| Die Sitzung findet statt | not parsed | | *statt* left out |
+| Er macht mir Sorgen | not parsed | | *mir* without *ich* is an object |
+| Er hat eine Entscheidung getroffen | not parsed | | perfect tense, left out |
+| Er legt Wert auf Qualität | not parsed | | object and prepositional noun, left out |
+| Ich stelle das in Frage | obl in stellen | Üblich | in Frage stellen |
+| Er bringt das zum Ausdruck | obl zu bringen | Üblich | zum Ausdruck bringen |
+| eine Entscheidung treffen über, einen Überblick / Auskunft geben über, eine Diskussion führen über | not parsed | | verb-final, trailing preposition |
+| Ich denke das macht Sinn, Ich glaube das macht Spaß, Ich weiß das kostet Geld | not parsed | | two clauses |
+| Ich hole mir Unterstützung | obj holen | Üblich | sich Unterstützung holen (rank 11) |
+| Ich lese den ersten Teil, Ich bekomme einen großen Teil | obj | Nicht typisch | einen Teil beitragen / ausmachen (data; as #70's *bekommt einen Teil*) |
+| Wir feiern ein schönes Fest | obj feiern | Üblich | ein Fest feiern |
+| ebnet den Weg | obj *ebnenen* | Üblich | den Weg *ebnenen* (a broken lab lemma, #70's known limit) |
+| Alle Fragen beantworten | obj beantworten | Üblich | Fragen beantworten |
+| ins All fliegen | not parsed | | as before (*All* has no noun page) |
+
+Every sentence gets the verdict of its dictionary form, the bar the
+dispatch set. Every wrong phrase (*mache eine Entscheidung, nimmt ein
+Foto, bezahle Aufmerksamkeit, warte für, denke über, interessiere mich
+an*) is "Nicht typisch" with the right phrase first; no right phrase is
+"Nicht typisch" except the #70 data gap (*Kaffee bestellen*).
+
+**Over HTTP** (this branch's app on a spare port against the dev
+database): `/api/check?q=Ich nehme an der Sitzung teil` → obl,
+*teilnehmen*, usual; `Er hat eine Entscheidung getroffen` and `seit
+langem` → `{"parsed": false}`; `schwerer Regen` → amod, unusual;
+`/api/collocations/Entscheidung` → 200.
+
+**Usage counts (#72).** More phrases parse, so a sentence the learner
+used to get "Keine Ergebnisse" for now counts as `check` or `check_obl`.
+`check` from this deploy on is not strictly comparable with the days
+before; note the deploy date next to the A0 numbers. The hint changes no
+count: an unparsed check was never counted, and the plain search it fell
+through to found nothing, so it was not a `word_page` either.
+
+**Review** (one fresh-context `general-purpose` reviewer, on the whole
+branch; it compared the old and new splitters on about 56k phrases built
+from the top 8,000 lab pairs). It found that my first claim, "no phrase
+that parsed before changed", was false. Fixed, test-first:
+1. A preposition between *das* and the noun was dropped as an adjective,
+   so 1,981 of the generated *das* + prepositional phrase + verb inputs moved
+   from obl to obj. *das in Kauf nehmen* went from Üblich to "Nicht
+   typisch". Fixed by the opener and attributive-ending rules above.
+2. A trailing preposition after a verb-final phrase became a particle
+   verb (*Entscheidung treffen über* → *übertreffen*, "Nicht typisch"). The
+   same cause turned *Angst haben vor* into *vorhaben*. Fixed by the
+   verb-before-noun rule.
+3. A verb after *das* was dropped as an adjective (*Ich denke das macht
+   Sinn* → *denken + Sinn*).
+4. A dropped reflexive was held to the top-10 limit (*Ich hole mir
+   Unterstützung*, "Nicht typisch").
+5. A capitalised particle word at the end hid the noun (*Ich lese den
+   ersten Teil*).
+6. The quantifier pattern matched the noun *All*.
+7. On the frontend, the header and the card showed the same hint at
+   once. The header hint is now hidden when `?pruefen=` holds the same
+   phrase (`showsSearchHint`). The logo jumped when the hint appeared: the
+   header row is now `items-start`.
+
+Left as they are: resubmitting the same unparsed phrase does not announce
+the hint again; `gibt's` (without *es*) is not treated as existential.
+
+**Rulings and their cost if wrong.**
+- **#70 reading first.** Cost: a learner reading can never replace a poor
+  #70 parse, for example verb `null`.
+- **Particles at ≥ 50 split rows, without *statt*.** Cost: a rarer particle
+  verb stays unparsed and shows the hint. The stray-particle rule catches a
+  wrong pop.
+- **Stray particle → not parsed.** Cost: a learner's made-up particle verb
+  gets the hint instead of "Nicht typisch".
+- **Particle + the form's lemma.** Cost: a wrong particle verb only when
+  the lab has the composed verb and the learner meant something else.
+- **Reflexive dropped, sich optional.** Cost: an unneeded reflexive is not
+  flagged (*ich treffe mir eine Entscheidung* → Üblich).
+- **Attributive endings only.** Cost: an adjective without such an ending
+  (*lila*, *rosa*, comparatives in *-er* already pass) leaves the phrase
+  unparsed.
+- ***es gibt* has no learner reading.** Cost: those sentences get the hint.
+- **The hint goes under the header field.** Cost: on phones the sticky
+  header grows by 2 or 3 lines while the hint shows, and the hint has no
+  URL. If that bothers learners, move it to the top of `main`.
+- **Three or more words before the hint.** Cost: a two-word phrase we
+  cannot read still ends on "Keine Ergebnisse", as in #70.
+
+**Left out.**
+- The perfect tense and modal verbs (*Er hat eine Entscheidung
+  getroffen*, *ich will … treffen*).
+- Two clauses (*Ich denke, das macht Sinn*).
+- Object plus prepositional noun (*Wert auf Qualität legen*).
+- *du*-forms the examples never write with the base verb (*nimmst … teil*;
+  the tagger gives *nimmst* the lemma *nimmst*).
+- An adjective before an all-lowercase noun (*eine schwere entscheidung
+  treffen*).
+- *stattfinden* and other subject-only verbs.
+- A subject noun (*Die Sitzung beginnt* is still read as an object check,
+  as in #70).
+- Two prepositions (#76).
+- The hint offering the dictionary form of the typed sentence.
+
+**Changed test.** One #70 assertion said `splitPhrase('eine wichtige
+Entscheidung treffen')` is null, which recorded #70's limit. It now parses
+(asserted in a new test). The old assertion is now *eine wichtige
+entscheidung treffen* (lowercase noun), the case still left out.
+
+**Checked.** `npm test` (144), `npm run test:db -w backend` (37),
+`npm run typecheck`, `npm run lint -w frontend`, `npm run build -w
+frontend`, after the review fixes. The API over HTTP as above. Not
+checked: the header hint in a browser at phone width (no browser in this
+session), and VoiceOver.
+
+**Deploy.** Backend and frontend together (the frontend change only
+matters with the backend's parsing, but each works without the other).
+No migration, no data load.

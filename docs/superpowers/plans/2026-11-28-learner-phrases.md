@@ -62,3 +62,20 @@ failed request → search.
 `npm run lint -w frontend`, `npm run build -w frontend`; the spot-check
 before/after through `CheckCollocationService` against the dev database;
 decision #78.
+
+## Task 6: review fixes (findings 1–8 of the branch review)
+
+- `collocationCheck.ts`: prepositions moved here (`prepositionOf`) and
+  never dropped; only attributive-looking words dropped; a particle
+  popped only when lowercase; quantifiers only lowercase or first;
+  `SplitPhrase.reflexiveDropped`; `judge(…, reflexiveDropped)`.
+- `CheckCollocationService#verbLemma(…, verbFirst)`: no split particle
+  after a verb-final phrase.
+- `showsSearchHint(hintFor, value, pruefen)` in
+  `frontend/src/lib/collocationCheck.ts`; `Layout.tsx` header row
+  `items-start`.
+
+Tests: *das in Kauf nehmen*, *Ich stelle das in Frage*, *Ich denke das
+macht Sinn*, *Ich lese den ersten Teil*, *ins All fliegen*, *Ich hole
+mir Unterstützung*, the any-rank reflexive in `judge`, *Sport machen
+auf*, and the header hint next to an unparsed `?pruefen=`.
