@@ -121,8 +121,9 @@ test('splitPhrase drops a subject pronoun, also capitalised at the start', () =>
 test('splitPhrase drops a reflexive that agrees with the subject, without requiring the sich pair', () => {
   // "mir"/"uns" are often free datives ("ich mache mir einen Kaffee"); the
   // #70 top-10 rule and #76's fallback still find "sich Sorgen machen".
-  assert.deepEqual(splitPhrase('Ich mache mir Sorgen'), { words: ['mache', 'Sorgen'], sich: false, particle: null });
-  assert.deepEqual(splitPhrase('wir geben uns Mühe'), { words: ['geben', 'Mühe'], sich: false, particle: null });
+  const dropped = { sich: false, particle: null, reflexiveDropped: true };
+  assert.deepEqual(splitPhrase('Ich mache mir Sorgen'), { words: ['mache', 'Sorgen'], ...dropped });
+  assert.deepEqual(splitPhrase('wir geben uns Mühe'), { words: ['geben', 'Mühe'], ...dropped });
   // A typed "sich" still means only the sich pair (#70).
   assert.deepEqual(splitPhrase('er gibt sich Mühe'), { words: ['gibt', 'Mühe'], sich: true, particle: null });
   // "mir" without "ich" is an object, not a reflexive: not parsed.
@@ -168,7 +169,45 @@ test('splitPhrase reads a capitalised particle word as the noun when the particl
   assert.deepEqual(splitPhrase('feiert ein Fest'), { words: ['feiert', 'Fest'], sich: false, particle: null });
 });
 
+// Review findings on #78.
+
+test('splitPhrase never drops a preposition as an adjective, so the obl branch gets it', () => {
+  assert.equal(splitPhrase('das in Kauf nehmen'), null);
+  assert.equal(splitPhrase('Ich stelle das in Frage'), null);
+  assert.equal(splitPhrase('das zur Verfügung stellen'), null);
+});
+
+test('splitPhrase drops only attributive-looking words, never a verb after "das"', () => {
+  assert.equal(splitPhrase('Ich denke das macht Sinn'), null);
+  assert.equal(splitPhrase('Ich weiß das kostet Geld'), null);
+  assert.deepEqual(splitPhrase('eine wichtige Entscheidung treffen'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+});
+
+test('splitPhrase pops only a particle typed in lowercase', () => {
+  assert.deepEqual(splitPhrase('Ich lese den ersten Teil'), { words: ['lese', 'Teil'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Wir feiern ein schönes Fest'), { words: ['feiern', 'Fest'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('ebnet den Weg'), { words: ['ebnet', 'Weg'], sich: false, particle: null });
+});
+
+test('splitPhrase reads a capitalised "All" as a noun, not a quantifier', () => {
+  assert.equal(splitPhrase('ins All fliegen'), null);
+  assert.deepEqual(splitPhrase('Alle Fragen beantworten'), { words: ['Fragen', 'beantworten'], sich: false, particle: null });
+});
+
+test('splitPhrase marks a dropped agreeing reflexive', () => {
+  assert.deepEqual(splitPhrase('Ich hole mir Unterstützung'), {
+    words: ['hole', 'Unterstützung'], sich: false, particle: null, reflexiveDropped: true,
+  });
+});
+
+test('judge: a dropped reflexive matches its sich pair at any rank', () => {
+  const others = Array.from({ length: 11 }, (_, i) => pair(`verb${i}`, 1000 - i, { noun: 'Unterstützung' }));
+  const pairs = [...others, pair('sich holen', 7, { noun: 'Unterstützung' })];
+  assert.equal(judge('holen', false, pairs).verdict, 'unusual');
+  assert.equal(judge('holen', false, pairs, true).verdict, 'usual');
+});
+
 test('splitPhrase takes sentences up to eight words', () => {
-  assert.deepEqual(splitPhrase('Ich gebe mir eine sehr große Mühe'), { words: ['gebe', 'Mühe'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Ich gebe mir eine sehr große Mühe'), { words: ['gebe', 'Mühe'], sich: false, particle: null, reflexiveDropped: true });
   assert.equal(splitPhrase('a b c d e f g h i'), null);
 });
