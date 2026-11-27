@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #80), and add it to the index.
+(next: #82), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -56,6 +56,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#77](#77) One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
 - [#78](#78) The check reads learner sentences (pronouns, adjectives, more particles); an unreadable sentence gets the hint, not "Keine Ergebnisse" (amends #70, #76, #77)
 - [#79](#79) Adjacency lists: a pair needs 3 sentences, and adjectives the tagger reads as adverbs go under "Adjektive" (amends #36, #43)
+- [#81](#81) The check's verdict is a label, its suggestions are links, chip borders are stronger (B3 of the 2026-11-27 UI review)
 
 ---
 
@@ -4186,3 +4187,25 @@ message (branch `frontend-feature-message-states`, B4 of
 `docs/ui-review-2026-11-27-search-and-cohesion.md`), not a lower floor.
 The query took 57 s on the VM (a full pass over `lemma_collocations`);
 don't repeat it at busy times.
+
+---
+
+<a id="81"></a>
+## 81. The check's verdict is a label, its suggestions are links, chip borders are stronger (B3 of the 2026-11-27 UI review)
+
+**Date.** 2026-11-28. Branch `frontend-feature-chip-affordances`. B3 of
+`docs/ui-review-2026-11-27-search-and-cohesion.md`.
+
+**Decision.**
+- The check's verdict is a label, not a pill: uppercase 12 px text with a
+  leading glyph, "✓ Üblich", "✗ Nicht typisch", "Keine Daten". Pills are
+  the tappable chips' shape; the glyph keeps #63's no-colour rule.
+- Each suggestion in the card is a link that runs its own check
+  (`checkSearch`), as every other partner on the page can be tapped.
+- `--border` goes from `oklch(0.922 0 0)` (1.26:1 on white) to
+  `oklch(0.87 0 0)`, and in dark mode from 10 % to 16 % white, so chips,
+  the card and the header rule stay visible on a sunlit phone.
+
+**Checked.** `npm test` (145), frontend lint and build. Headless Chrome at
+360 px, light and dark: the *bei einer Sitzung teilnehmen* card, and a tap
+on its suggestion shows "✓ Üblich".

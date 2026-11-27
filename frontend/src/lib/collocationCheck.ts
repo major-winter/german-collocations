@@ -106,6 +106,11 @@ export function checkHintExample(pairs: Pick<VerbNounPair, 'relation' | 'phrase'
     return (pairs.find((p) => p.relation === 'obj') ?? pairs.find((p) => p.relation === 'obl'))?.phrase ?? null;
 }
 
+/** The URL search that runs a check on the current noun page (a tapped suggestion, the hint's example). */
+export function checkSearch(phrase: string): string {
+    return `?pruefen=${encodeURIComponent(phrase)}`;
+}
+
 /** Where a parsed phrase takes the learner: its noun page, with the check in the URL. */
 export function checkTarget(check: CollocationCheck): string | null {
     if (!check.parsed) return null;
@@ -118,8 +123,8 @@ export function checkMatchesPage(check: CollocationCheck, word: string, lemma: s
 }
 
 const LABELS: Record<CheckVerdict, string> = {
-    usual: 'Üblich ✓',
-    unusual: 'Nicht typisch',
+    usual: '✓ Üblich',
+    unusual: '✗ Nicht typisch',
     noData: 'Keine Daten',
 };
 
