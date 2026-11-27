@@ -18,6 +18,7 @@ const headwords: Record<string, Headword> = {
   Frage: { lemma: { id: 500, text: "Frage" }, pos: "NOUN" },
   Sitzung: { lemma: { id: 600, text: "Sitzung" }, pos: "NOUN" },
   Verfügung: { lemma: { id: 700, text: "Verfügung" }, pos: "NOUN" },
+  Foto: { lemma: { id: 800, text: "Foto" }, pos: "NOUN" },
   Hohe: { lemma: { id: 3, text: "hoch" }, pos: "ADJ" },
   Starker: { lemma: { id: 1, text: "stark" }, pos: "ADJ" },
 };
@@ -34,9 +35,12 @@ const adjectives: Record<string, AdjectiveLemma> = {
   offene: { id: 36, lemma: "offen", mostlyAdjective: false },
 };
 
-const verbs: Record<string, string> = {
+const verbs: Record<string, string | string[]> = {
   machen: "machen", regen: "sich regen", kosten: "kosten", bekannte: "bekennen", stellt: "stellen", offene: "öffnen",
   teilnehmen: "teilnehmen", stellen: "stellen", treffen: "treffen",
+  // #78: finite forms of a particle verb, as the lab examples write them split.
+  nehme: ["nehmen", "teilnehmen"], nimmt: ["nehmen", "teilnehmen", "aufnehmen"], ist: "sein",
+  aufnehmen: "aufnehmen", // the lab verb itself, found by its lemma
 };
 
 // Decision #76: the nouns whose obl pairs the fake store knows, and every noun it was asked about.
@@ -59,11 +63,11 @@ const kostenPairs = [pair(3, 200, 2000), pair(21, 50, 800), pair(22, 20, 300), p
 function store(): CollocationCheckStore {
   return {
     resolveHeadword: async (word) => headwords[word] ?? null,
-    findVerbCandidates: async (surface) => (verbs[surface] ? [{ verb: verbs[surface], uses: 3 }] : []),
+    findVerbCandidates: async (surface) => [verbs[surface] ?? []].flat().map((verb) => ({ verb, uses: 3 })),
     findObjectPairs: async (noun) =>
-      noun === "Sport" || noun === "Frage"
+      noun === "Sport" || noun === "Frage" || noun === "Foto"
         ? [{
-            verb: noun === "Sport" ? "machen" : "stellen", noun, phraseNoun: noun, score: 10,
+            verb: { Sport: "machen", Frage: "stellen", Foto: "aufnehmen" }[noun]!, noun, phraseNoun: noun, score: 10,
             subjectScore: null, verbObjectShare: null,
           }]
         : [],
@@ -208,4 +212,37 @@ test("a phrase splitPhrase accepts never reaches the obl branch", async () => {
 
 test("an obl phrase whose noun has no page is not parsed", async () => {
   assert.deepEqual(await service.check("an der Tagung teilnehmen"), { parsed: false });
+});
+
+// Decision #78: learner-style sentences.
+
+test("a sentence with a split particle gets the dictionary form's verdict", async () => {
+  const dictionary = obl(await service.check("an der Sitzung teilnehmen"));
+  for (const q of ["Ich nehme an der Sitzung teil", "nimmt an der Sitzung teil", "Ich nehme an einer wichtigen Sitzung teil"]) {
+    const check = obl(await service.check(q));
+    assert.equal(check.verb, "teilnehmen", q);
+    assert.equal(check.verdict, dictionary.verdict, q);
+    assert.deepEqual(check.matched, dictionary.matched, q);
+    assert.equal(check.phrase, q, q);
+  }
+});
+
+test("an adjective inside the object phrase leaves the verb check", async () => {
+  const check = await service.check("Wir stellen eine wichtige Frage");
+  assert.equal(check.parsed && check.relation, "obj");
+  assert.equal(check.parsed && check.verdict, "usual");
+});
+
+test("a particle verb the examples never write with the typed form is particle + the form's lemma", async () => {
+  // The examples have "nehme" for "nehmen" and "teilnehmen", not for "aufnehmen".
+  const check = await service.check("Ich nehme ein Foto auf");
+  assert.equal(check.parsed && check.relation, "obj");
+  assert.equal(check.parsed && check.relation === "obj" && check.verb, "aufnehmen");
+  assert.equal(check.parsed && check.verdict, "usual");
+});
+
+test("a trailing particle the typed verb has no particle verb for is not parsed", async () => {
+  // "offen" is also a predicative adjective: "Die Frage ist offen" must not
+  // become "ist kein typisches Verb zu Frage".
+  assert.deepEqual(await service.check("Die Frage ist offen"), { parsed: false });
 });

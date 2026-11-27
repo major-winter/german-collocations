@@ -1,5 +1,6 @@
 import type { CollocationCheck } from "@collocations/types";
 import {
+  baseOf,
   judge,
   normalisePhrase,
   pickVerbLemma,
@@ -82,7 +83,11 @@ export class CheckCollocationService implements CheckCollocation {
     const headword = await this.#store.resolveHeadword(nounForm);
     if (headword === null || pageSide(headword.pos) !== "noun") return null;
 
-    const verb = pickVerbLemma(verbToken, split.particle, verbCandidates);
+    const verb = await this.#verbLemma(verbToken, split.particle, verbCandidates);
+    // #78: a trailing particle the typed verb has no particle verb for is
+    // more likely a predicative adjective ("Die Frage ist offen") or a word
+    // we cannot read than a wrong verb: not parsed, never "Nicht typisch".
+    if (verb === null && split.particle !== null) return null;
     const { noun, pairs } = await this.#pairsOf(nounForm, headword.lemma?.text ?? null, (n) => this.#store.findObjectPairs(n));
     const { verdict, matched, suggestions } = judge(verb, split.sich, pairs);
 
@@ -110,7 +115,8 @@ export class CheckCollocationService implements CheckCollocation {
     const headword = await this.#store.resolveHeadword(nounForm);
     if (headword === null || pageSide(headword.pos) !== "noun") return null;
 
-    const verb = pickVerbLemma(verbToken, split.particle, verbCandidates);
+    const verb = await this.#verbLemma(verbToken, split.particle, verbCandidates);
+    if (verb === null && split.particle !== null) return null; // #78, as in #verbCheck
     const { noun, pairs } = await this.#pairsOf(nounForm, headword.lemma?.text ?? null, (n) => this.#store.findOblPairs(n));
     const { verdict, matched, suggestions, otherPreposition } = judgePreposition(verb, split.sich, split.preposition, pairs);
 
@@ -213,6 +219,20 @@ export class CheckCollocationService implements CheckCollocation {
     return forA.length > 0
       ? { nounToken: b, verbToken: a, verbCandidates: forA }
       : { nounToken: a, verbToken: b, verbCandidates: forB };
+  }
+
+  // #70's pickVerbLemma, without looking at the noun. #78: the examples are
+  // news-heavy, so a first-person form may never be written with its
+  // particle verb ("nehme … auf"). Then particle + the form's own lemma
+  // ("auf" + "nehmen") is the particle verb, when the lab has that verb.
+  async #verbLemma(verbToken: string, particle: string | null, candidates: VerbCandidate[]): Promise<string | null> {
+    const verb = pickVerbLemma(verbToken, particle, candidates);
+    if (verb !== null || particle === null) return verb;
+    const base = pickVerbLemma(verbToken, null, candidates);
+    if (base === null) return null;
+    const composed = particle + base;
+    const known = await this.#store.findVerbCandidates(composed);
+    return known.some((c) => baseOf(c.verb) === composed) ? composed : null;
   }
 
   // Same order as the noun page (#60): the typed form, then its lemma.
