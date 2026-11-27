@@ -3248,3 +3248,18 @@ pin can go.
 (three `react-hooks/set-state-in-effect`, one
 `react-refresh/only-export-components` in the generated
 `ui/button.tsx`). They are fixed on a separate branch.
+
+### Follow-up: deployed to production (2026-11-27)
+
+Merged as `43cf453` together with the deploy and docs-auditor agents.
+On the live checkout (previously `c689bb9`): `git pull`, then `docker
+compose -f compose.prod.yml build migrate backend`, then `up -d --no-deps
+backend`. The backend started at 00:54:30 UTC, after its image was built
+(00:54:09), and logged no errors. No migration was added, so migrate did
+not run. The frontend was not rebuilt: `IMPRESSUM_EMAIL` is still unset
+on the server, so its build guard (#72) would stop it, and the lock-file
+change affects only lint tooling there. Lint was waived by the owner for
+this deploy because of the 4 known errors. Checked against the live site:
+`/` 200, `/api/collocations/Entscheidung` 200 with *treffen*,
+`/api/collocations/zzzqqq` 404, `/api/check?q=Sport machen` 200. These
+checks added 2 `word_page` and 1 `check` to `usage_counts` for 2026-11-27.
