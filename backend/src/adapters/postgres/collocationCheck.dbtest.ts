@@ -5,11 +5,12 @@ import { CheckCollocationService } from "../../application/CheckCollocationServi
 import { PgCollocationCheckStore } from "./PgCollocationCheckStore.ts";
 import { openTestDatabase, seeder } from "./testDatabase.ts";
 
-// Decision #70: the collocation check through its inbound port, against a
-// real Postgres (#67).
+// Decisions #70, #74: the collocation check through its inbound port,
+// against a real Postgres (#67).
 
 const db = await openTestDatabase();
-const service = new CheckCollocationService(new PgCollocationCheckStore(db.pool));
+const store = new PgCollocationCheckStore(db.pool);
+const service = new CheckCollocationService(store);
 let seed = seeder(db.pool);
 
 beforeEach(async () => {
@@ -19,10 +20,17 @@ beforeEach(async () => {
 after(() => db.close());
 
 function parsed(check: CollocationCheck) {
-  assert.equal(check.parsed, true);
-  return check as Extract<CollocationCheck, { parsed: true }>;
+  assert.equal(check.parsed && check.relation, "obj");
+  return check as Extract<CollocationCheck, { relation: "obj" }>;
 }
-const phrases = (check: CollocationCheck) => parsed(check).suggestions.map((s) => s.phrase);
+function amod(check: CollocationCheck) {
+  assert.equal(check.parsed && check.relation, "amod");
+  return check as Extract<CollocationCheck, { relation: "amod" }>;
+}
+const phrases = (check: CollocationCheck) => {
+  assert.equal(check.parsed, true);
+  return (check as Extract<CollocationCheck, { parsed: true }>).suggestions.map((s) => s.phrase);
+};
 
 async function entscheidung() {
   await seed.word("Entscheidung", { pos: "NOUN" });
@@ -112,4 +120,97 @@ test("an adjective + noun search is not a check (final review I1)", async () => 
   await seed.word("Hilfe", { pos: "NOUN" });
   await seed.labPair("leisten", "Hilfe", { score: 900 });
   assert.deepEqual(await service.check("erste Hilfe"), { parsed: false });
+});
+
+// Decision #74: adjective + noun from the #54 attributive data.
+async function regen() {
+  await seed.word("Regen", { pos: "NOUN" });
+  await seed.word("Wind", { pos: "NOUN" });
+  await seed.word("Arbeit", { pos: "NOUN" });
+  for (const adjective of ["stark", "leicht", "heftig", "strömend", "dicht", "schwer", "kalt"]) {
+    await seed.word(adjective, { pos: "ADJ" });
+  }
+  await seed.word("starker", { lemma: "stark", pos: "ADJ" });
+  await seed.word("schwerer", { lemma: "schwer", pos: "ADJ" });
+  const counts: [string, number][] = [
+    ["stark", 30], ["leicht", 10], ["heftig", 8], ["strömend", 6], ["dicht", 5], ["schwer", 1], ["kalt", 2],
+  ];
+  for (const [adjective, count] of counts) {
+    await seed.adjectiveAttribute("Regen", adjective, count);
+    const written = adjective === "stark" ? "starken" : `${adjective}er`;
+    await seed.adjectiveAttributeExample("Regen", adjective, `Es gab ${written} Regen.`, { noun: "Regen", adjective: written });
+  }
+  // Other written forms of "stark Regen": sentence-initial (counted
+  // lowercase), and more often still with a non-lemma noun form.
+  await seed.adjectiveAttributeExample("Regen", "stark", "Starker Regen fiel.", { noun: "Regen", adjective: "Starker" });
+  await seed.adjectiveAttributeExample("Regen", "stark", "Starker Regen fällt.", { noun: "Regen", adjective: "Starker" });
+  await seed.adjectiveAttributeExample("Regen", "stark", "Bei starken Regens.", { noun: "Regens", adjective: "starken" });
+  await seed.adjectiveAttributeExample("Regen", "stark", "Wegen starken Regens.", { noun: "Regens", adjective: "starken" });
+  await seed.adjectiveAttributeExample("Regen", "stark", "Trotz starken Regens.", { noun: "Regens", adjective: "starken" });
+  // stark and schwer are common elsewhere: their totals make Regen pairs score low.
+  await seed.adjectiveAttribute("Wind", "stark", 3000);
+  await seed.adjectiveAttribute("Arbeit", "schwer", 4000);
+}
+
+test("the store counts the noun's full total and the adjective's other nouns", async () => {
+  await regen();
+  const { rows } = await db.pool.query<{ id: number; lemma: string }>("SELECT id, lemma FROM lemmas");
+  const id = (lemma: string) => rows.find((r) => r.lemma === lemma)!.id;
+  const counts = await store.findAdjectiveCounts(id("Regen"), id("schwer"));
+  assert.equal(counts.nounTotal, 62);
+  const byLemma = new Map(counts.pairs.map((p) => [p.adjective, p]));
+  assert.deepEqual([...byLemma.keys()].sort(), ["dicht", "heftig", "leicht", "schwer", "stark", "strömend"]);
+  assert.equal(byLemma.get("stark")?.adjectiveTotal, 3030);
+  assert.equal(byLemma.get("schwer")?.count, 1);
+  assert.deepEqual(await store.findAdjectiveLemma("starker"), { id: id("stark"), lemma: "stark" });
+  assert.equal(await store.findAdjectiveLemma("regen"), null);
+});
+
+test("schwerer Regen is not typical, with the top three by logDice as written", async () => {
+  await regen();
+  const check = amod(await service.check("schwerer Regen"));
+  assert.equal(check.noun, "Regen");
+  assert.equal(check.adjective, "schwer");
+  assert.equal(check.verdict, "unusual");
+  assert.deepEqual(phrases(check), ["leichter Regen", "heftiger Regen", "strömender Regen"]);
+});
+
+test("ein starker Regen is usual, written as the corpus most often writes it", async () => {
+  await regen();
+  const check = amod(await service.check("ein starker Regen"));
+  assert.equal(check.verdict, "usual");
+  // "starken Regens" is more frequent, but the noun's lemma form wins;
+  // "Starker" at a sentence start counts as "starker".
+  assert.deepEqual(check.matched, { phrase: "starker Regen", nounWord: "Regen", partnerWord: "starker" });
+  assert.deepEqual(phrases(check), ["leichter Regen", "heftiger Regen"]);
+});
+
+test("a noun with too few frequent adjectives gets noData", async () => {
+  await seed.word("Kaffee", { pos: "NOUN" });
+  await seed.word("stark", { pos: "ADJ" });
+  await seed.word("heiß", { pos: "ADJ" });
+  await seed.adjectiveAttribute("Kaffee", "heiß", 20);
+  await seed.adjectiveAttribute("Kaffee", "stark", 2);
+  const check = amod(await service.check("Kaffee stark"));
+  assert.equal(check.verdict, "noData");
+});
+
+test("lange Zeit: the form's attributive lemma wins over its dominant adverb lemma", async () => {
+  await seed.word("Zeit", { pos: "NOUN" });
+  await seed.word("lang", { pos: "ADJ" });
+  await seed.word("kurz", { pos: "ADJ" });
+  await seed.word("lange", { pos: "ADV" }); // dominant lemma "lange", the adverb
+  await seed.wordLemma("lange", "lang", 5);
+  for (const [adjective, count] of [["lang", 40], ["kurz", 30], ["lange", 1]] as const) {
+    await seed.adjectiveAttribute("Zeit", adjective, count);
+  }
+  for (const adjective of ["a", "b", "c"]) {
+    await seed.word(adjective, { pos: "ADJ" });
+    await seed.adjectiveAttribute("Zeit", adjective, 5);
+  }
+  await seed.adjectiveAttributeExample("Zeit", "lang", "Seit langer Zeit.", { noun: "Zeit", adjective: "langer" });
+  const check = amod(await service.check("lange Zeit"));
+  assert.equal(check.adjective, "lang");
+  assert.equal(check.verdict, "usual");
+  assert.equal(check.matched?.phrase, "langer Zeit");
 });

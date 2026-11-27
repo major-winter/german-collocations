@@ -132,9 +132,19 @@ export function seeder(pool: Pool) {
         "INSERT INTO word_dominant_lemma (word_id, lemma_id, count, share) VALUES ($1, $2, 10, 1)",
         [id, lemmaRowId],
       );
+      await pool.query("INSERT INTO word_lemmas (word_id, lemma_id, count) VALUES ($1, $2, 10)", [id, lemmaRowId]);
       if (pos) {
         await pool.query("INSERT INTO word_pos (word_id, pos, count) VALUES ($1, $2, 10)", [id, pos]);
       }
+    },
+
+    /** A further, non-dominant lemma of a seeded word ("lange" -> "lang"); the lemma must exist. */
+    async wordLemma(text: string, lemma: string, count: number): Promise<void> {
+      await pool.query("INSERT INTO word_lemmas (word_id, lemma_id, count) VALUES ($1, $2, $3)", [
+        idOf(wordIds, text),
+        idOf(lemmaIds, lemma),
+        count,
+      ]);
     },
 
     /** Two lemmas seen next to each other, left then right. */
