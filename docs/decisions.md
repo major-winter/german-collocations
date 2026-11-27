@@ -4154,6 +4154,6 @@ Live checks: `/` 200; `/api/collocations/Entscheidung` 200 with
 *auf eine Antwort warten*; *Er hat eine Entscheidung getroffen*
 `{"parsed":false}`; *an einer Sitzung teilnehmen* usual; *Sport machen*
 200. The served bundle `index-Ct5nYGy4.js` contains "Das können wir
-nicht prüfen". The smoke run made 7 lookups (2 each of Entscheidung's
-two calls counted once each, plus zzzqqq, Nebel and
-Bundesverfassungsgericht before and after) and 5 checks.
+nicht prüfen". The smoke run made 7 lookups (Nebel and
+Bundesverfassungsgericht before and after, Entscheidung twice, zzzqqq
+once) and 5 checks.
