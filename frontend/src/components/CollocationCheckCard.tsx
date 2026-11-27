@@ -4,6 +4,7 @@ import type { CheckPhrase, CollocationCheck } from '@collocations/types';
 import { cn } from '@/lib/utils';
 import {
     checkMatchesPage,
+    checkSearch,
     checkTarget,
     partnerKind,
     partnerTyped,
@@ -63,7 +64,8 @@ function Verdict({ check }: { check: Parsed }) {
         <>
             <span
                 className={cn(
-                    'inline-block rounded-full border px-2 py-0.5 text-xs font-semibold tracking-wide',
+                    // A label, not a pill: the chips below are the tappable shapes (B3).
+                    'inline-block text-xs font-semibold uppercase tracking-wide',
                     check.verdict === 'usual' ? 'text-foreground' : 'text-muted-foreground',
                 )}
             >
@@ -119,7 +121,12 @@ function Verdict({ check }: { check: Parsed }) {
                     {check.suggestions.map((s) => (
                         <li key={s.phrase}>
                             <span className="text-muted-foreground">→ </span>
-                            <Phrase phrase={s} partner={partner} />
+                            {/* B3: a suggestion runs its own check, like every other partner is tappable. */}
+                            <Link
+                                to={{ search: checkSearch(s.phrase) }}
+                                className="underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground">
+                                <Phrase phrase={s} partner={partner} />
+                            </Link>
                         </li>
                     ))}
                 </ul>
@@ -201,7 +208,7 @@ export function CollocationCheckCard({ word, lemma, showHint, hintExample }: Col
                     <>
                         , z.&nbsp;B.{' '}
                         <Link
-                            to={{ search: `?${PARAM}=${encodeURIComponent(hintExample)}` }}
+                            to={{ search: checkSearch(hintExample) }}
                             className="italic underline underline-offset-2 hover:text-foreground">
                             {hintExample}
                         </Link>

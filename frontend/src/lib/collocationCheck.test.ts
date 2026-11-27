@@ -16,6 +16,7 @@ import {
     showsSearchHint,
     unusualReason,
     verdictLabel,
+    checkSearch,
 } from './collocationCheck.ts';
 
 const entscheidung: CollocationCheck = {
@@ -122,8 +123,8 @@ test('checkMatchesPage only for the page\'s own noun', () => {
 });
 
 test('verdictLabel uses the spec\'s German labels', () => {
-    assert.equal(verdictLabel('usual'), 'Üblich ✓');
-    assert.equal(verdictLabel('unusual'), 'Nicht typisch');
+    assert.equal(verdictLabel('usual'), '✓ Üblich');
+    assert.equal(verdictLabel('unusual'), '✗ Nicht typisch');
     assert.equal(verdictLabel('noData'), 'Keine Daten');
 });
 
@@ -187,4 +188,8 @@ test('unusualReason tells another preposition from another verb or adjective (#7
 test('historyStateWithoutCheck drops the passed check so a reload fetches again (#77)', () => {
     assert.deepEqual(historyStateWithoutCheck({ usr: { check: entscheidung }, key: 'k1', idx: 3 }), { usr: null, key: 'k1', idx: 3 });
     assert.deepEqual(historyStateWithoutCheck(null), { usr: null });
+});
+
+test('checkSearch is the URL search that runs a check on the current page (B3)', () => {
+    assert.equal(checkSearch('an den Sitzungen teilnehmen'), '?pruefen=an%20den%20Sitzungen%20teilnehmen');
 });
