@@ -4130,3 +4130,30 @@ backend` against a private `*_test` database (41, four new: the count
 floor, an ADV-tagged adjective, no repeat on a noun page, an adverb with
 stray ADJ tags staying "other"; two older tests that leaned on a
 one-sentence pair now use 3 and 5 sentences).
+
+### Follow-up: deployed to production (2026-11-28)
+
+Merge commits `8817eb1` (`backend-feature-learner-phrases`, #78) and
+`049a114` (`database-bug-adjacency-noise`, #79); #78 ships with this
+deploy too. The server went from `722ea87` (PREV) to `049a114`. Built
+`migrate`, `backend` and `frontend` (images done 17:41:07 to 17:41:21
+UTC), ran `migrate` first, then `up -d --no-deps backend frontend`;
+containers started 17:41:53 UTC, after their images. Disk before: 7.3 GB
+free of 25 GB. Backend log clean.
+
+Migration `019_add_lemma_adjective_shares.sql` applied (the only one);
+`lemma_adjective_shares` has 12,083 rows on prod (`lemma_dominant_pos`:
+87,760). No data load. A code rollback does not need to drop the table:
+the old backend ignores it.
+
+Live checks: `/` 200; `/api/collocations/Entscheidung` 200 with
+*treffen*; `zzzqqq` 404; *Nebel* went from 23 to 4 collocation entries;
+*Bundesverfassungsgericht* from 20 to 1, and no longer lists
+*angeordnet* or *Müsst*; *Ich nehme an der Sitzung teil* parsed, usual
+(obl *teilnehmen*); *Ich warte für eine Antwort* unusual, suggesting
+*auf eine Antwort warten*; *Er hat eine Entscheidung getroffen*
+`{"parsed":false}`; *an einer Sitzung teilnehmen* usual; *Sport machen*
+200. The served bundle `index-Ct5nYGy4.js` contains "Das können wir
+nicht prüfen". The smoke run made 7 lookups (2 each of Entscheidung's
+two calls counted once each, plus zzzqqq, Nebel and
+Bundesverfassungsgericht before and after) and 5 checks.
