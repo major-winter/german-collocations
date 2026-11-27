@@ -21,6 +21,17 @@ export function isPhraseQuery(q: string): boolean {
     return q.trim().split(/\s+/).length >= 2;
 }
 
+/**
+ * What the card's field sends to the check (#75): a whole phrase as typed,
+ * exactly like the search box; a single word goes with the page's noun.
+ * Null when the field is empty.
+ */
+export function checkQueryFor(input: string, word: string): string | null {
+    const typed = input.trim().split(/\s+/).filter((t) => t !== '').join(' ');
+    if (typed === '') return null;
+    return isPhraseQuery(typed) ? typed : `${word} ${typed}`;
+}
+
 /** Where a parsed phrase takes the learner: its noun page, with the check in the URL. */
 export function checkTarget(check: CollocationCheck): string | null {
     if (!check.parsed) return null;
