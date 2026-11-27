@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
-import { Link, matchPath, useLocation } from 'react-router';
+import { Link, matchPath, useLocation, useSearchParams } from 'react-router';
+import { searchFieldValue } from '@/lib/collocationCheck.ts';
 import { SearchBox } from './SearchBox';
 
 interface LayoutProps {
@@ -24,6 +25,9 @@ export function Layout({ children }: LayoutProps) {
 
     const match = matchPath("/wort/:word", location.pathname);
     const currentWord = match?.params.word ?? "";
+    // #77: the one field shows the check on a word page, so the learner corrects it in place.
+    const [searchParams] = useSearchParams();
+    const fieldValue = searchFieldValue(currentWord, match ? searchParams.get("pruefen") : null);
 
     return (
         <div className="min-h-screen flex flex-col">
@@ -31,7 +35,7 @@ export function Layout({ children }: LayoutProps) {
                 <div className="py-3 sm:py-4 max-w-xl md:max-w-2xl mx-auto px-4 w-full flex items-center gap-3">
                     <Logomark />
                     <div className="flex-1">
-                        <SearchBox initialValue={currentWord} />
+                        <SearchBox initialValue={fieldValue} />
                     </div>
                 </div>
             </header>

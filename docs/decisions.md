@@ -53,6 +53,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#74](#74) "Passt das zusammen?" for adjective + noun: attributive logDice over the #54 data (amends #70)
 - [#75](#75) One phrase field on the check card; the verb-vs-adjective rule in either word order (amends #70, #74)
 - [#76](#76) "Passt das zusammen?" for a verb with a prepositional noun (amends #70)
+- [#77](#77) One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
 
 ---
 
@@ -3639,3 +3640,61 @@ suggesting *an den Sitzungen teilnehmen*; *zur Verfügung stellen*
 usual; *eine Entscheidung treffen* still usual (object path). The
 served bundle `index-DvZpo8RN.js` contains `otherPreposition`. The
 smoke run made 2 lookups and 5 checks (counted in `usage_counts`).
+
+---
+
+## 77. One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
+
+**Date.** 2026-11-27. Branch `frontend-feature-single-search-field`.
+Source: Option 1 of `docs/ui-review-2026-11-27-search-and-cohesion.md`,
+chosen by the user.
+
+**Problem.** A noun page had two text fields 200 px apart: the sticky
+header search box and the check card's "Verbindung prüfen" field (#75).
+For phrases they did the same thing, but a phrase typed in the header
+moved into the card and the header reset to the noun. Each phrase search
+sent two `/api/check` requests (the box, then the card). They differed
+only on a single word: the card paired it with the page's noun, and since
+#76 that could mislead. *teilnehmen* on *Sitzung* became the object check
+*Sitzung teilnehmen*, "Nicht typisch", while *an den Sitzungen teilnehmen*
+was the first chip on the same page.
+
+**Decision.**
+- The header search box is the only input. Placeholder "Wort oder
+  Verbindung", accessible name "Wort suchen oder Verbindung prüfen". A
+  single word always looks that word up; a phrase is checked as in #70.
+- On a word page with `?pruefen=…` the header field shows the checked
+  phrase (`searchFieldValue`), so the learner corrects it in place.
+- The card has no form. It shows the verdict (or the "can't check" hint)
+  in its `aria-live` region. Without a check, a noun with pairs or
+  adjectives gets one muted line: "Passt ein Wort zu *Sitzung*? Geben Sie
+  oben die ganze Verbindung ein, z. B. *die Sitzung leiten*." The example
+  is the noun's best object pair, else its best prepositional pair
+  (`checkHintExample`), and is a link that runs that check.
+- The search box passes the check it fetched in the navigation state;
+  the card uses it when phrase and page match (`preloadedCheck`), so a
+  phrase search costs one request. The card then drops the check from the
+  browser's history entry (`historyStateWithoutCheck`), because the browser
+  keeps that state across a reload; a direct link, reload or back/forward
+  fetches again.
+- `checkQueryFor` (the single-word shortcut) is removed.
+
+**Cost.** The one-word shortcut is gone: to check *leiten* with *Sitzung*
+the learner types *Sitzung leiten*. The usage counts (#72) never recorded
+which field a check came from, so there is no measure of how much it was
+used.
+
+**Left out.** A phrase the server cannot parse, typed in the header,
+still falls through to a plain search ("Keine Ergebnisse"); the card's
+hint shows only for such a phrase in the URL. A bare verb typed with its
+noun (*Sitzung teilnehmen*) is still checked only as an object, not
+against the prepositional pairs (backend, a separate step).
+
+**Checked.** `npm test` (116), typecheck, frontend lint and build. In
+headless Chrome at 360 and 1280 px, light and dark (ui-ux-designer):
+hint and its link, correcting *bei* to *an* in the header, a phrase from
+`/wort/treffen` (one check request), single-word lookup, the unparsed
+hint, back/forward, tab order, no sideways scroll, the hint without
+"z. B." on *Nebel*. The first run found that a reload reused the passed
+check; fixed, and re-checked (one request on a header search, a fetch
+on reload). Not checked: VoiceOver on iOS, a phone's keyboard.

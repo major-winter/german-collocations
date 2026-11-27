@@ -1,7 +1,8 @@
-import type { CheckPhrase, CheckVerdict, CollocationCheck } from '@collocations/types';
+import type { CheckPhrase, CheckVerdict, CollocationCheck, VerbNounPair } from '@collocations/types';
 
-// Decisions #70, #74, #76: "Passt das zusammen?" - the pure parts of the check
-// card and of the search box's phrase routing.
+// Decisions #70, #74, #76, #77: "Passt das zusammen?" - the pure parts of the
+// check card and of the search box's phrase routing. Since #77 the header
+// search box is the only field: it looks words up and checks phrases.
 
 type Parsed = Extract<CollocationCheck, { parsed: true }>;
 export type PartnerKind = 'verb' | 'adjective';
@@ -32,14 +33,44 @@ export function isPhraseQuery(q: string): boolean {
 }
 
 /**
- * What the card's field sends to the check (#75): a whole phrase as typed,
- * exactly like the search box; a single word goes with the page's noun.
- * Null when the field is empty.
+ * What the header search box shows (#77): the check in the URL, so the
+ * learner corrects it in place, else the page's word.
  */
-export function checkQueryFor(input: string, word: string): string | null {
-    const typed = input.trim().split(/\s+/).filter((t) => t !== '').join(' ');
-    if (typed === '') return null;
-    return isPhraseQuery(typed) ? typed : `${word} ${typed}`;
+export function searchFieldValue(word: string, pruefen: string | null): string {
+    const phrase = (pruefen ?? '').trim().split(/\s+/).filter((t) => t !== '').join(' ');
+    if (phrase !== '') return phrase;
+    try {
+        return decodeURIComponent(word);
+    } catch {
+        return word;
+    }
+}
+
+/**
+ * The check the search box already fetched and passed in the navigation
+ * state (#77), when it is for this query and this page; saves the card a
+ * second request.
+ */
+export function preloadedCheck(state: unknown, query: string | null, word: string, lemma: string): Parsed | null {
+    if (typeof state !== 'object' || state === null || !('check' in state)) return null;
+    const check = (state as { check: CollocationCheck }).check;
+    if (!check?.parsed || check.phrase !== query || !checkMatchesPage(check, word, lemma)) return null;
+    return check;
+}
+
+/**
+ * The browser's history entry without the passed check (#77). The browser
+ * keeps `history.state` across a reload; without this, a reload would show
+ * the stored verdict instead of asking the server again.
+ */
+export function historyStateWithoutCheck(state: unknown): Record<string, unknown> {
+    const rest = typeof state === 'object' && state !== null ? state : {};
+    return { ...rest, usr: null };
+}
+
+/** The phrase the card's hint offers to check (#77): the best object pair, else the best prepositional one. */
+export function checkHintExample(pairs: Pick<VerbNounPair, 'relation' | 'phrase'>[]): string | null {
+    return (pairs.find((p) => p.relation === 'obj') ?? pairs.find((p) => p.relation === 'obl'))?.phrase ?? null;
 }
 
 /** Where a parsed phrase takes the learner: its noun page, with the check in the URL. */

@@ -10,6 +10,7 @@ import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { hasAnyResults } from "../lib/verbNounGroups.ts";
 import { legendSections } from "../lib/wordClass.ts";
+import { checkHintExample } from "../lib/collocationCheck.ts";
 
 import { API_BASE_URL } from "../config.ts";
 
@@ -149,10 +150,11 @@ export function Word() {
                 <CollocationCheckCard
                     word={state.data.word}
                     lemma={state.data.verbNounPairs.lemma}
-                    showField={
+                    showHint={
                         state.data.verbNounPairs.pairs.some((p) => p.relation === "obj" || p.relation === "obl") ||
                         state.data.collocations.some((c) => c.section === "adjective")
                     }
+                    hintExample={checkHintExample(state.data.verbNounPairs.pairs)}
                 />
             )}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
