@@ -4,6 +4,7 @@ import type { CollocationCheck } from "@collocations/types";
 import type { AdjectiveCount } from "../domain/adjectiveCheck.ts";
 import type { Headword } from "./ports/out/CollocationStore.ts";
 import type { AdjectiveLemma, CollocationCheckStore } from "./ports/out/CollocationCheckStore.ts";
+import type { OblPair } from "../domain/prepositionCheck.ts";
 import { CheckCollocationService } from "./CheckCollocationService.ts";
 
 // Decision #74: the role assignment and the adjective branch, against an
@@ -15,6 +16,8 @@ const headwords: Record<string, Headword> = {
   Sport: { lemma: { id: 300, text: "Sport" }, pos: "NOUN" },
   Nacht: { lemma: { id: 400, text: "Nacht" }, pos: "NOUN" },
   Frage: { lemma: { id: 500, text: "Frage" }, pos: "NOUN" },
+  Sitzung: { lemma: { id: 600, text: "Sitzung" }, pos: "NOUN" },
+  Verfügung: { lemma: { id: 700, text: "Verfügung" }, pos: "NOUN" },
   Hohe: { lemma: { id: 3, text: "hoch" }, pos: "ADJ" },
   Starker: { lemma: { id: 1, text: "stark" }, pos: "ADJ" },
 };
@@ -33,7 +36,15 @@ const adjectives: Record<string, AdjectiveLemma> = {
 
 const verbs: Record<string, string> = {
   machen: "machen", regen: "sich regen", kosten: "kosten", bekannte: "bekennen", stellt: "stellen", offene: "öffnen",
+  teilnehmen: "teilnehmen", stellen: "stellen", treffen: "treffen",
 };
+
+// Decision #76: the nouns whose obl pairs the fake store knows, and every noun it was asked about.
+const oblPairs: Record<string, OblPair[]> = {
+  Sitzung: [{ verb: "teilnehmen", prep: "an", noun: "Sitzung", phraseNoun: "an den Sitzungen", score: 1201 }],
+  Verfügung: [{ verb: "stellen", prep: "zu", noun: "Verfügung", phraseNoun: "zur Verfügung", score: 9000 }],
+};
+const oblLookups: string[] = [];
 
 const lemmaOf = (id: number) => Object.values(adjectives).find((a) => a.id === id)?.lemma ?? `adj${id}`;
 const pair = (adjectiveId: number, count: number, adjectiveTotal: number): AdjectiveCount => ({
@@ -56,6 +67,10 @@ function store(): CollocationCheckStore {
             subjectScore: null, verbObjectShare: null,
           }]
         : [],
+    findOblPairs: async (noun) => {
+      oblLookups.push(noun);
+      return oblPairs[noun] ?? [];
+    },
     findAdjectiveLemma: async (surface) => adjectives[surface] ?? null,
     findAdjectiveCounts: async (nounLemmaId, adjectiveLemmaId) => {
       const pairs = { 100: regenPairs, 200: kostenPairs, 500: fragePairs }[nounLemmaId] ?? [];
@@ -160,4 +175,37 @@ test("the verb-vs-adjective rule holds in either word order", async () => {
 test("the verb reading stays when the verb check is usual", async () => {
   const usual = await service.check("Sport machen");
   assert.equal(usual.parsed && usual.relation, "obj");
+});
+
+function obl(check: CollocationCheck) {
+  assert.equal(check.parsed && check.relation, "obl");
+  return check as Extract<CollocationCheck, { relation: "obl" }>;
+}
+
+test("an der Sitzung teilnehmen is usual through the obl branch (#76)", async () => {
+  const check = obl(await service.check("an der Sitzung teilnehmen"));
+  assert.equal(check.noun, "Sitzung");
+  assert.equal(check.preposition, "an");
+  assert.equal(check.verb, "teilnehmen");
+  assert.equal(check.verdict, "usual");
+  assert.equal(check.matched?.phrase, "an den Sitzungen teilnehmen");
+});
+
+test("zur Verfügung stellen maps the contraction and opens the Verfügung page", async () => {
+  const check = obl(await service.check("zur Verfügung stellen"));
+  assert.equal(check.noun, "Verfügung");
+  assert.equal(check.prepositionTyped, "zur");
+  assert.equal(check.preposition, "zu");
+  assert.equal(check.verdict, "usual");
+});
+
+test("a phrase splitPhrase accepts never reaches the obl branch", async () => {
+  oblLookups.length = 0;
+  await service.check("Sport machen");
+  await service.check("schwerer Regen");
+  assert.deepEqual(oblLookups, []);
+});
+
+test("an obl phrase whose noun has no page is not parsed", async () => {
+  assert.deepEqual(await service.check("an der Tagung teilnehmen"), { parsed: false });
 });

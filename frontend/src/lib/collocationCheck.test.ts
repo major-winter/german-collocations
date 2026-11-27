@@ -9,6 +9,7 @@ import {
     partnerKind,
     partnerTyped,
     phraseParts,
+    unusualReason,
     verdictLabel,
 } from './collocationCheck.ts';
 
@@ -95,4 +96,32 @@ test('partnerKind and partnerTyped follow the relation', () => {
     assert.equal(partnerTyped(entscheidung), 'machen');
     assert.equal(partnerTyped(regen), 'schwerer');
     assert.equal(checkTarget(regen), '/wort/Regen?pruefen=schwerer%20Regen');
+});
+
+const sitzung: Extract<CollocationCheck, { relation: 'obl' }> = {
+    parsed: true,
+    phrase: 'an einer Sitzung teilnehmen',
+    noun: 'Sitzung',
+    verbTyped: 'teilnehmen',
+    verb: 'teilnehmen',
+    prepositionTyped: 'an',
+    preposition: 'an',
+    relation: 'obl',
+    verdict: 'unusual',
+    otherPreposition: true,
+    matched: null,
+    suggestions: [],
+};
+
+test('a prepositional check has a verb partner, typed as the verb (#76)', () => {
+    assert.equal(partnerKind(sitzung), 'verb');
+    assert.equal(partnerTyped(sitzung), 'teilnehmen');
+    assert.equal(checkTarget(sitzung), '/wort/Sitzung?pruefen=an%20einer%20Sitzung%20teilnehmen');
+});
+
+test('unusualReason tells another preposition from another verb or adjective (#76)', () => {
+    assert.equal(unusualReason(sitzung), 'preposition');
+    assert.equal(unusualReason({ ...sitzung, otherPreposition: false }), 'verb');
+    assert.equal(unusualReason(entscheidung), 'verb');
+    assert.equal(unusualReason(regen), 'adjective');
 });

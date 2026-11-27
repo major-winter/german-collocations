@@ -56,6 +56,14 @@ test("an adjective check is counted as check_adj, keeping the verb-check baselin
   assert.deepEqual(kinds, ["check_adj", "check"]);
 });
 
+test("a prepositional check is counted as check_obl (#76)", async () => {
+  const { counter, kinds } = recorder();
+  const prepositional = { parsed: true, relation: "obl" } as unknown as CollocationCheck;
+  const check = new CountingCheckCollocation({ check: async () => prepositional }, counter, quiet);
+  await check.check("an der Sitzung teilnehmen");
+  assert.deepEqual(kinds, ["check_obl"]);
+});
+
 test("a failing counter is logged and never fails the request", async () => {
   const { counter } = recorder("reject");
   const errors: unknown[] = [];

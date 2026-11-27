@@ -31,7 +31,7 @@ export interface SplitPhrase {
 // Learners type "eine Entscheidung treffen?" - the card asks a question.
 const EDGE_PUNCTUATION = /^[.,;:!?"'„“”‚‘’»«()]+|[.,;:!?"'„“”‚‘’»«()]+$/g;
 
-function tokensOf(q: string): string[] {
+function rawTokens(q: string): string[] {
   return q
     .trim()
     .split(/\s+/)
@@ -39,24 +39,32 @@ function tokensOf(q: string): string[] {
     .filter((t) => t !== "");
 }
 
-/** The phrase as typed, without surrounding punctuation or extra spaces. */
-export function normalisePhrase(q: string): string {
-  return tokensOf(q).join(" ");
+/** The typed tokens, without edge punctuation; null outside the 2–5 token bounds. */
+export function tokensOf(q: string): string[] | null {
+  const tokens = rawTokens(q);
+  return tokens.length < MIN_TOKENS || tokens.length > MAX_TOKENS ? null : tokens;
 }
 
-/** null unless the phrase is exactly a noun and a verb once function words are gone. */
-export function splitPhrase(q: string): SplitPhrase | null {
-  const tokens = tokensOf(q);
-  if (tokens.length < MIN_TOKENS || tokens.length > MAX_TOKENS) return null;
+/** The phrase as typed, without surrounding punctuation or extra spaces. */
+export function normalisePhrase(q: string): string {
+  return rawTokens(q).join(" ");
+}
 
-  // Before the determiners go: a trailing "ein" is a particle, not an article.
-  let particle: string | null = null;
+/**
+ * Pops a trailing separable particle - before the determiners go, so a
+ * trailing "ein" is a particle, not an article. Mutates `tokens`.
+ */
+export function popParticle(tokens: string[]): string | null {
   const last = tokens[tokens.length - 1].toLowerCase();
   if (tokens.length >= 3 && SEPARABLE_PARTICLES.has(last)) {
-    particle = last;
     tokens.pop();
+    return last;
   }
+  return null;
+}
 
+/** The two words left once "sich" and determiners are gone, or null. */
+export function contentWords(tokens: string[]): { words: [string, string]; sich: boolean } | null {
   let sich = false;
   const words = tokens.filter((t) => {
     if (t.toLowerCase() === "sich") {
@@ -66,7 +74,16 @@ export function splitPhrase(q: string): SplitPhrase | null {
     return !DETERMINER.test(t);
   });
   if (words.length !== 2) return null;
-  return { words: [words[0], words[1]], sich, particle };
+  return { words: [words[0], words[1]], sich };
+}
+
+/** null unless the phrase is exactly a noun and a verb once function words are gone. */
+export function splitPhrase(q: string): SplitPhrase | null {
+  const tokens = tokensOf(q);
+  if (tokens === null) return null;
+  const particle = popParticle(tokens);
+  const content = contentWords(tokens);
+  return content === null ? null : { ...content, particle };
 }
 
 export interface VerbCandidate {
@@ -76,7 +93,8 @@ export interface VerbCandidate {
   uses: number;
 }
 
-function baseOf(verb: string): string {
+/** The verb lemma without its "sich". */
+export function baseOf(verb: string): string {
   return verb.startsWith(REFLEXIVE_PREFIX) ? verb.slice(REFLEXIVE_PREFIX.length) : verb;
 }
 

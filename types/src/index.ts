@@ -89,4 +89,20 @@ export type CollocationCheck =
       verdict: CheckVerdict;
       matched: CheckPhrase | null;
       suggestions: CheckPhrase[];
+    }
+  // Decision #76: a verb with a prepositional noun ("an einer Sitzung
+  // teilnehmen"), from the lab's obl pairs.
+  | {
+      parsed: true;
+      phrase: string;            // the query, whitespace-normalised, as typed
+      noun: string;              // the noun page to open
+      verbTyped: string;         // the verb token as typed ("teilnehmen")
+      verb: string | null;       // the lab verb lemma, null when unknown
+      prepositionTyped: string;  // as typed ("zur")
+      preposition: string;       // its lemma ("zu")
+      relation: 'obl';
+      verdict: CheckVerdict;
+      otherPreposition: boolean; // unusual because the verb takes another preposition with this noun
+      matched: CheckPhrase | null;
+      suggestions: CheckPhrase[];
     };

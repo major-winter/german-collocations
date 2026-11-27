@@ -3,6 +3,7 @@ import type { AdjectiveLemma, CollocationCheckStore } from "../../application/po
 import type { Headword } from "../../application/ports/out/CollocationStore.ts";
 import { MIN_ADJECTIVE_PAIR_COUNT, type AdjectiveCounts, type AdjectiveCount, type WrittenForm } from "../../domain/adjectiveCheck.ts";
 import type { CheckPair, VerbCandidate } from "../../domain/collocationCheck.ts";
+import type { OblPair } from "../../domain/prepositionCheck.ts";
 import { resolveHeadword } from "./headword.ts";
 
 // Driven adapter for the collocation check (#70).
@@ -42,6 +43,16 @@ const OBJECT_PAIRS_QUERY = `
     ) END AS "verbObjectShare"
   FROM obj
   ORDER BY score DESC, verb
+`;
+
+// Decision #76: all of a noun's prepositional pairs, best-first; the domain
+// drops the weak ones. Through idx_lab_verb_pairs_noun: 0.6 ms for the
+// largest noun ("Zeit", 155 obl pairs), local, warm.
+const OBL_PAIRS_QUERY = `
+  SELECT verb, prep, noun, phrase_noun AS "phraseNoun", score
+  FROM lab_verb_pairs
+  WHERE relation = 'obl' AND noun = $1
+  ORDER BY score DESC, verb, prep
 `;
 
 // Decision #74. A typed adjective form ("hohe") through its lemmas
@@ -118,6 +129,11 @@ export class PgCollocationCheckStore implements CollocationCheckStore {
 
   async findObjectPairs(noun: string): Promise<CheckPair[]> {
     const result = await this.#pool.query<CheckPair>(OBJECT_PAIRS_QUERY, [noun]);
+    return result.rows;
+  }
+
+  async findOblPairs(noun: string): Promise<OblPair[]> {
+    const result = await this.#pool.query<OblPair>(OBL_PAIRS_QUERY, [noun]);
     return result.rows;
   }
 

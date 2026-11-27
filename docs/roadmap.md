@@ -27,7 +27,8 @@ Last ranked: 2026-11-27 (product-builder, propose mode).
    link name the word. Size **S**. No dependency. Status: `idea`.
 4. **Prepositional verb–noun check** (*an einer Sitzung teilnehmen*,
    *in Frage stellen*), from the lab's `obl` pairs. Size **M**. Builds on
-   #70; needs contraction handling (*zur*, *im*). Status: `idea`.
+   #70; needs contraction handling (*zur*, *im*). Status: `built` (#76),
+   plan `docs/superpowers/plans/2026-11-27-prepositional-check.md`.
 5. **Long chip lists collapse on phones** ("mehr …" after the top 5).
    Size **S**. A ranking/UX call (UI audit, "left for later"). Status:
    `idea`.

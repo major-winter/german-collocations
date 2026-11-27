@@ -1,5 +1,6 @@
 import type { AdjectiveCounts, WrittenForm } from "../../../domain/adjectiveCheck.ts";
 import type { CheckPair, VerbCandidate } from "../../../domain/collocationCheck.ts";
+import type { OblPair } from "../../../domain/prepositionCheck.ts";
 import type { Headword } from "./CollocationStore.ts";
 
 /** An adjective lemma that has attributive data (#54). */
@@ -10,7 +11,7 @@ export interface AdjectiveLemma {
   mostlyAdjective: boolean;
 }
 
-// Driven (outbound) port for the collocation check (#70, #74). Narrow on
+// Driven (outbound) port for the collocation check (#70, #74, #76). Narrow on
 // purpose, next to CollocationStore rather than widening it (#68).
 export interface CollocationCheckStore {
   /** null when the corpus doesn't have the word at all. */
@@ -19,6 +20,8 @@ export interface CollocationCheckStore {
   findVerbCandidates(surface: string): Promise<VerbCandidate[]>;
   /** All of a noun's lab object pairs, best-first. */
   findObjectPairs(noun: string): Promise<CheckPair[]>;
+  /** All of a noun's lab prepositional (obl) pairs, best-first (#76). */
+  findOblPairs(noun: string): Promise<OblPair[]>;
   /** The attributive lemma a lowercase typed form stands for, null when none of its lemmas is one (#74). */
   findAdjectiveLemma(surface: string): Promise<AdjectiveLemma | null>;
   /** The noun's attributive total and its frequent pairs plus the typed adjective's, with the adjectives' totals (#74). */

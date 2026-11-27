@@ -4,7 +4,6 @@ import {
   normalisePhrase,
   pickVerbLemma,
   splitPhrase,
-  type CheckPair,
   type VerbCandidate,
 } from "../domain/collocationCheck.ts";
 import {
@@ -15,6 +14,7 @@ import {
   positiveEnding,
   type AdjectiveCount,
 } from "../domain/adjectiveCheck.ts";
+import { judgePreposition, splitPrepositionalPhrase, type PrepositionalSplit } from "../domain/prepositionCheck.ts";
 import { lookupCandidates, pageSide } from "../domain/verbNounPhrases.ts";
 import type { CheckCollocation } from "./ports/in/CheckCollocation.ts";
 import type { AdjectiveLemma, CollocationCheckStore } from "./ports/out/CollocationCheckStore.ts";
@@ -32,7 +32,7 @@ function capitalise(word: string): string {
 type Split = NonNullable<ReturnType<typeof splitPhrase>>;
 
 // Decision #70: "Passt das zusammen?" for a typed verb–noun phrase; #74
-// adds adjective + noun.
+// adds adjective + noun, #76 a verb with a prepositional noun.
 export class CheckCollocationService implements CheckCollocation {
   #store: CollocationCheckStore;
   constructor(store: CollocationCheckStore) {
@@ -41,7 +41,12 @@ export class CheckCollocationService implements CheckCollocation {
 
   async check(q: string): Promise<CollocationCheck> {
     const split = splitPhrase(q);
-    if (split === null) return NOT_PARSED;
+    if (split === null) {
+      // #76: only phrases the verb and adjective checks cannot parse, so
+      // none of their verdicts changes.
+      const prepositional = splitPrepositionalPhrase(q);
+      return (prepositional && (await this.#oblCheck(q, prepositional))) ?? NOT_PARSED;
+    }
 
     // The verb branch first, exactly as in #70; the adjective branch only
     // gets the phrases it does not parse, so no verb check changes.
@@ -78,7 +83,7 @@ export class CheckCollocationService implements CheckCollocation {
     if (headword === null || pageSide(headword.pos) !== "noun") return null;
 
     const verb = pickVerbLemma(verbToken, split.particle, verbCandidates);
-    const { noun, pairs } = await this.#objectPairs(nounForm, headword.lemma?.text ?? null);
+    const { noun, pairs } = await this.#pairsOf(nounForm, headword.lemma?.text ?? null, (n) => this.#store.findObjectPairs(n));
     const { verdict, matched, suggestions } = judge(verb, split.sich, pairs);
 
     return {
@@ -89,6 +94,37 @@ export class CheckCollocationService implements CheckCollocation {
       verb,
       relation: "obj",
       verdict,
+      matched,
+      suggestions,
+    };
+  }
+
+  // Decision #76: the same roles and verb lemma as #verbCheck, judged
+  // against the noun's obl pairs.
+  async #oblCheck(q: string, split: PrepositionalSplit): Promise<Extract<CollocationCheck, { relation: "obl" }> | null> {
+    const roles = await this.#roles(split.words);
+    if (roles === null) return null;
+    const { nounToken, verbToken, verbCandidates } = roles;
+
+    const nounForm = capitalise(nounToken);
+    const headword = await this.#store.resolveHeadword(nounForm);
+    if (headword === null || pageSide(headword.pos) !== "noun") return null;
+
+    const verb = pickVerbLemma(verbToken, split.particle, verbCandidates);
+    const { noun, pairs } = await this.#pairsOf(nounForm, headword.lemma?.text ?? null, (n) => this.#store.findOblPairs(n));
+    const { verdict, matched, suggestions, otherPreposition } = judgePreposition(verb, split.sich, split.preposition, pairs);
+
+    return {
+      parsed: true,
+      phrase: normalisePhrase(q),
+      noun,
+      verbTyped: verbToken,
+      verb,
+      prepositionTyped: split.prepositionTyped,
+      preposition: split.preposition,
+      relation: "obl",
+      verdict,
+      otherPreposition,
       matched,
       suggestions,
     };
@@ -180,9 +216,13 @@ export class CheckCollocationService implements CheckCollocation {
   }
 
   // Same order as the noun page (#60): the typed form, then its lemma.
-  async #objectPairs(form: string, lemmaText: string | null): Promise<{ noun: string; pairs: CheckPair[] }> {
+  async #pairsOf<P>(
+    form: string,
+    lemmaText: string | null,
+    find: (noun: string) => Promise<P[]>,
+  ): Promise<{ noun: string; pairs: P[] }> {
     for (const candidate of lookupCandidates(form, lemmaText)) {
-      const pairs = await this.#store.findObjectPairs(candidate);
+      const pairs = await find(candidate);
       if (pairs.length > 0) return { noun: candidate, pairs };
     }
     return { noun: form, pairs: [] };

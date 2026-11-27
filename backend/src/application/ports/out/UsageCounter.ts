@@ -1,8 +1,9 @@
 // Driven (outbound) port: anonymous per-day usage counts (#72). Nothing
 // that identifies a visitor ever reaches it - only what kind of request.
 // "check" stays the verb check (#70) only, so the A0 baseline is comparable
-// across #74, which counts adjective checks as "check_adj".
-export type UsageKind = "word_page" | "check" | "check_adj";
+// across #74, which counts adjective checks as "check_adj", and #76, which counts
+// prepositional checks as "check_obl".
+export type UsageKind = "word_page" | "check" | "check_adj" | "check_obl";
 
 export interface UsageCounter {
   record(kind: UsageKind): Promise<void>;
