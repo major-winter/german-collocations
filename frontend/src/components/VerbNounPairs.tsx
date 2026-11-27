@@ -41,8 +41,8 @@ function OpenPair({ pair, side, lemma, colors }: {
     const partnerWord = side === 'noun' ? lastWord(pair.partner) : pair.phraseNoun;
 
     return (
-        <div className="rounded-lg px-2 py-1.5 space-y-1">
-            <p className="font-serif text-xl">
+        <div className="rounded-lg py-1.5 space-y-1">
+            <p className="type-phrase">
                 {highlightCollocates(pair.phrase, searchedWord, partnerWord, colors.partner, colors.searched)}
             </p>
             {pair.examples.map((example, exampleIndex) => (
@@ -85,7 +85,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                 const openIndex = openChip[relation];
                 return (
                     <div key={relation} className="py-3">
-                        <h3 className="text-base font-medium mb-2 text-muted-foreground">
+                        <h3 className="type-heading mb-2">
                             {headings[relation].map((part) => (
                                 <span key={part.text} className={cn(part.noun && cn('font-semibold', wordClassStyle('noun').text))}>
                                     {part.text}

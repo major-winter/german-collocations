@@ -39,18 +39,18 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                 <div className="flex flex-col gap-4">
                     {WORD_CLASS_ORDER.filter((section) => groups.has(section)).map((section) => (
                         <div key={section} className="py-3">
-                            <h3 className="text-base font-medium mb-2 text-muted-foreground">
+                            <h3 className="type-heading mb-2">
                                 {wordClassStyle(section).label}
                             </h3>
                             <ul className="flex flex-col gap-4 list-none p-0">
                                 {groups
                                     .get(section)!
                                     .map((entry, i) => (
-                                        <li key={`${entry.word}-${i}`} className="px-2 space-y-1">
+                                        <li key={`${entry.word}-${i}`} className="space-y-1">
                                             {entry.examples.length > 0 ? (
                                                 <>
                                                     {/* The partner's lemma, so the list can be scanned without reading every sentence. */}
-                                                    <p className="font-serif text-lg">{entry.word}</p>
+                                                    <p className="type-lemma">{entry.word}</p>
                                                     {entry.examples.map((example, i) => (
                                                         <p key={i} className="text-base text-muted-foreground italic border-l-2 pl-3">
                                                             {highlightCollocates(
