@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationResponse, VerbNounPair, VerbNounRelation } from '@collocations/types';
-import { groupHeadings, groupPairs, hasAnyResults, headingParts, initialOpen, openAfterClick } from './verbNounGroups.ts';
+import { groupHeadings, groupPairs, hasAnyResults, isThinPage, headingParts, initialOpen, openAfterClick } from './verbNounGroups.ts';
 
 function pair(relation: VerbNounRelation, partner: string): VerbNounPair {
   return {
@@ -72,4 +72,18 @@ test('clicking the open chip keeps it open; clicking another opens that one', ()
   assert.deepEqual(openAfterClick(open, 'obj', 2), { obj: 2, obl: 0, nsubj: null });
   assert.deepEqual(openAfterClick(open, 'obj', 4), { obj: 4, obl: 0, nsubj: null });
   assert.deepEqual(openAfterClick(open, 'nsubj', 1), { obj: 2, obl: 0, nsubj: 1 });
+});
+
+test('isThinPage: some partners, but fewer than THIN_PAGE_MAX (#79 floor)', () => {
+  const entry = { word: 'a', section: 'adjective', cooccurrence: 3, significance: 7, examples: [] } as unknown as CollocationResponse['collocations'][number];
+  const page = (n: number, pairs = 0): CollocationResponse => ({
+    word: 'x',
+    collocations: Array.from({ length: n }, () => entry),
+    verbNounPairs: { side: 'noun', lemma: 'x', article: null, pairs: Array.from({ length: pairs }, () => pair('obj', 'üben')) },
+  });
+  assert.equal(isThinPage(page(0)), false); // empty: its own message
+  assert.equal(isThinPage(page(1)), true);
+  assert.equal(isThinPage(page(2, 2)), true);
+  assert.equal(isThinPage(page(3, 2)), false);
+  assert.equal(isThinPage({ word: 'x', collocations: [entry], verbNounPairs: null }), true);
 });

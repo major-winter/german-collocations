@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+import { StatusMessage } from './StatusMessage.tsx';
 import { highlightCollocates } from '@/lib/highlight.tsx';
 import { WORD_CLASS_ORDER, wordClassStyle } from '@/lib/wordClass.ts';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
@@ -29,7 +30,11 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
     return (
         <section className="mb-6">
             {entries.length === 0 ? (
-                showEmptyMessage && <p className="text-sm text-muted-foreground text-center">Keine Ergebnisse.</p>
+                showEmptyMessage && (
+                    <StatusMessage className="mt-4">
+                        Zu <i>{word}</i> haben wir in unseren Texten noch keine Verbindungen gefunden.
+                    </StatusMessage>
+                )
             ) : (
                 <div className="flex flex-col gap-4">
                     {WORD_CLASS_ORDER.filter((section) => groups.has(section)).map((section) => (

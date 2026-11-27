@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #80), and add it to the index.
+(next: #81), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -56,6 +56,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#77](#77) One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
 - [#78](#78) The check reads learner sentences (pronouns, adjectives, more particles); an unreadable sentence gets the hint, not "Keine Ergebnisse" (amends #70, #76, #77)
 - [#79](#79) Adjacency lists: a pair needs 3 sentences, and adjectives the tagger reads as adverbs go under "Adjektive" (amends #36, #43)
+- [#80](#80) One status message for the word page; thin and empty pages say why they are short (applies #79, B4 of the 2026-11-27 UI review)
 
 ---
 
@@ -4186,3 +4187,33 @@ message (branch `frontend-feature-message-states`, B4 of
 `docs/ui-review-2026-11-27-search-and-cohesion.md`), not a lower floor.
 The query took 57 s on the VM (a full pass over `lemma_collocations`);
 don't repeat it at busy times.
+
+---
+
+<a id="80"></a>
+## 80. One status message for the word page; thin and empty pages say why they are short (applies #79, B4 of the 2026-11-27 UI review)
+
+**Date.** 2026-11-28. Branch `frontend-feature-message-states`.
+
+**Problem.** The word page's loading, error, not-found and empty states
+each had their own look: centred or not, serif or sans, "Keine
+Ergebnisse" for a word that exists. The not-found heading hyphenated the
+word ("Sit-zung"). And since #79 keeps only pairs from 3+ sentences, a
+rare word's page can shrink to one or two partners with no explanation.
+
+**Decision.**
+- `StatusMessage` (title, one muted sentence, optional action),
+  left-aligned like the content it replaces, with no `hyphens-auto`.
+  Used for loading, error, not found and "no partners". The two messages
+  inside the check card were already left-aligned and stay as they are.
+- An existing word with no partners now reads "Zu *X* haben wir in
+  unseren Texten noch keine Verbindungen gefunden." instead of "Keine
+  Ergebnisse."
+- A page with 1–4 partners in all (`THIN_PAGE_MAX = 5`, `isThinPage`)
+  ends with "Zu *X* haben wir noch wenige Verbindungen: Wir zeigen nur,
+  was in mindestens drei Sätzen unserer Texte vorkommt." The cut-off is a
+  judgement: below 5, a learner may think the page is broken.
+
+**Checked.** `npm test` (145), frontend lint and build. Headless Chrome at
+360 px, light and dark: *Regenschirm* (1 partner, note shown), *Löffel*
+(empty), *Sitzzung* (not found, left-aligned, no hyphen).

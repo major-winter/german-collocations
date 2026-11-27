@@ -6,9 +6,10 @@ import { fetchSearch } from "../api/search.ts";
 import { Button } from "@/components/ui/button";
 import { CollocationCheckCard } from "../components/CollocationCheckCard.tsx";
 import { CollocationList } from "../components/CollocationList.tsx";
+import { StatusMessage } from "../components/StatusMessage.tsx";
 import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
-import { hasAnyResults } from "../lib/verbNounGroups.ts";
+import { hasAnyResults, isThinPage } from "../lib/verbNounGroups.ts";
 import { legendSections } from "../lib/wordClass.ts";
 import { checkHintExample } from "../lib/collocationCheck.ts";
 
@@ -81,37 +82,35 @@ export function Word() {
 
     if (state.status === "loading") {
         return (
-            <p role="status" className="mt-10 text-sm text-muted-foreground text-center">
-                Wird geladen …
-            </p>
+            <StatusMessage role="status">Wird geladen …</StatusMessage>
         );
     }
 
     if (state.status === "error") {
         return (
-            <div className="mt-10 text-center space-y-3">
-                <p role="alert">{state.message}</p>
-                <Button variant="outline" className="h-10 px-4" onClick={() => setAttempt((n) => n + 1)}>
-                    Erneut versuchen
-                </Button>
-            </div>
+            <StatusMessage
+                role="alert"
+                title={state.message}
+                action={
+                    <Button variant="outline" className="h-10 px-4" onClick={() => setAttempt((n) => n + 1)}>
+                        Erneut versuchen
+                    </Button>
+                }
+            />
         );
     }
 
     if (state.status === "notFound") {
         return (
-            <div className="mt-10 text-center space-y-4">
-                <h2 className="font-serif text-2xl font-semibold break-words hyphens-auto">
-                    Keine Ergebnisse für „{word}“
-                </h2>
+            <StatusMessage title={<>Keine Ergebnisse für „{word}“</>}>
                 {state.suggestions.length > 0 ? (
                     <div className="space-y-2">
-                        <p className="text-sm text-muted-foreground">Meinten Sie:</p>
-                        <ul className="flex flex-wrap justify-center gap-2 list-none p-0">
+                        <p>Meinten Sie:</p>
+                        <ul className="flex flex-wrap gap-2 list-none p-0">
                             {state.suggestions.map((s) => (
                                 <li key={s.word}>
                                     <Link to={`/wort/${encodeURIComponent(s.word)}`}
-                                        className="inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm
+                                        className="inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm text-foreground
                                         hover:bg-accent hover:text-accent-foreground
                                         transition-colors">
                                         {s.word}
@@ -121,9 +120,9 @@ export function Word() {
                         </ul>
                     </div>
                 ) : (
-                    <p className="text-muted-foreground">Auch keine ähnlichen Wörter gefunden.</p>
+                    <p>Auch keine ähnlichen Wörter gefunden.</p>
                 )}
-            </div>
+            </StatusMessage>
         );
     }
 
@@ -166,6 +165,13 @@ export function Word() {
                 entries={state.data.collocations}
                 showEmptyMessage={!hasAnyResults(state.data)}
             />
+            {/* Decision #79: rare words keep only well-attested partners, so say why the page is short. */}
+            {isThinPage(state.data) && (
+                <StatusMessage className="mt-2 mb-6">
+                    Zu <i>{state.data.word}</i> haben wir noch wenige Verbindungen: Wir zeigen nur, was in
+                    mindestens drei Sätzen unserer Texte vorkommt.
+                </StatusMessage>
+            )}
         </div>
     );
 }
