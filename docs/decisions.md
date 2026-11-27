@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #71), and add it to the index.
+(next: #74), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -49,6 +49,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#70](#70) "Passt das zusammen?": checking a typed verb–noun phrase against the lab's object pairs
 - [#71](#71) Saved lists + practice: browser-only list first, gap-fill second, accounts only after measured repeat use (proposed, not built)
 - [#72](#72) Usage baseline and legal pages: anonymous per-day counts, Impressum and Datenschutz with the operator's details kept out of git
+- [#73](#73) TypeScript 6 at the root for ESLint, TypeScript 7 declared where backend and database use it
 
 ---
 
@@ -3216,3 +3217,34 @@ FROM usage_counts GROUP BY 1, 2 ORDER BY 1, 2;"
 **Not chosen.** Caddy access logs (IP addresses, rotation, manual
 parsing); in-memory counters flushed periodically (lost on restart,
 with no restart policy in production).
+
+## 73. TypeScript 6 at the root for ESLint, TypeScript 7 declared where backend and database use it
+
+**Problem.** `npm run lint -w frontend` crashed before linting any file:
+`TypeError: Cannot read properties of undefined (reading 'Intrinsic')` in
+`ts-api-utils`. `database` depends on TypeScript `^7.0.2`, so npm hoisted
+TypeScript 7 to the root `node_modules`, and the hoisted `ts-api-utils`
+loaded it. TypeScript 7 has no JavaScript API, and typescript-eslint
+(8.74, the latest) supports only `typescript >=4.8.4 <6.1.0`. The lock
+file had not changed since August, so lint had likely been broken on
+`main` for months without anyone noticing.
+
+**Decision.** The root `package.json` declares `typescript: ~6.0.2` as a
+dev dependency, so npm hoists 6.0.3 and ESLint's helpers find it.
+`backend` declares `typescript: ^7.0.2` explicitly; it had used 7 only
+through hoisting and still does. `database` keeps its own 7, `frontend`
+uses 6 (its `tsc -b` build is unchanged).
+
+**Rejected.** An npm `overrides` entry for `ts-api-utils`'s TypeScript:
+tried, and npm does not move a package because of an override on its
+peer dependency, so the crash stayed. Moving the whole repo to
+TypeScript 6: would change `database`'s and `backend`'s typecheck for a
+lint-only problem.
+
+**Revisit** when typescript-eslint supports TypeScript 7; then the root
+pin can go.
+
+**Follow-up.** With the crash gone, ESLint reports 4 existing errors
+(three `react-hooks/set-state-in-effect`, one
+`react-refresh/only-export-components` in the generated
+`ui/button.tsx`). They are fixed on a separate branch.
