@@ -74,6 +74,20 @@ export function openAfterClick(
     return { ...open, [relation]: chipIndex };
 }
 
+function resultCount(response: CollocationResponse): number {
+    return response.collocations.length + (response.verbNounPairs?.pairs.length ?? 0);
+}
+
 export function hasAnyResults(response: CollocationResponse): boolean {
-    return response.collocations.length > 0 || (response.verbNounPairs?.pairs.length ?? 0) > 0;
+    return resultCount(response) > 0;
+}
+
+// Decision #79 keeps only pairs from 3+ sentences, so a rare word's page can
+// shrink to a handful of partners. Below this many, the page says so.
+export const THIN_PAGE_MAX = 5;
+
+/** Some partners, but few enough that the page should say the data is thin. */
+export function isThinPage(response: CollocationResponse): boolean {
+    const n = resultCount(response);
+    return n > 0 && n < THIN_PAGE_MAX;
 }
