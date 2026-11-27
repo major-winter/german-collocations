@@ -3622,3 +3622,20 @@ build session).
 
 **Deploy.** Backend and frontend together (the card reads the new
 `relation: 'obl'` variant). No migration, no reload.
+
+### Follow-up: deployed to production (2026-11-27)
+
+Merge commit `b13faa4` (`backend-feature-prepositional-check`). The
+server went from `4abfd4e` (PREV) to `b13faa4`. Built `backend` and
+`frontend`; no migration, no data load. Both restarted with
+`up -d --no-deps` at 16:00:29 UTC, after their images were built
+(backend 15:59:50, frontend 16:00:11). Backend log clean.
+
+Live checks: `/` 200; `/api/collocations/Entscheidung` 200 with
+*treffen*; `/api/collocations/zzzqqq` 404; `/api/check?q=Sport machen`
+200. Prepositional path: *an einer Sitzung teilnehmen* usual;
+*bei einer Sitzung teilnehmen* unusual, `otherPreposition: true`,
+suggesting *an den Sitzungen teilnehmen*; *zur Verfügung stellen*
+usual; *eine Entscheidung treffen* still usual (object path). The
+served bundle `index-DvZpo8RN.js` contains `otherPreposition`. The
+smoke run made 2 lookups and 5 checks (counted in `usage_counts`).
