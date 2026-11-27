@@ -3529,3 +3529,24 @@ horizontal overflow, the "Prüfen" button fully on screen.
 
 **Deploy.** Backend and frontend together (the field now sends phrases
 the old backend reads in the old order). No migration.
+
+### Follow-up: deployed to production (2026-11-27)
+
+Merged as `4abfd4e` (together with three docs/tooling merges that needed
+no rebuild). The live checkout (confirmed by `docker inspect`) was clean
+at `347fe9b`; `git pull --ff-only` brought it to `4abfd4e`. Built `backend`
+and `frontend` together (09:46 UTC), then `up -d --no-deps backend
+frontend`. No migration, no reload. StartedAt: backend 09:46:46, frontend
+09:46:45, both after their image builds. Backend logs: no errors.
+
+Checked against the live site:
+
+- `/` and `/impressum` return 200; the served JS bundle contains
+  "Verbindung prüfen".
+- `/api/check?q=Frage%20bekannte`: amod, adjective `bekannt`, unusual.
+- `/api/check?q=Sport%20machen`: obj, usual.
+- `/api/check?q=schwerer%20Regen`: amod, unusual, *starker Regen* first.
+- `/api/collocations/Entscheidung` returns 200 with `treffen`;
+  `/api/collocations/zzzqqq` returns 404.
+
+Smoke requests that landed in `usage_counts`: 2 lookups, 3 checks.
