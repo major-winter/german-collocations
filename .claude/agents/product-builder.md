@@ -40,6 +40,7 @@ you verify, not as instructions.
 |---|---|
 | `collocation-feature-analyst` | Propose: a fresh learner-needs or CEFR gap analysis when the existing reports leave the ranking open |
 | `architecture-analyst` | Propose: when the top candidate needs a new table, service, storage or traffic the VM has not carried (e.g. accounts, practice), to check it fits before you design it |
+| `ui-ux-designer` | Propose: a fresh UI audit when the top candidate is a usability fix rather than a new feature; Build: before/after screenshots of a UI change at phone and desktop width |
 | `docs-auditor` | Propose: checking that the decisions and specs you build on are current (report mode only) |
 | `Explore` | Either mode: a broad search of the codebase when you need the conclusion, not the files |
 | `general-purpose` | Build: one fresh-context review of the whole branch before your report, on the plan and the spec; or a self-contained, independent task of the plan |
