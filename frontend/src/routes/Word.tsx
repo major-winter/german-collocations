@@ -161,9 +161,11 @@ export function Word() {
                 <VerbNounPairs key={state.data.word} data={state.data.verbNounPairs} />
             )}
             <CollocationList
+                key={state.data.word}
                 word={state.data.word}
                 entries={state.data.collocations}
                 showEmptyMessage={!hasAnyResults(state.data)}
+                openFirst={(state.data.verbNounPairs?.pairs.length ?? 0) === 0}
             />
             {/* Decision #79: rare words keep only well-attested partners, so say why the page is short. */}
             {isThinPage(state.data) && (

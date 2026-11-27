@@ -4,6 +4,7 @@ import { chipParts } from '@/lib/chipParts.ts';
 import { highlightCollocates } from '@/lib/highlight.tsx';
 import { groupPairs, headingParts, initialOpen, openAfterClick } from '@/lib/verbNounGroups.ts';
 import { wordClassStyle } from '@/lib/wordClass.ts';
+import { PartnerChips } from './PartnerChips.tsx';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
 
 interface VerbNounPairsProps {
@@ -92,42 +93,25 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                 </span>
                             ))}
                         </h3>
-                        <div className="flex flex-wrap gap-2 md:gap-1.5 mb-1.5">
-                            {pairs.map((pair, chipIndex) => (
-                                <button
-                                    key={pair.phrase}
-                                    type="button"
-                                    aria-pressed={openIndex === chipIndex}
-                                    onClick={() => open(relation, chipIndex)}
-                                    className={cn(
-                                        'inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm transition-colors hover:bg-accent/50',
-                                        openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
-                                    )}
-                                >
-                                    {/* One inline wrapper: as direct flex items the parts would lose their spaces ("dieEntscheidung"). */}
-                                    <span>
-                                        {chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
-                                            <span
-                                                key={partIndex}
-                                                className={cn(
-                                                    part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'),
-                                                )}
-                                            >
-                                                {part.text}
-                                            </span>
-                                        ))}
+                        <PartnerChips
+                            chips={pairs.map((pair, chipIndex) => ({
+                                key: pair.phrase,
+                                label: chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
+                                    <span
+                                        key={partIndex}
+                                        className={cn(part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'))}
+                                    >
+                                        {part.text}
                                     </span>
-                                </button>
-                            ))}
-                        </div>
-                        {openIndex !== null && pairs[openIndex] && (
-                            <OpenPair
-                                pair={pairs[openIndex]}
-                                side={data.side}
-                                lemma={data.lemma}
-                                colors={colors}
-                            />
-                        )}
+                                )),
+                            }))}
+                            openIndex={openIndex}
+                            onOpen={(chipIndex) => open(relation, chipIndex)}
+                        >
+                            {openIndex !== null && pairs[openIndex] && (
+                                <OpenPair pair={pairs[openIndex]} side={data.side} lemma={data.lemma} colors={colors} />
+                            )}
+                        </PartnerChips>
                     </div>
                 );
             })}

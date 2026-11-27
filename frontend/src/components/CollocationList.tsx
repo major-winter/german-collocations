@@ -1,4 +1,6 @@
-import { cn } from '@/lib/utils';
+import { useState } from 'react';
+import { PartnerChips } from './PartnerChips.tsx';
+import { initialOpenGroups, openGroupChip } from '@/lib/partnerChips.ts';
 import { StatusMessage } from './StatusMessage.tsx';
 import { highlightCollocates } from '@/lib/highlight.tsx';
 import { WORD_CLASS_ORDER, wordClassStyle } from '@/lib/wordClass.ts';
@@ -9,6 +11,32 @@ interface CollocationListProps {
     entries: CollocationEntry[];
     // False when another part of the page (VerbNounPairs) has results.
     showEmptyMessage: boolean;
+    // #83: open the first group's first chip, when no verb pair is open above.
+    openFirst: boolean;
+}
+
+function OpenEntry({ word, entry, section }: { word: string; entry: CollocationEntry; section: CollocationSection }) {
+    const partnerColor = wordClassStyle(section).text;
+    if (entry.examples.length === 0) {
+        // No example sentence: the bare pair, so the chip still opens to something.
+        return (
+            <div className="py-1.5 space-y-1">
+                <p className="type-phrase">
+                    <span className="font-semibold">{word}</span> <span className={partnerColor}>{entry.word}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">Noch keine Beispielsätze.</p>
+            </div>
+        );
+    }
+    return (
+        <div className="py-1.5 space-y-1">
+            {entry.examples.map((example, i) => (
+                <p key={i} className="text-base text-muted-foreground italic border-l-2 pl-3">
+                    {highlightCollocates(example.sentence, example.searchWord, example.collocateWord, partnerColor)}
+                </p>
+            ))}
+        </div>
+    );
 }
 
 function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, CollocationEntry[]> {
@@ -24,8 +52,10 @@ function groupBySection(entries: CollocationEntry[]): Map<CollocationSection, Co
     return groups;
 }
 
-export function CollocationList({ word, entries, showEmptyMessage }: CollocationListProps) {
+export function CollocationList({ word, entries, showEmptyMessage, openFirst }: CollocationListProps) {
     const groups = groupBySection(entries);
+    const sections = WORD_CLASS_ORDER.filter((section) => groups.has(section));
+    const [openChip, setOpenChip] = useState(() => initialOpenGroups(sections, openFirst));
 
     return (
         <section className="mb-6">
@@ -37,44 +67,24 @@ export function CollocationList({ word, entries, showEmptyMessage }: Collocation
                 )
             ) : (
                 <div className="flex flex-col gap-4">
-                    {WORD_CLASS_ORDER.filter((section) => groups.has(section)).map((section) => (
-                        <div key={section} className="py-3">
-                            <h3 className="type-heading mb-2">
-                                {wordClassStyle(section).label}
-                            </h3>
-                            <ul className="flex flex-col gap-4 list-none p-0">
-                                {groups
-                                    .get(section)!
-                                    .map((entry, i) => (
-                                        <li key={`${entry.word}-${i}`} className="space-y-1">
-                                            {entry.examples.length > 0 ? (
-                                                <>
-                                                    {/* The partner's lemma, so the list can be scanned without reading every sentence. */}
-                                                    <p className="type-lemma">{entry.word}</p>
-                                                    {entry.examples.map((example, i) => (
-                                                        <p key={i} className="text-base text-muted-foreground italic border-l-2 pl-3">
-                                                            {highlightCollocates(
-                                                                example.sentence,
-                                                                example.searchWord,
-                                                                example.collocateWord,
-                                                                wordClassStyle(section).text,
-                                                            )}
-                                                        </p>
-                                                    ))}
-                                                </>
-                                            ) : (
-                                                <p className="text-base text-muted-foreground">
-                                                    <span className="font-semibold not-italic">{word}</span>{' '}
-                                                    <span className={cn('not-italic', wordClassStyle(section).text)}>
-                                                        {entry.word}
-                                                    </span>
-                                                </p>
-                                            )}
-                                        </li>
-                                    ))}
-                            </ul>
-                        </div>
-                    ))}
+                    {sections.map((section) => {
+                        const group = groups.get(section)!;
+                        const openIndex = openChip[section] ?? null;
+                        return (
+                            <div key={section} className="py-3">
+                                <h3 className="type-heading mb-2">{wordClassStyle(section).label}</h3>
+                                <PartnerChips
+                                    chips={group.map((entry, i) => ({ key: `${entry.word}-${i}`, label: entry.word }))}
+                                    openIndex={openIndex}
+                                    onOpen={(chipIndex) => setOpenChip((current) => openGroupChip(current, section, chipIndex))}
+                                >
+                                    {openIndex !== null && group[openIndex] && (
+                                        <OpenEntry word={word} entry={group[openIndex]} section={section} />
+                                    )}
+                                </PartnerChips>
+                            </div>
+                        );
+                    })}
                 </div>
             )}
         </section>

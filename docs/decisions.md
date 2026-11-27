@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #83), and add it to the index.
+(next: #84), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -59,6 +59,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#80](#80) One status message for the word page; thin and empty pages say why they are short (applies #79, B4 of the 2026-11-27 UI review)
 - [#81](#81) The check's verdict is a label, its suggestions are links, chip borders are stronger (B3 of the 2026-11-27 UI review)
 - [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
+- [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
 
 ---
 
@@ -4266,3 +4267,42 @@ the home page can adopt them when they are next touched.
 **Checked.** `npm test` (144), frontend lint and build. Headless Chrome at
 1280 px on *Sitzung*: headings in the foreground colour, phrases flush
 with the chips.
+
+---
+
+<a id="83"></a>
+## 83. Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
+
+**Date.** 2026-11-28. Branch `frontend-feature-partner-shapes`. B2 of
+`docs/ui-review-2026-11-27-search-and-cohesion.md`, chosen by the user.
+
+**Problem.** One kind of thing, a partner of the headword, was drawn four
+ways. Verb pairs were chips with one open entry (#60). Adjectives, nouns,
+verbs and "Sonstige" from the adjacency lists were a serif lemma plus
+three example sentences, **every entry expanded**: on *Sitzung* at
+360 px the adjective group alone ran 3,250 px, the page 5,839 px.
+Entries without examples were a one-line sans variant.
+
+**Decision.**
+- Every partner group is a chip row with one open entry: a shared
+  `PartnerChips` component, used by `VerbNounPairs` and `CollocationList`.
+- An open adjacency chip shows its example sentences; one without
+  examples shows the bare pair and "Noch keine Beispielsätze."
+- Open state: one chip per group (`openGroupChip`). The adjacency groups
+  start closed when the page has verb pairs (their first chip is already
+  open above); otherwise the first group's first chip starts open
+  (`initialOpenGroups`), so an adjective page never opens on chips alone.
+- `CollocationList` is keyed by the word, like `VerbNounPairs`, so open
+  chips do not carry over to the next word.
+
+**Effect.** *Sitzung* at 360 px: 5,839 → 2,014 px. No sideways scroll on
+*Sitzung* or *schnell*, light or dark.
+
+**Cost.** A learner who scanned the adjectives' sentences now taps to see
+them. The lemma list stays scannable as chips, which is what #60 chose
+for verbs.
+
+**Checked.** `npm test` (148), frontend lint and build. Headless Chrome at
+360 px, light and dark: *Sitzung* (verb pairs open, adjective chips
+closed; tapping *jung* shows its 3 sentences) and *schnell* (first chip
+open).
