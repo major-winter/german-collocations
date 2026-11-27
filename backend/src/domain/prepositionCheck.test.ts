@@ -113,3 +113,35 @@ test('judgePreposition: no pair above the floor is no data', () => {
   assert.equal(j.verdict, 'noData');
   assert.deepEqual(j.suggestions, []);
 });
+
+// Decision #78: learner-style input.
+
+test('splitPrepositionalPhrase reads a sentence with a subject pronoun and a split particle', () => {
+  assert.deepEqual(splitPrepositionalPhrase('Ich nehme an der Sitzung teil'), {
+    words: ['nehme', 'Sitzung'],
+    sich: false,
+    particle: 'teil',
+    preposition: 'an',
+    prepositionTyped: 'an',
+  });
+  assert.equal(splitPrepositionalPhrase('nimmt an der Sitzung teil')?.particle, 'teil');
+});
+
+test('splitPrepositionalPhrase drops an adjective after the determiner or the preposition', () => {
+  assert.deepEqual(splitPrepositionalPhrase('an einer wichtigen Sitzung teilnehmen')?.words, ['Sitzung', 'teilnehmen']);
+  assert.deepEqual(splitPrepositionalPhrase('an wichtigen Sitzungen teilnehmen')?.words, ['Sitzungen', 'teilnehmen']);
+  assert.deepEqual(splitPrepositionalPhrase('Ich warte auf eine schnelle Antwort')?.words, ['warte', 'Antwort']);
+});
+
+test('splitPrepositionalPhrase drops an agreeing reflexive; the verdict finds the sich pair', () => {
+  const j = splitPrepositionalPhrase('Ich freue mich auf den Besuch');
+  assert.equal(j?.sich, false);
+  assert.deepEqual(j?.words, ['freue', 'Besuch']);
+  assert.deepEqual(splitPrepositionalPhrase('Wir interessieren uns für Musik')?.words, ['interessieren', 'Musik']);
+  assert.equal(judgePreposition('freuen', false, 'auf', besuch).matched?.phrase, 'sich auf ihren Besuch freuen');
+});
+
+test('splitPrepositionalPhrase never drops a contraction as an adjective', () => {
+  // "zum" sits between a preposition and the noun, but is a preposition itself.
+  assert.equal(splitPrepositionalPhrase('bis zum Ende warten'), null);
+});

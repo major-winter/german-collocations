@@ -9,9 +9,10 @@ import {
   USUAL_SUGGESTIONS,
   baseOf,
   contentWords,
-  popParticle,
-  tokensOf,
+  prepositionOf,
+  readingsOf,
   type Judgement,
+  type Reading,
   type SplitPhrase,
 } from "./collocationCheck.ts";
 import { phraseNounWord, phraseOf } from "./verbNounPhrases.ts";
@@ -25,25 +26,10 @@ export const MIN_OBL_SCORE = 10.83;
 // drops "auf Einsatz kommen" (3 %) and "vor die Frage stellen" (3 %).
 export const PREPOSITION_SHARE_OF_BEST = 0.1;
 
-const PREPOSITIONS = new Set([
-  "in", "zu", "auf", "mit", "an", "für", "von", "bei", "nach", "aus", "über", "um", "durch", "unter",
-  "vor", "seit", "bis", "ab", "gegen", "wegen", "per", "ohne", "während", "innerhalb", "hinter",
-  "zwischen", "neben", "laut", "aufgrund", "pro", "trotz", "außer", "anhand", "gemäß", "außerhalb",
-  "binnen", "dank",
-]);
-
-const CONTRACTIONS: Record<string, string> = {
-  am: "an", ans: "an", im: "in", ins: "in", beim: "bei", vom: "von", zum: "zu", zur: "zu",
-  aufs: "auf", fürs: "für", ums: "um", übers: "über", durchs: "durch", unters: "unter",
-  unterm: "unter", vors: "vor", vorm: "vor", hinters: "hinter", hinterm: "hinter",
-};
+// The prepositions and contractions live in collocationCheck.ts since #78
+// (`prepositionOf`), so no reading drops one as an adjective.
 
 const REFLEXIVE_PREFIX = "sich ";
-
-function prepositionOf(token: string): string | null {
-  const t = token.toLowerCase();
-  return PREPOSITIONS.has(t) ? t : (CONTRACTIONS[t] ?? null);
-}
 
 export interface PrepositionalSplit extends SplitPhrase {
   /** The preposition's lemma: "zu" for "zur". */
@@ -58,10 +44,17 @@ export interface PrepositionalSplit extends SplitPhrase {
  * trailing one is a separable particle, as in #70 ("nimmt ein Foto auf").
  */
 export function splitPrepositionalPhrase(q: string): PrepositionalSplit | null {
-  const tokens = tokensOf(q);
-  if (tokens === null) return null;
-  const particle = popParticle(tokens);
+  // #78: the same readings as splitPhrase; an adjective may follow the
+  // preposition directly ("an wichtigen Sitzungen").
+  for (const reading of readingsOf(q)) {
+    const split = splitReading(reading);
+    if (split !== null) return split;
+  }
+  return null;
+}
 
+function splitReading({ tokens: typed, particle }: Reading): PrepositionalSplit | null {
+  const tokens = [...typed];
   const at = tokens.map((t, i) => (i < tokens.length - 1 && prepositionOf(t) !== null ? i : -1)).filter((i) => i >= 0);
   if (at.length !== 1) return null;
   const [prepositionTyped] = tokens.splice(at[0], 1);

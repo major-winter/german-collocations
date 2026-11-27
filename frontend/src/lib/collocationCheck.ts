@@ -32,6 +32,39 @@ export function isPhraseQuery(q: string): boolean {
     return q.trim().split(/\s+/).length >= 2;
 }
 
+export type SearchRoute = { kind: 'check' | 'search'; to: string } | { kind: 'hint' };
+
+// #78: from three words on, an unparsed phrase is a sentence we could not
+// read, not a multiword headword: "Keine Ergebnisse" would mislead.
+const HINT_MIN_WORDS = 3;
+
+/**
+ * Where the header search box takes a query, given what /api/check said
+ * (null: not asked, or the request failed). A parsed phrase opens its noun
+ * page with the check (#70); an unparsed one of three or more words shows
+ * the "can't check" hint in place (#78); anything else, including a
+ * two-word fallback ("seit langem"), is a plain search.
+ */
+export function searchRoute(q: string, check: CollocationCheck | null): SearchRoute {
+    const query = q.trim();
+    const target = check && checkTarget(check);
+    if (target) return { kind: 'check', to: target };
+    if (check && !check.parsed && query.split(/\s+/).length >= HINT_MIN_WORDS) return { kind: 'hint' };
+    return { kind: 'search', to: `/wort/${encodeURIComponent(query)}` };
+}
+
+const words = (s: string) => s.trim().split(/\s+/).join(' ');
+
+/**
+ * Whether the header shows the "can't check" hint (#78): while the field
+ * still holds the phrase the server could not read, and not when the card
+ * already shows it for the same phrase in `?pruefen=`.
+ */
+export function showsSearchHint(hintFor: string | null, value: string, pruefen: string | null): boolean {
+    if (hintFor === null || words(value) !== words(hintFor)) return false;
+    return pruefen === null || words(pruefen) !== words(hintFor);
+}
+
 /**
  * What the header search box shows (#77): the check in the URL, so the
  * learner corrects it in place, else the page's word.
