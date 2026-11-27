@@ -4157,3 +4157,32 @@ Live checks: `/` 200; `/api/collocations/Entscheidung` 200 with
 nicht prüfen". The smoke run made 7 lookups (Nebel and
 Bundesverfassungsgericht before and after, Entscheidung twice, zzzqqq
 once) and 5 checks.
+
+### Follow-up: the floor measured on production (2026-11-28)
+
+Production has fewer pairs than the local data (3,110,047 adjacency
+pairs, of which 610,867 have ≥ 2 sentences and 329,242 have ≥ 3), so the
+floor cut harder there than in the local spot-check: *Nebel* 23 → 4,
+*Bundesverfassungsgericht* 20 → 1. Measured over the 5,327 headwords with
+frequency ≥ 20: entries kept per headword at floors 1 / 2 / 3, using the
+page's rules (logDice ≥ 6.3, top 10 per group, no proper nouns), but
+grouped by the partner's dominant POS instead of the page's exact
+sections. So the absolute numbers run high; the ratios are what count.
+
+| Headword frequency | Headwords | Floor 1 | Floor 2 | Floor 3 | Lost > half at 3 | Empty at 3 |
+|---|---|---|---|---|---|---|
+| ≥ 1,000 | 96 | 83.8 | 83.8 | 83.8 | 0 | 0 |
+| 200–999 | 557 | 73.2 | 66.8 | 60.6 | 3 | 0 |
+| 50–199 | 1,829 | 57.4 | 37.8 | 27.7 | 1,016 (56 %) | 0 |
+| 20–49 | 2,845 | 42.8 | 17.0 | 9.6 | 2,786 (98 %) | 28 |
+
+**Kept at 3 (user's decision).** Frequent headwords, which learners
+mostly look up, are untouched. What the floor removes from rarer ones
+rests mostly on one sentence, which the #79 sample found to be about
+half noise. Floor 2 would bring back two-sentence noise (*Dichter* on
+*Nebel*) and still cut rare headwords by 60 %. The cost is thin pages
+for rare words; the fix for those is an honest "few collocations yet"
+message (branch `frontend-feature-message-states`, B4 of
+`docs/ui-review-2026-11-27-search-and-cohesion.md`), not a lower floor.
+The query took 57 s on the VM (a full pass over `lemma_collocations`);
+don't repeat it at busy times.
