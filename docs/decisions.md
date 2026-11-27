@@ -52,6 +52,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#73](#73) TypeScript 6 at the root for ESLint, TypeScript 7 declared where backend and database use it
 - [#74](#74) "Passt das zusammen?" for adjective + noun: attributive logDice over the #54 data (amends #70)
 - [#75](#75) One phrase field on the check card; the verb-vs-adjective rule in either word order (amends #70, #74)
+- [#76](#76) "Passt das zusammen?" for a verb with a prepositional noun (amends #70)
 
 ---
 
@@ -3550,3 +3551,74 @@ Checked against the live site:
   `/api/collocations/zzzqqq` returns 404.
 
 Smoke requests that landed in `usage_counts`: 2 lookups, 3 checks.
+
+## 76. "Passt das zusammen?" for a verb with a prepositional noun (amends #70)
+
+**Problem.** The check judged a verb with its object (#70) and an
+adjective with its noun (#74), but not the prepositional pairs learners
+get wrong most often: *an einer Sitzung teilnehmen*, *zur Verfügung
+stellen*, *auf eine Antwort warten*. Those phrases were not parsed and
+fell through to a plain search. The data was already loaded: the lab's
+`obl` pairs (#60), 33,268 of them over 6,260 nouns, with the preposition
+as a lemma (`zu` for *zur*) and the noun phrase as written (*zur
+Verfügung*).
+
+**Decision.** (user, 2026-11-27; plan
+`docs/superpowers/plans/2026-11-27-prepositional-check.md`, item 4 of
+`docs/improvement-ideas.md`)
+- A third branch in `CheckCollocationService`, only for phrases
+  `splitPhrase` rejects, so no #70/#74/#75 verdict changes. Rules in
+  `backend/src/domain/prepositionCheck.ts`; one query over
+  `lab_verb_pairs` (`relation = 'obl'`); no migration.
+- **Parsing.** Exactly one token is a preposition or a contraction
+  (*am, im, ins, zum, zur, beim, vom, ums, …*) followed by another token;
+  a trailing one stays a separable particle, as in #70. Postpositions
+  (*zufolge, gegenüber, lang*) are left out.
+- **Noise floor `MIN_OBL_SCORE = 10.83`**, the LL critical value at
+  p < 0.001 (1 df). The data has wrong prepositions as weak pairs (*in
+  Einsatz kommen* LL 1, beside *zum Einsatz kommen* LL 18,761). Drops
+  4,045 of the 33,268 local pairs.
+- **`PREPOSITION_SHARE_OF_BEST = 0.1`**: the typed preposition counts
+  only at 10 % of the best preposition for the same verb + noun. Keeps
+  *sich freuen über/auf Besuch* (421 vs 472), drops *auf Einsatz kommen*
+  and *vor die Frage stellen* (3 % each).
+- **Verdicts.** `usual` names up to 2 stronger prepositions of the same
+  verb. `unusual` with `otherPreposition: true` (the verb takes another
+  preposition with this noun) suggests that verb's pairs; the card says
+  "Mit *teilnehmen* steht bei *Sitzung* meist eine andere Präposition."
+  `unusual` with `otherPreposition: false` suggests pairs with the typed
+  preposition, else the noun's top pairs. A dropped *sich* matches the
+  reflexive pair (*an der Diskussion beteiligen* → *sich an der
+  Diskussion beteiligen*, usual).
+- Counted as `check_obl` in `usage_counts`, so the #72 `check` baseline
+  stays comparable (no migration: `kind` has no CHECK constraint).
+
+**Spot-check** (20 phrases through the dev API, 2026-11-27): all 12
+right phrases usual (*an einer Sitzung teilnehmen, zur Verfügung
+stellen, in Frage stellen, auf eine Antwort warten, sich für Musik
+interessieren, sich auf/über den Besuch freuen, von der Situation
+abhängen, zum Einsatz kommen, ums Leben kommen, im Mittelpunkt stehen,
+an die Zukunft denken*), all 8 wrong ones unusual with the right phrase
+first (*bei einer Sitzung teilnehmen → an den Sitzungen teilnehmen*,
+*in Einsatz kommen → zum Einsatz kommen*, *für eine Antwort warten*,
+*an Musik interessieren*, *auf der Situation abhängen*, *über die
+Zukunft denken*, *in Verfügung stellen*, *mit der Diskussion
+beteiligen*). No constant needed tuning. *Entscheidung treffen* and
+*eine Frage stellen* still take the object check.
+
+**Left out.** Two prepositions (*bis zum Ende warten*) are not parsed.
+A finite verb whose particle is not in #70's list (*nimmt an der
+Sitzung teil*) is not parsed. *legt Wert auf* still reads *auf* as a
+particle (the #70 path, unchanged). The case the preposition takes is
+not shown (item 12 of `docs/improvement-ideas.md`).
+
+**Measured.** `findOblPairs` for *Zeit* (155 pairs, the largest noun):
+bitmap index scan on `idx_lab_verb_pairs_noun`, 0.9 ms local. Re-measure
+on prod after the deploy.
+
+**Checked.** `npm test` (113), `test:db` (37), typecheck, frontend lint
+and build. Not checked in a browser at phone width (no browser in the
+build session).
+
+**Deploy.** Backend and frontend together (the card reads the new
+`relation: 'obl'` variant). No migration, no reload.
