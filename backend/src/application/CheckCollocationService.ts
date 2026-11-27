@@ -83,13 +83,13 @@ export class CheckCollocationService implements CheckCollocation {
     const headword = await this.#store.resolveHeadword(nounForm);
     if (headword === null || pageSide(headword.pos) !== "noun") return null;
 
-    const verb = await this.#verbLemma(verbToken, split.particle, verbCandidates);
+    const verb = await this.#verbLemma(verbToken, split.particle, verbCandidates, split.words[0] === verbToken);
     // #78: a trailing particle the typed verb has no particle verb for is
     // more likely a predicative adjective ("Die Frage ist offen") or a word
     // we cannot read than a wrong verb: not parsed, never "Nicht typisch".
     if (verb === null && split.particle !== null) return null;
     const { noun, pairs } = await this.#pairsOf(nounForm, headword.lemma?.text ?? null, (n) => this.#store.findObjectPairs(n));
-    const { verdict, matched, suggestions } = judge(verb, split.sich, pairs);
+    const { verdict, matched, suggestions } = judge(verb, split.sich, pairs, split.reflexiveDropped === true);
 
     return {
       parsed: true,
@@ -115,7 +115,7 @@ export class CheckCollocationService implements CheckCollocation {
     const headword = await this.#store.resolveHeadword(nounForm);
     if (headword === null || pageSide(headword.pos) !== "noun") return null;
 
-    const verb = await this.#verbLemma(verbToken, split.particle, verbCandidates);
+    const verb = await this.#verbLemma(verbToken, split.particle, verbCandidates, split.words[0] === verbToken);
     if (verb === null && split.particle !== null) return null; // #78, as in #verbCheck
     const { noun, pairs } = await this.#pairsOf(nounForm, headword.lemma?.text ?? null, (n) => this.#store.findOblPairs(n));
     const { verdict, matched, suggestions, otherPreposition } = judgePreposition(verb, split.sich, split.preposition, pairs);
@@ -225,7 +225,17 @@ export class CheckCollocationService implements CheckCollocation {
   // news-heavy, so a first-person form may never be written with its
   // particle verb ("nehme … auf"). Then particle + the form's own lemma
   // ("auf" + "nehmen") is the particle verb, when the lab has that verb.
-  async #verbLemma(verbToken: string, particle: string | null, candidates: VerbCandidate[]): Promise<string | null> {
+  // Review finding: a split particle follows a verb that comes before its
+  // noun ("legt eine Pause ein", "nehme … teil"). After a verb-final phrase
+  // the trailing word is a dangling preposition ("Entscheidung treffen
+  // über" is not "übertreffen", "Angst haben vor" not "vorhaben").
+  async #verbLemma(
+    verbToken: string,
+    particle: string | null,
+    candidates: VerbCandidate[],
+    verbFirst: boolean,
+  ): Promise<string | null> {
+    if (particle !== null && !verbFirst) return null;
     const verb = pickVerbLemma(verbToken, particle, candidates);
     if (verb !== null || particle === null) return verb;
     const base = pickVerbLemma(verbToken, null, candidates);

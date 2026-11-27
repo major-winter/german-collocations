@@ -41,6 +41,7 @@ const verbs: Record<string, string | string[]> = {
   // #78: finite forms of a particle verb, as the lab examples write them split.
   nehme: ["nehmen", "teilnehmen"], nimmt: ["nehmen", "teilnehmen", "aufnehmen"], ist: "sein",
   aufnehmen: "aufnehmen", // the lab verb itself, found by its lemma
+  aufmachen: "aufmachen",
 };
 
 // Decision #76: the nouns whose obl pairs the fake store knows, and every noun it was asked about.
@@ -239,6 +240,14 @@ test("a particle verb the examples never write with the typed form is particle +
   assert.equal(check.parsed && check.relation, "obj");
   assert.equal(check.parsed && check.relation === "obj" && check.verb, "aufnehmen");
   assert.equal(check.parsed && check.verdict, "usual");
+});
+
+test("a trailing word after a verb-final phrase is no split particle (review finding)", async () => {
+  // "Sport machen auf" must not become "aufmachen", like "Entscheidung
+  // treffen über" -> "übertreffen": a split particle follows a verb that
+  // comes before its noun ("legt eine Pause ein").
+  assert.deepEqual(await service.check("Sport machen auf"), { parsed: false });
+  assert.deepEqual(await service.check("Foto aufnehmen auf"), { parsed: false });
 });
 
 test("a trailing particle the typed verb has no particle verb for is not parsed", async () => {
