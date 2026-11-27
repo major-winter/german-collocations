@@ -1,10 +1,10 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router';
+import { useNavigate, useSearchParams } from 'react-router';
 import type { CollocationCheck } from '@collocations/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LoaderCircle, Search } from 'lucide-react';
-import { isPhraseQuery, searchRoute } from '@/lib/collocationCheck.ts';
+import { isPhraseQuery, searchRoute, showsSearchHint } from '@/lib/collocationCheck.ts';
 import { fetchCheck } from '../api/check.ts';
 import { API_BASE_URL } from '../config.ts';
 import { UnparsedCheckHint } from './UnparsedCheckHint.tsx';
@@ -29,7 +29,8 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
     // #78: the phrase the server could not read. The hint shows while the
     // field still holds it, so editing the phrase or navigating hides it.
     const [hintFor, setHintFor] = useState<string | null>(null);
-    const showHint = hintFor !== null && value.trim() === hintFor;
+    const [searchParams] = useSearchParams();
+    const showHint = showsSearchHint(hintFor, value, searchParams.get('pruefen'));
     const navigate = useNavigate();
 
     async function handleSubmit(e: FormEvent<HTMLFormElement>) {

@@ -13,6 +13,7 @@ import {
     historyStateWithoutCheck,
     searchFieldValue,
     searchRoute,
+    showsSearchHint,
     unusualReason,
     verdictLabel,
 } from './collocationCheck.ts';
@@ -67,6 +68,14 @@ test('searchRoute: a word, a two-word fallback or a failed check is a plain sear
         kind: 'search',
         to: '/wort/Er%20hat%20eine%20Entscheidung%20getroffen',
     });
+});
+
+test('showsSearchHint: while the field holds the unparsed phrase, unless the card already shows it', () => {
+    assert.equal(showsSearchHint('es gibt Probleme', ' es gibt Probleme ', null), true);
+    assert.equal(showsSearchHint('es gibt Probleme', 'es gibt keine Probleme', null), false);
+    assert.equal(showsSearchHint(null, 'es gibt Probleme', null), false);
+    // The card shows the hint for an unparsed ?pruefen= (#75): not twice.
+    assert.equal(showsSearchHint('es gibt Probleme', 'es gibt Probleme', 'es gibt  Probleme'), false);
 });
 
 test('searchFieldValue shows the check in the URL, else the page word (#77)', () => {
