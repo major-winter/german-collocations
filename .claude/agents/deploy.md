@@ -43,7 +43,9 @@ report is a good outcome; a production site left half-changed is not.
    not running, say in the report that the database tests were skipped.
 
 Done when every command above exited 0 and you read its output. Any
-failure: stop and report the failing command and its last lines.
+failure: stop and report the failing command and its last lines. The one
+exception is a check the dispatch prompt names as waived by the user: run
+it anyway and put its result in the report as "waived".
 
 ## Step 2: merge and push (skip if no branch was given)
 
@@ -70,6 +72,7 @@ failure: stop and report the failing command and its last lines.
    | `backend/`, `types/` | `backend` |
    | `frontend/`, `types/` | `frontend` |
    | `compose.prod.yml`, `Caddyfile` or a Dockerfile | the services it affects |
+   | `package-lock.json`, root `package.json`, a workspace's `package.json` | every service whose image runs `npm ci` for that workspace (backend, frontend, migrate) |
    | `docs/`, `.claude/`, `*.md` only | nothing: report "no deploy needed" |
    | `database/scripts/`, `data/`, a new loader service | stop: a data load is the user's call |
 
