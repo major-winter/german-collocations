@@ -9,9 +9,9 @@ import {
   USUAL_SUGGESTIONS,
   baseOf,
   contentWords,
-  popParticle,
-  tokensOf,
+  readingsOf,
   type Judgement,
+  type Reading,
   type SplitPhrase,
 } from "./collocationCheck.ts";
 import { phraseNounWord, phraseOf } from "./verbNounPhrases.ts";
@@ -58,10 +58,17 @@ export interface PrepositionalSplit extends SplitPhrase {
  * trailing one is a separable particle, as in #70 ("nimmt ein Foto auf").
  */
 export function splitPrepositionalPhrase(q: string): PrepositionalSplit | null {
-  const tokens = tokensOf(q);
-  if (tokens === null) return null;
-  const particle = popParticle(tokens);
+  // #78: the same readings as splitPhrase; an adjective may follow the
+  // preposition directly ("an wichtigen Sitzungen").
+  for (const reading of readingsOf(q, (t) => prepositionOf(t) !== null)) {
+    const split = splitReading(reading);
+    if (split !== null) return split;
+  }
+  return null;
+}
 
+function splitReading({ tokens: typed, particle }: Reading): PrepositionalSplit | null {
+  const tokens = [...typed];
   const at = tokens.map((t, i) => (i < tokens.length - 1 && prepositionOf(t) !== null ? i : -1)).filter((i) => i >= 0);
   if (at.length !== 1) return null;
   const [prepositionTyped] = tokens.splice(at[0], 1);

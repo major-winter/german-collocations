@@ -7,10 +7,17 @@ import type { CheckPhrase, CheckVerdict } from "@collocations/types";
 import { phraseNounWord, phraseOf } from "./verbNounPhrases.ts";
 
 const MIN_TOKENS = 2;
-const MAX_TOKENS = 5;
+// #78: 8, not #70's 5, so a learner's sentence fits: "Ich nehme an einer
+// wichtigen Sitzung teil" is 7 words.
+const MAX_TOKENS = 8;
 
 const SEPARABLE_PARTICLES = new Set([
   "ab", "an", "auf", "aus", "bei", "ein", "fest", "mit", "nach", "vor", "weg", "zu", "zurück",
+  // #78: every particle the lab examples write split from its verb at least
+  // 50 times ("nimmt … teil" 482, "stellt … dar" 586). Not "statt": the noun
+  // of "stattfinden" is its subject, which the check does not judge.
+  "auseinander", "bereit", "dar", "durch", "entgegen", "fort", "frei", "her", "hervor", "heraus",
+  "hin", "hinzu", "nieder", "offen", "teil", "um", "über", "voran", "wahr", "weiter", "zusammen",
 ]);
 
 // Articles, "kein" and possessives with any ending: they carry no meaning
@@ -18,6 +25,21 @@ const SEPARABLE_PARTICLES = new Set([
 const DETERMINER = /^(der|die|das|den|dem|des|(ein|kein|mein|dein|sein|ihr|unser|euer|eur)(e|en|em|er|es)?)$/i;
 
 const REFLEXIVE_PREFIX = "sich ";
+
+// #78: a subject pronoun carries nothing for the check ("wir treffen eine
+// Entscheidung"). "ihr" is also a possessive, already dropped as one.
+const SUBJECT_PRONOUNS = new Set(["ich", "du", "er", "sie", "es", "wir", "ihr", "man"]);
+// The reflexive forms that agree with a subject pronoun: "ich mache mir
+// Sorgen" is "(sich) Sorgen machen". Without its subject, "mir" is an object.
+const REFLEXIVES_OF: Record<string, string[]> = { ich: ["mich", "mir"], du: ["dich", "dir"], wir: ["uns"], ihr: ["euch"] };
+// "es gibt" is existential; the lab extracts no objects for it (#64), so
+// "es gibt keine Lösung" would be judged as "Lösung geben".
+const GEBEN_FORMS = new Set(["gibt", "gab", "gäbe", "gaben", "geben", "gegeben"]);
+// #78: demonstratives and quantifiers, dropped like articles in a learner
+// reading ("Ich verbringe viel Zeit", "diese Entscheidung treffen"). Only
+// there, so "viele Fragen" stays a #74 adjective check. Not "einig-":
+// "einigen" is also a verb form ("wir einigen uns").
+const LEARNER_DETERMINER = /^(dies|jed|jen|manch|welch|solch|viel|wenig|mehrer|all|beid)(e|en|em|er|es)?$/i;
 
 export interface SplitPhrase {
   /** The two remaining words, in typed order: one noun, one verb. */
@@ -77,13 +99,98 @@ export function contentWords(tokens: string[]): { words: [string, string]; sich:
   return { words: [words[0], words[1]], sich };
 }
 
+export function isDeterminer(token: string): boolean {
+  return DETERMINER.test(token);
+}
+
+function isCapitalised(token: string): boolean {
+  return token[0] !== token[0].toLowerCase();
+}
+
+/**
+ * #78: the subject pronoun goes, and so does a reflexive that agrees with
+ * it ("ich freue mich"). The reflexive is not read as a typed "sich":
+ * "mir", "uns" are often free datives ("ich mache mir einen Kaffee"), and
+ * the #70 top-10 rule and #76's fallback still find "sich freuen". Returns
+ * a new array.
+ */
+export function dropSubjectPronouns(tokens: string[]): string[] {
+  const lower = tokens.map((t) => t.toLowerCase());
+  const reflexives = new Set(lower.flatMap((t) => REFLEXIVES_OF[t] ?? []));
+  return tokens.filter((_, i) => !SUBJECT_PRONOUNS.has(lower[i]) && !reflexives.has(lower[i]));
+}
+
+/**
+ * #78: drops the lowercase words between a determiner (or `isFunctionWord`,
+ * e.g. a preposition) and the capitalised noun after them: "eine (sehr)
+ * schwere Entscheidung", "an wichtigen Sitzungen". A function word itself
+ * is never dropped ("bis zum Ende"). Returns a new array.
+ */
+export function dropAttributiveAdjectives(
+  tokens: string[],
+  isFunctionWord: (token: string) => boolean = () => false,
+): string[] {
+  const opens = (t: string) => isDeterminer(t) || isFunctionWord(t);
+  const drop = new Set<number>();
+  for (let start = 0; start < tokens.length; start++) {
+    if (!opens(tokens[start])) continue;
+    let end = start + 1;
+    while (end < tokens.length && !isCapitalised(tokens[end]) && !opens(tokens[end]) && tokens[end].toLowerCase() !== "sich") {
+      end++;
+    }
+    if (end > start + 1 && end < tokens.length && isCapitalised(tokens[end])) {
+      for (let i = start + 1; i < end; i++) drop.add(i);
+    }
+  }
+  return tokens.filter((_, i) => !drop.has(i));
+}
+
+export interface Reading {
+  tokens: string[];
+  particle: string | null;
+}
+
+/**
+ * The ways to read a phrase, in order. First as #70 read it, so every
+ * phrase it parsed keeps its parse; then without popping a trailing word
+ * that is also a particle ("bekommt einen Teil"); then as a learner's
+ * sentence (#78): without the subject pronoun, with and then without
+ * dropping the adjectives inside the noun phrase. Callers take the first
+ * reading that parses.
+ */
+export function readingsOf(q: string, isFunctionWord: (token: string) => boolean = () => false): Reading[] {
+  const tokens = tokensOf(q);
+  if (tokens === null) return [];
+  const existential =
+    tokens.some((t) => t.toLowerCase() === "es") && tokens.some((t) => GEBEN_FORMS.has(t.toLowerCase()));
+  const readings: Reading[] = [];
+  for (const learner of existential ? [false] : [false, true]) {
+    for (const pop of [true, false]) {
+      const rest = [...tokens];
+      const particle = pop ? popParticle(rest) : null;
+      if (!pop && popParticle([...tokens]) === null) continue; // the same as the reading with pop
+      if (!learner) {
+        readings.push({ tokens: rest, particle });
+        continue;
+      }
+      const withoutPronouns = dropSubjectPronouns(rest);
+      const isLearnerDeterminer = (t: string) => LEARNER_DETERMINER.test(t);
+      const withoutAdjectives = dropAttributiveAdjectives(withoutPronouns, (t) => isLearnerDeterminer(t) || isFunctionWord(t));
+      for (const reduced of [withoutAdjectives, withoutPronouns]) {
+        readings.push({ tokens: reduced.filter((t) => !isLearnerDeterminer(t)), particle });
+      }
+    }
+  }
+  return readings;
+}
+
 /** null unless the phrase is exactly a noun and a verb once function words are gone. */
 export function splitPhrase(q: string): SplitPhrase | null {
-  const tokens = tokensOf(q);
-  if (tokens === null) return null;
-  const particle = popParticle(tokens);
-  const content = contentWords(tokens);
-  return content === null ? null : { ...content, particle };
+  for (const { tokens, particle } of readingsOf(q)) {
+    const content = contentWords(tokens);
+    if (content !== null) return { ...content, particle };
+  }
+  return null;
 }
 
 export interface VerbCandidate {

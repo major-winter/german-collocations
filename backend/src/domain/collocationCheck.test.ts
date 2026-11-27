@@ -16,7 +16,9 @@ test('splitPhrase remembers sich and a trailing separable particle', () => {
 
 test('splitPhrase rejects anything that is not exactly noun + verb', () => {
   assert.equal(splitPhrase('Entscheidung'), null);
-  assert.equal(splitPhrase('eine wichtige Entscheidung treffen'), null);
+  // #78 reads "eine wichtige Entscheidung treffen"; an adjective before a
+  // lowercase noun is still not dropped.
+  assert.equal(splitPhrase('eine wichtige entscheidung treffen'), null);
   assert.equal(splitPhrase('a b c d e f'), null);
   assert.equal(splitPhrase('die das'), null);
 });
@@ -103,4 +105,70 @@ test('splitPhrase and normalisePhrase ignore punctuation around words (final rev
   assert.deepEqual(splitPhrase('eine Entscheidung treffen?'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
   assert.deepEqual(splitPhrase('„Entscheidung treffen.“'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
   assert.equal(normalisePhrase('  eine Entscheidung   treffen? '), 'eine Entscheidung treffen');
+});
+
+// Decision #78: learner-style input - sentences with a subject pronoun, an
+// adjective inside the noun phrase, a split particle not in #70's list.
+
+test('splitPhrase drops a subject pronoun, also capitalised at the start', () => {
+  assert.deepEqual(splitPhrase('wir treffen eine Entscheidung'), { words: ['treffen', 'Entscheidung'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Er macht ein Foto'), { words: ['macht', 'Foto'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Sie stellen die Frage'), { words: ['stellen', 'Frage'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Man spielt eine Rolle'), { words: ['spielt', 'Rolle'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Es macht Spaß'), { words: ['macht', 'Spaß'], sich: false, particle: null });
+});
+
+test('splitPhrase drops a reflexive that agrees with the subject, without requiring the sich pair', () => {
+  // "mir"/"uns" are often free datives ("ich mache mir einen Kaffee"); the
+  // #70 top-10 rule and #76's fallback still find "sich Sorgen machen".
+  assert.deepEqual(splitPhrase('Ich mache mir Sorgen'), { words: ['mache', 'Sorgen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('wir geben uns Mühe'), { words: ['geben', 'Mühe'], sich: false, particle: null });
+  // A typed "sich" still means only the sich pair (#70).
+  assert.deepEqual(splitPhrase('er gibt sich Mühe'), { words: ['gibt', 'Mühe'], sich: true, particle: null });
+  // "mir" without "ich" is an object, not a reflexive: not parsed.
+  assert.equal(splitPhrase('er macht mir Sorgen'), null);
+});
+
+test('splitPhrase leaves existential "es gibt" unparsed (#64: the lab has no objects for it)', () => {
+  assert.equal(splitPhrase('es gibt keine Lösung'), null);
+  assert.equal(splitPhrase('Es gab ein Problem'), null);
+});
+
+test('splitPhrase drops an attributive adjective after a determiner', () => {
+  assert.deepEqual(splitPhrase('eine schwere Entscheidung treffen'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Wir treffen eine sehr wichtige Entscheidung'), { words: ['treffen', 'Entscheidung'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('Ich stelle eine dumme Frage'), { words: ['stelle', 'Frage'], sich: false, particle: null });
+});
+
+test('splitPhrase drops demonstratives and quantifiers in a learner reading', () => {
+  assert.deepEqual(splitPhrase('Ich verbringe viel Zeit'), { words: ['verbringe', 'Zeit'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('diese Entscheidung treffen'), { words: ['Entscheidung', 'treffen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('wir stellen viele dumme Fragen'), { words: ['stellen', 'Fragen'], sich: false, particle: null });
+  // In the #74 reading first: "viele Fragen" stays an adjective check.
+  assert.deepEqual(splitPhrase('viele Fragen'), { words: ['viele', 'Fragen'], sich: false, particle: null });
+});
+
+test('splitPhrase keeps the #70 and #74 readings first', () => {
+  // The adjective check still gets its adjective.
+  assert.deepEqual(splitPhrase('ein starker Regen'), { words: ['starker', 'Regen'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('schwerer Regen'), { words: ['schwerer', 'Regen'], sich: false, particle: null });
+  // "das" is a pronoun here, and "macht" no adjective.
+  assert.deepEqual(splitPhrase('das macht Sinn'), { words: ['macht', 'Sinn'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('nimmt ein Foto auf'), { words: ['nimmt', 'Foto'], sich: false, particle: 'auf' });
+});
+
+test('splitPhrase takes the particles the lab data splits, and a split particle with a pronoun', () => {
+  assert.deepEqual(splitPhrase('Er stellt das Produkt vor'), { words: ['stellt', 'Produkt'], sich: false, particle: 'vor' });
+  assert.deepEqual(splitPhrase('nimmt die Chance wahr'), { words: ['nimmt', 'Chance'], sich: false, particle: 'wahr' });
+  assert.deepEqual(splitPhrase('führt eine Studie durch'), { words: ['führt', 'Studie'], sich: false, particle: 'durch' });
+});
+
+test('splitPhrase reads a capitalised particle word as the noun when the particle reading fails', () => {
+  assert.deepEqual(splitPhrase('bekommt einen Teil'), { words: ['bekommt', 'Teil'], sich: false, particle: null });
+  assert.deepEqual(splitPhrase('feiert ein Fest'), { words: ['feiert', 'Fest'], sich: false, particle: null });
+});
+
+test('splitPhrase takes sentences up to eight words', () => {
+  assert.deepEqual(splitPhrase('Ich gebe mir eine sehr große Mühe'), { words: ['gebe', 'Mühe'], sich: false, particle: null });
+  assert.equal(splitPhrase('a b c d e f g h i'), null);
 });
