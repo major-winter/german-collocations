@@ -5,10 +5,6 @@ made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
 (next: #83), and add it to the index.
 
-(next: #83), and add it to the index.
-
-(next: #83), and add it to the index.
-
 Decisions #1-32 predate this file and are not in this repository.
 
 ## Index
