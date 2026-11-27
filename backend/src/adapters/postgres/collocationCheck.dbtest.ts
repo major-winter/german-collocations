@@ -166,13 +166,13 @@ test("the store counts the noun's full total and the adjective's other nouns", a
   assert.equal(await store.findAdjectiveLemma("regen"), null);
 });
 
-test("schwerer Regen is not typical, with the top three by logDice as written", async () => {
+test("schwerer Regen is not typical, with the three most frequent usual pairs as written", async () => {
   await regen();
   const check = amod(await service.check("schwerer Regen"));
   assert.equal(check.noun, "Regen");
   assert.equal(check.adjective, "schwer");
   assert.equal(check.verdict, "unusual");
-  assert.deepEqual(phrases(check), ["leichter Regen", "heftiger Regen", "strömender Regen"]);
+  assert.deepEqual(phrases(check), ["starker Regen", "leichter Regen", "heftiger Regen"]);
 });
 
 test("ein starker Regen is usual, written as the corpus most often writes it", async () => {
@@ -182,7 +182,8 @@ test("ein starker Regen is usual, written as the corpus most often writes it", a
   // "starken Regens" is more frequent, but the noun's lemma form wins;
   // "Starker" at a sentence start counts as "starker".
   assert.deepEqual(check.matched, { phrase: "starker Regen", nounWord: "Regen", partnerWord: "starker" });
-  assert.deepEqual(phrases(check), ["leichter Regen", "heftiger Regen"]);
+  // The most frequent usual pair: nothing is "noch häufiger".
+  assert.deepEqual(phrases(check), []);
 });
 
 test("a noun with too few frequent adjectives gets noData", async () => {

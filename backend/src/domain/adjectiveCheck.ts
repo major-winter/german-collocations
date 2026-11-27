@@ -65,16 +65,19 @@ export function judgeAdjective(adjectiveId: number, counts: AdjectiveCounts): Ad
   const score = (p: AdjectiveCount) => attributiveLogDice(p.count, counts.nounTotal, p.adjectiveTotal);
   // Suggestions are frequent and usual themselves: no hapax adjective (a
   // total of 1-2 gives a high logDice), never a pair the check rejects.
+  // logDice decides *whether* a pair is usual; count decides the order, so
+  // the commonest phrase comes first ("starker", not "strömender Regen",
+  // user 2026-11-27) and "Noch häufiger" is literally true.
   const usual = frequent
     .filter((p) => score(p) >= MIN_ADJECTIVE_CHECK_LOGDICE)
-    .sort((a, b) => score(b) - score(a) || b.count - a.count || a.adjective.localeCompare(b.adjective));
+    .sort((a, b) => b.count - a.count || score(b) - score(a) || a.adjective.localeCompare(b.adjective));
 
   const typed = counts.pairs.find((p) => p.adjectiveId === adjectiveId);
   if (typed === undefined || score(typed) < MIN_ADJECTIVE_CHECK_LOGDICE) {
     return { verdict: "unusual", matched: null, suggestions: usual.slice(0, UNUSUAL_SUGGESTIONS) };
   }
-  const stronger = usual.filter((p) => p.adjectiveId !== adjectiveId && score(p) > score(typed));
-  return { verdict: "usual", matched: typed, suggestions: stronger.slice(0, USUAL_SUGGESTIONS) };
+  const moreFrequent = usual.filter((p) => p.adjectiveId !== adjectiveId && p.count > typed.count);
+  return { verdict: "usual", matched: typed, suggestions: moreFrequent.slice(0, USUAL_SUGGESTIONS) };
 }
 
 export function adjectiveCheckPhrase(written: WrittenPair): CheckPhrase {

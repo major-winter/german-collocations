@@ -51,11 +51,13 @@ test("a noun with fewer than 5 adjectives of count >= 5 has no data", () => {
   assert.deepEqual(judgeAdjective(idOf("stark"), kaffee), { verdict: "noData", matched: null, suggestions: [] });
 });
 
-test("an adjective the noun never takes is not typical, with the top 3 by logDice", () => {
+test("an adjective the noun never takes is not typical, with the 3 most frequent usual pairs", () => {
   const j = judgeAdjective(idOf("hoch"), regen);
   assert.equal(j.verdict, "unusual");
   assert.equal(j.matched, null);
-  assert.deepEqual(names(j.suggestions), ["strömend", "heftig", "stark"]);
+  // logDice decides what is usual; count decides the order (user, 2026-11-27):
+  // "starker Regen" first, the commonest phrase a learner would use.
+  assert.deepEqual(names(j.suggestions), ["stark", "leicht", "heftig"]);
 });
 
 test("a rare pair with a common adjective is not typical, however often it occurs", () => {
@@ -69,16 +71,16 @@ test("a hapax adjective is never suggested, but counts as usual when typed", () 
   assert.ok(!names(unusual.suggestions).includes("selten"));
   const typed = judgeAdjective(idOf("selten"), regen);
   assert.equal(typed.verdict, "usual");
-  assert.deepEqual(names(typed.suggestions), ["strömend", "heftig"]);
+  assert.deepEqual(names(typed.suggestions), ["stark", "leicht"]);
 });
 
-test("usual names at most 2 stronger adjectives, by logDice, not count", () => {
+test("usual names at most 2 more frequent usual adjectives (\"Noch häufiger\")", () => {
   const stark = judgeAdjective(idOf("stark"), regen);
   assert.equal(stark.verdict, "usual");
   assert.equal(stark.matched?.adjective, "stark");
-  assert.deepEqual(names(stark.suggestions), ["strömend", "heftig"]);
-  const best = judgeAdjective(idOf("strömend"), regen);
-  assert.deepEqual(names(best.suggestions), []);
+  assert.deepEqual(names(stark.suggestions), []); // the most frequent: nothing is "noch häufiger"
+  const stroemend = judgeAdjective(idOf("strömend"), regen); // highest logDice, fewest uses
+  assert.deepEqual(names(stroemend.suggestions), ["stark", "leicht"]);
 });
 
 test("unusual with no usual pair at all has no suggestions", () => {

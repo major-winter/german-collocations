@@ -91,10 +91,10 @@ test("schwerer Regen is not typical, with written suggestions", async () => {
   assert.equal(check.adjective, "schwer");
   assert.equal(check.verdict, "unusual");
   assert.equal(check.matched, null);
-  // The top 3 by logDice are adj11, adj13, adj12; adj13 has no example,
-  // so it is dropped rather than shown as a bare lemma.
-  assert.deepEqual(check.suggestions.map((s) => s.phrase), ["adj11e Regen", "adj12e Regen"]);
-  assert.deepEqual(check.suggestions[0], { phrase: "adj11e Regen", nounWord: "Regen", partnerWord: "adj11e" });
+  // The usual pairs by count are stark (30), adj11 (10), adj12 (8), adj13 (6);
+  // the top 3 are shown, each as its examples write it.
+  assert.deepEqual(check.suggestions.map((s) => s.phrase), ["starke Regen", "adj11e Regen", "adj12e Regen"]);
+  assert.deepEqual(check.suggestions[1], { phrase: "adj11e Regen", nounWord: "Regen", partnerWord: "adj11e" });
 });
 
 test("the adjective is found in any order, with an article or a sentence-initial capital", async () => {

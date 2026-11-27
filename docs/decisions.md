@@ -3303,10 +3303,15 @@ computed within the attributive relation only**. It is not the window
 logDice of `lemma_collocations` (#43, #44), and the two are never merged or
 ranked together. Thin-noun gate: a noun with fewer than 5 adjectives of
 count ≥ 5 gets "Keine Daten". Suggestions ("Typisch sind" and "Noch
-häufiger", 3 and 2 as in #70) are ranked by the same logDice. They need
-count ≥ 5 and logDice ≥ 6 (builder choice): otherwise a hapax adjective
-with a total of 1–2 would rank first, or the card would name a pair it
-rejects itself.
+häufiger", 3 and 2 as in #70) are usual pairs themselves: count ≥ 5 and
+logDice ≥ 6 (builder choice), so no hapax adjective and never a pair the
+card rejects. Among those they are **ordered by count**, logDice breaking
+ties (user, 2026-11-27): logDice decides *whether* a pair is usual, count
+decides which comes first, so the phrase a learner would most likely use
+leads (*schwerer Regen* → *starker Regen*, 31 uses, not *strömender*, 16).
+"Noch häufiger" names only pairs with a higher count than the typed one,
+so it is literally true. Ordering by logDice, as first built, put
+specific adjectives (*strömend*, *gefrierend*) ahead of the common one.
 
 Evidence (the main session, on the spec's 64 hand-labelled pairs, same gate):
 
@@ -3382,6 +3387,13 @@ broken adjective lemma shown in a 20-headword spot-check, or too many
 **Spot-check** (local, 2026-11-27, through `/api/check`). Before: every
 adjective + noun phrase was a plain search (`parsed: false`).
 
+The table below was taken with suggestions ordered by logDice; after the
+switch to count order the suggestions read: *schwerer Regen* → starker /
+leichter / strömender Regen; *starker Regen* → Üblich, nothing more
+frequent; *hohe Chance* → gute / große / neue Chance; *große Kosten* →
+hohe / steigende / zusätzliche Kosten; *hohe Kosten* → Üblich, nothing
+more frequent. Verdicts are unchanged.
+
 | Typed | Verdict | Shown |
 |---|---|---|
 | schwerer Regen | Nicht typisch | strömender / gefrierender / einsetzender Regen |
@@ -3433,9 +3445,6 @@ Entscheidung machen*, *macht / fällt eine Entscheidung*, *nimmt ein
 Foto*, *legt eine Pause ein*, *sich Mühe geben*, *Bus fahren*.
 
 **Known limitations.**
-- logDice favours specific adjectives over the general one a learner
-  wants: *schwerer Regen* suggests *strömender / gefrierender /
-  einsetzender Regen*, not *starker Regen* (rank 4 or lower).
 - *gute Nacht* (greeting) and *hohe Chance* (defensible) come out
   "Nicht typisch": *gut* and *hoch* have huge totals, and the corpus is
   news-heavy. The footnote covers this.
