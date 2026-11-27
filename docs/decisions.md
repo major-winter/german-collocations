@@ -4322,3 +4322,16 @@ for verbs.
 360 px, light and dark: *Sitzung* (verb pairs open, adjective chips
 closed; tapping *jung* shows its 3 sentences) and *schnell* (first chip
 open).
+
+### Follow-up: deployed to production (2026-11-28)
+
+Merge `857bc5b` of `frontend-feature-partner-shapes`. Only `frontend/` and
+docs changed: no backend change, no migration, no data load. Server
+checkout moved from `b8b6ad3` to `857bc5b`; only `frontend` was built
+(18:16 UTC) and restarted with `up -d --no-deps` (container started
+18:16:12, image built 18:16:10). The `IMPRESSUM_*` variables were present.
+
+**Checked.** `/` 200; `/api/collocations/Entscheidung` 200; the served JS
+bundle contains "Noch keine Beispielsätze"; the served CSS still contains
+`type-heading`; the backend log of the last 5 minutes has no errors.
+Smoke traffic: 1 lookup (`Entscheidung`), no checks.
