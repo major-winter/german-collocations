@@ -3468,3 +3468,25 @@ Left open: the frontend component copy has no unit test (the frontend
 tests only `lib/`), and the VM cold-cache measurement belongs to the
 deploy.
 
+
+### Follow-up: deployed to production (2026-11-27)
+
+Merged as `347fe9b`. On the live checkout (previously `43cf453`): `git
+pull`, then `docker compose -f compose.prod.yml build backend frontend`,
+then `up -d --no-deps backend frontend`. `IMPRESSUM_EMAIL` had been set
+on the server by the owner beforehand, so the frontend guard (#72) passed.
+No migration. The backend started at 09:37:50 UTC (image built 09:35:32)
+and the frontend at 09:37:50 (image built 09:37:38); no errors in the
+backend log. Checked against the live site: `/` 200,
+`/api/collocations/Entscheidung` 200 with *treffen*,
+`/api/collocations/zzzqqq` 404, `/api/check?q=Sport machen` 200 (usual,
+obj), `/api/check?q=schwerer Regen` 200 (amod, unusual, *starker Regen*
+first), the served bundle contains "Wort prüfen", `/impressum` 200.
+Timing of `/api/check?q=großer Mann`: the first request after the restart
+took 0.58 s from outside (about 0.15 s of that is network); then 0.17 to
+0.19 s from outside. Inside the backend container, 20 sequential requests:
+224, 98, 239, 115, 129, 189 ms, then 65 to 107 ms once warm. So the warm
+server-side time is under the 150 ms revisit trigger; the cold start is
+above it. These checks added about 2 `check` (Sport machen, schwerer
+Regen) and about 14 `check` lookups for großer Mann from outside, plus 20
+from inside the container, plus 2 `word_page` to `usage_counts`.
