@@ -4220,6 +4220,8 @@ rare word's page can shrink to one or two partners with no explanation.
 360 px, light and dark: *Regenschirm* (1 partner, note shown), *Löffel*
 (empty), *Sitzzung* (not found, left-aligned, no hyphen).
 
+---
+
 <a id="81"></a>
 ## 81. The check's verdict is a label, its suggestions are links, chip borders are stronger (B3 of the 2026-11-27 UI review)
 
@@ -4239,6 +4241,8 @@ rare word's page can shrink to one or two partners with no explanation.
 **Checked.** `npm test` (145), frontend lint and build. Headless Chrome at
 360 px, light and dark: the *bei einer Sitzung teilnehmen* card, and a tap
 on its suggestion shows "✓ Üblich".
+
+---
 
 <a id="82"></a>
 ## 82. Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
