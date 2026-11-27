@@ -4266,3 +4266,19 @@ the home page can adopt them when they are next touched.
 **Checked.** `npm test` (144), frontend lint and build. Headless Chrome at
 1280 px on *Sitzung*: headings in the foreground colour, phrases flush
 with the chips.
+
+### Follow-up: deployed to production (2026-11-28)
+
+Merge `b8b6ad3` (main, with the merges of `frontend-feature-logo-colour`,
+`-message-states` #80, `-chip-affordances` #81 and `-type-roles` #82) went
+to the Linode VM. Server checkout moved from `049a114` (PREV) to `b8b6ad3`.
+Only `frontend` was rebuilt and restarted (`up -d --no-deps`); no backend
+change, no migration, no data load. Image built 18:04:27 UTC, container
+started 18:04:29 UTC. Backend log of the last 5 minutes: no errors.
+
+Checks against the public site: `/` 200; `/api/collocations/Entscheidung`
+200 with `treffen`; `/api/collocations/zzzqqq` 404; `/api/check?q=Sport%20machen`
+200. The served bundles contain `type-heading`, "wenige Verbindungen",
+"noch keine Verbindungen gefunden" and "✗ Nicht typisch"; `--border` is
+`oklch(87% 0 0)` (0.87); the logo mark uses `bg-foreground`. Smoke traffic
+in `usage_counts`: 3 lookups (Entscheidung twice, zzzqqq) and 1 check.
