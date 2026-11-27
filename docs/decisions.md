@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #80), and add it to the index.
+(next: #83), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -56,6 +56,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#77](#77) One input: the header search box looks words up and checks phrases; the card keeps only the verdict (amends #75)
 - [#78](#78) The check reads learner sentences (pronouns, adjectives, more particles); an unreadable sentence gets the hint, not "Keine Ergebnisse" (amends #70, #76, #77)
 - [#79](#79) Adjacency lists: a pair needs 3 sentences, and adjectives the tagger reads as adverbs go under "Adjektive" (amends #36, #43)
+- [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
 
 ---
 
@@ -4186,3 +4187,28 @@ message (branch `frontend-feature-message-states`, B4 of
 `docs/ui-review-2026-11-27-search-and-cohesion.md`), not a lower floor.
 The query took 57 s on the VM (a full pass over `lemma_collocations`);
 don't repeat it at busy times.
+
+---
+
+<a id="82"></a>
+## 82. Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
+
+**Date.** 2026-11-28. Branch `frontend-feature-type-roles`. B5 of
+`docs/ui-review-2026-11-27-search-and-cohesion.md`.
+
+**Decision.** Two type roles, written into `index.css` as utilities:
+- **Serif = German language content.** `type-phrase` (serif `xl`, an
+  open pair's phrase) and `type-lemma` (serif `lg`, a partner in the
+  adjacency list). The headword stays serif `3xl`.
+- **Sans = interface.** `type-heading` (`base`, medium, foreground). Group
+  headings were muted, so they looked lighter than the black lemmas under
+  them.
+- Everything aligns with the chip row: the 8 px `px-2` indent on the open
+  phrase and on list entries is gone.
+
+Only the word page's lists use the utilities so far; the check card and
+the home page can adopt them when they are next touched.
+
+**Checked.** `npm test` (144), frontend lint and build. Headless Chrome at
+1280 px on *Sitzung*: headings in the foreground colour, phrases flush
+with the chips.

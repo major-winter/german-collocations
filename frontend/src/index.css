@@ -145,3 +145,16 @@
     outline-offset: 2px;
   }
 }
+
+/* Decision #82 (B5 of the 2026-11-27 UI review): two type roles.
+   Serif = German language content; sans = interface. A heading is never
+   lighter than the words under it. */
+@utility type-phrase {
+  @apply font-serif text-xl;
+}
+@utility type-lemma {
+  @apply font-serif text-lg;
+}
+@utility type-heading {
+  @apply text-base font-medium text-foreground;
+}
