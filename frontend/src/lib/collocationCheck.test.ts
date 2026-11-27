@@ -3,12 +3,14 @@ import assert from 'node:assert/strict';
 import type { CollocationCheck } from '@collocations/types';
 import {
     checkMatchesPage,
-    checkQueryFor,
+    checkHintExample,
     checkTarget,
     isPhraseQuery,
     partnerKind,
     partnerTyped,
     phraseParts,
+    preloadedCheck,
+    searchFieldValue,
     unusualReason,
     verdictLabel,
 } from './collocationCheck.ts';
@@ -42,14 +44,36 @@ test('isPhraseQuery is two or more words', () => {
     assert.equal(isPhraseQuery(' eine Entscheidung machen '), true);
 });
 
-test('checkQueryFor sends a whole phrase as typed, like the search box (#75)', () => {
-    assert.equal(checkQueryFor(' schwerer  Regen ', 'Regen'), 'schwerer Regen');
-    assert.equal(checkQueryFor('eine Entscheidung treffen', 'Regen'), 'eine Entscheidung treffen');
+test('searchFieldValue shows the check in the URL, else the page word (#77)', () => {
+    assert.equal(searchFieldValue('Sitzung', 'bei einer  Sitzung teilnehmen '), 'bei einer Sitzung teilnehmen');
+    assert.equal(searchFieldValue('Sitzung', null), 'Sitzung');
+    assert.equal(searchFieldValue('Sitzung', '  '), 'Sitzung');
+    assert.equal(searchFieldValue('', null), '');
 });
 
-test('checkQueryFor puts the page noun with a single word', () => {
-    assert.equal(checkQueryFor('schwerer', 'Regen'), 'Regen schwerer');
-    assert.equal(checkQueryFor('  ', 'Regen'), null);
+test('searchFieldValue decodes the page word, and keeps a malformed one as is', () => {
+    assert.equal(searchFieldValue('Gr%C3%B6%C3%9Fe', null), 'Größe');
+    assert.equal(searchFieldValue('100%', null), '100%');
+});
+
+test('preloadedCheck reuses the search box\'s check for the same phrase and page (#77)', () => {
+    const state = { check: entscheidung };
+    assert.equal(preloadedCheck(state, 'eine Entscheidung machen', 'Entscheidung', 'Entscheidung'), entscheidung);
+    assert.equal(preloadedCheck(state, 'eine Entscheidung treffen', 'Entscheidung', 'Entscheidung'), null);
+    assert.equal(preloadedCheck(state, 'eine Entscheidung machen', 'Frage', 'Frage'), null);
+    assert.equal(preloadedCheck({ check: { parsed: false } }, 'x y', 'Entscheidung', 'Entscheidung'), null);
+    assert.equal(preloadedCheck(null, 'eine Entscheidung machen', 'Entscheidung', 'Entscheidung'), null);
+    assert.equal(preloadedCheck('junk', 'eine Entscheidung machen', 'Entscheidung', 'Entscheidung'), null);
+});
+
+test('checkHintExample is the noun\'s best object pair, else its best prepositional pair', () => {
+    const pair = (relation: 'obj' | 'obl' | 'nsubj', phrase: string) => ({ relation, phrase });
+    assert.equal(
+        checkHintExample([pair('nsubj', 'die Sitzung beginnt'), pair('obj', 'die Sitzung leiten'), pair('obl', 'an der Sitzung teilnehmen')]),
+        'die Sitzung leiten',
+    );
+    assert.equal(checkHintExample([pair('nsubj', 'die Sitzung beginnt'), pair('obl', 'an der Sitzung teilnehmen')]), 'an der Sitzung teilnehmen');
+    assert.equal(checkHintExample([pair('nsubj', 'die Sitzung beginnt')]), null);
 });
 
 test('checkTarget opens the noun page with the check in the URL', () => {

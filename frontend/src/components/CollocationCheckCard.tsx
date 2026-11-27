@@ -1,16 +1,14 @@
-import { useEffect, useState, type FormEvent } from 'react';
-import { useNavigate, useSearchParams } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import type { CheckPhrase, CollocationCheck } from '@collocations/types';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
     checkMatchesPage,
-    checkQueryFor,
     checkTarget,
     partnerKind,
     partnerTyped,
     phraseParts,
+    preloadedCheck,
     unusualReason,
     verdictLabel,
     type PartnerKind,
@@ -23,7 +21,9 @@ import { API_BASE_URL } from '../config.ts';
 // the URL (?pruefen=…), so the back button and shared links work. #74 adds
 // adjective + noun: the same card, with the partner's word class. #75: the
 // field takes a whole phrase, like the search box, so both agree. #76 adds
-// a verb with a prepositional noun ("an einer Sitzung teilnehmen").
+// a verb with a prepositional noun ("an einer Sitzung teilnehmen"). #77:
+// the card has no field of its own any more; the header search box is the
+// one input, and the card shows the verdict or a hint pointing at it.
 
 const PARAM = 'pruefen';
 
@@ -140,25 +140,29 @@ function Verdict({ check }: { check: Parsed }) {
 interface CollocationCheckCardProps {
     word: string;      // the page's word
     lemma: string;     // the lab lemma the page matched
-    showField: boolean; // the noun has object pairs or attributive adjectives to check against
+    showHint: boolean; // the noun has object pairs, prepositional pairs or adjectives to check against
+    hintExample: string | null; // a phrase the hint offers to check (#77)
 }
 
-export function CollocationCheckCard({ word, lemma, showField }: CollocationCheckCardProps) {
-    const [searchParams, setSearchParams] = useSearchParams();
+export function CollocationCheckCard({ word, lemma, showHint, hintExample }: CollocationCheckCardProps) {
+    const [searchParams] = useSearchParams();
     const query = searchParams.get(PARAM);
+    const location = useLocation();
+    // The search box already fetched this check (#77): show it without a second request.
+    const preloaded = preloadedCheck(location.state, query, word, lemma);
     // The last check, tagged with the query and page it was for, so a new
     // query hides the old verdict without resetting state in the effect.
     // A null check is a phrase the server could not parse.
     const key = `${query}\u0000${word}\u0000${lemma}`;
     const [result, setResult] = useState<{ key: string; check: Parsed | null } | null>(null);
     const current = result?.key === key ? result : null;
-    const check = current?.check ?? null;
-    const unparsed = current !== null && current.check === null;
-    const [phrase, setPhrase] = useState('');
+    const check = preloaded ?? current?.check ?? null;
+    const unparsed = !preloaded && current !== null && current.check === null;
     const navigate = useNavigate();
+    const hasPreloaded = preloaded !== null;
 
     useEffect(() => {
-        if (!query) return;
+        if (!query || hasPreloaded) return;
         const controller = new AbortController();
         fetchCheck(API_BASE_URL, query, controller.signal)
             .then((result) => {
@@ -166,65 +170,52 @@ export function CollocationCheckCard({ word, lemma, showField }: CollocationChec
                     setResult({ key, check: null });
                 } else if (checkMatchesPage(result, word, lemma)) {
                     setResult({ key, check: result });
-                    setPhrase(result.phrase);
                 } else {
                     // A phrase about another noun ("eine Entscheidung treffen"
                     // typed on the Regen page) opens that noun's page.
                     const target = checkTarget(result);
-                    if (target) navigate(target, { replace: true });
+                    if (target) navigate(target, { replace: true, state: { check: result } });
                 }
             })
             .catch(() => {
                 // A failed check shows the page without a card, never an error.
             });
         return () => controller.abort();
-    }, [query, word, lemma, key, navigate]);
+    }, [query, word, lemma, key, navigate, hasPreloaded]);
 
-    if (!check && !unparsed && !showField) return null;
-
-    function handleSubmit(e: FormEvent<HTMLFormElement>) {
-        e.preventDefault();
-        const q = checkQueryFor(phrase, word);
-        if (q === null) return;
-        setSearchParams({ [PARAM]: q });
+    if (!check && !unparsed) {
+        if (!showHint) return null;
+        return (
+            <p className="mt-4 mb-3 text-sm text-muted-foreground leading-snug">
+                Passt ein Wort zu <i>{word}</i>? Geben Sie oben die ganze Verbindung ein
+                {hintExample !== null && (
+                    <>
+                        , z.&nbsp;B.{' '}
+                        <Link
+                            to={{ search: `?${PARAM}=${encodeURIComponent(hintExample)}` }}
+                            className="italic underline underline-offset-2 hover:text-foreground">
+                            {hintExample}
+                        </Link>
+                    </>
+                )}
+                .
+            </p>
+        );
     }
 
     return (
         <section className="mt-4 mb-3 rounded-xl border p-3.5" aria-label="Verbindung prüfen">
-            {/* Announced when a check arrives; the field the learner just used sits below it. */}
+            {/* Announced when a check arrives; the learner corrects the phrase in the header field. */}
             <div aria-live="polite">
                 {check && <Verdict check={check} />}
                 {unparsed && (
-                    <p className="text-sm text-muted-foreground mb-3">
+                    <p className="text-sm text-muted-foreground">
                         Das können wir nicht prüfen. Geben Sie ein Nomen mit Verb oder Adjektiv ein, z. B.{' '}
                         <i>Entscheidung treffen</i>, <i>starker Regen</i> oder{' '}
                         <i>an einer Sitzung teilnehmen</i>.
                     </p>
                 )}
             </div>
-            <form
-                onSubmit={handleSubmit}
-                className={cn('flex flex-wrap items-center gap-x-2 gap-y-1.5', (check || unparsed) && 'border-t pt-3')}>
-                <label htmlFor="check-phrase" className="w-full md:w-auto text-sm text-muted-foreground whitespace-nowrap">
-                    Verbindung prüfen
-                </label>
-                <Input
-                    id="check-phrase"
-                    type="text"
-                    value={phrase}
-                    onChange={(e) => setPhrase(e.target.value)}
-                    placeholder="Wort oder Verbindung"
-                    enterKeyHint="go"
-                    autoComplete="off"
-                    autoCapitalize="none"
-                    autoCorrect="off"
-                    spellCheck={false}
-                    className="h-10 md:h-8 min-w-0 flex-1 md:text-base"
-                />
-                <Button type="submit" className="h-10 md:h-8">
-                    Prüfen
-                </Button>
-            </form>
         </section>
     );
 }
