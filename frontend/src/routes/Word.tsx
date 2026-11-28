@@ -10,6 +10,7 @@ import { StatusMessage } from "../components/StatusMessage.tsx";
 import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { hasAnyResults, isThinPage } from "../lib/verbNounGroups.ts";
+import { resultKeys } from "../lib/resultKeys.ts";
 import { legendSections } from "../lib/wordClass.ts";
 import { checkHintExample } from "../lib/collocationCheck.ts";
 
@@ -158,10 +159,10 @@ export function Word() {
             )}
             {/* Decision #60: verbs (or nouns) first - what the user came for. */}
             {state.data.verbNounPairs && (
-                <VerbNounPairs key={state.data.word} data={state.data.verbNounPairs} />
+                <VerbNounPairs key={resultKeys(state.data.word).pairs} data={state.data.verbNounPairs} />
             )}
             <CollocationList
-                key={state.data.word}
+                key={resultKeys(state.data.word).list}
                 word={state.data.word}
                 entries={state.data.collocations}
                 showEmptyMessage={!hasAnyResults(state.data)}
