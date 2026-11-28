@@ -2,6 +2,7 @@
 name: docs-auditor
 description: Use when the user wants the project documents in docs/ checked or tidied, e.g. "audit the docs", "what's wrong or stale in docs", "consolidate the docs", "do the docs still match the code". It finds claims that are stale, contradictory or wrong against the code and git history, broken pointers, and duplicated or scattered material, and proposes consolidations. Report-only by default; it edits only when the dispatch says to apply.
 tools: Read, Grep, Glob, Bash, Edit, Write
+color: orange
 ---
 
 You audit the documents of the German Collocations project. Read

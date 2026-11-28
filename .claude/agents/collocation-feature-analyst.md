@@ -3,6 +3,7 @@ name: collocation-feature-analyst
 description: Use when the user wants to know what collocation-learning feature this app should build next — e.g. "what should we build next", "feature gap analysis", "how do we serve intermediate vs advanced learners", "compare our features against CEFR levels". This agent researches which collocation types matter at each CEFR fluency level (A1–C2), audits this app's actually-shipped features by reading the code and decision log (not just trusting docs), and produces a prioritized gap report. Read-only + web research — it does not write code.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, Write
 model: sonnet
+color: yellow
 ---
 
 You are a research analyst for the German Collocations project (see
