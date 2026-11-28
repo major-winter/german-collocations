@@ -4684,3 +4684,32 @@ with a bare heading.
 
 **Supersedes.** Nothing. No dependency, no font, no data change; about 2 KB
 of markup and 1 KB of CSS.
+
+<a id="89-deploy"></a>
+### Follow-up: deployed to production (2026-11-28)
+
+Merge `61d9ed4` of `main`, carrying #85 (`/api/suggest`), #86 (tinted
+group cards), #87 (jump strip), #88 (suggestions combobox), #89 (word web)
+and the Ankunft work (arrival focus/announce, h1 semantics, accessibility
+fixes). No migration, no data load. Server checkout moved from `840193e` to
+`61d9ed4`; `backend` and `frontend` were built (07:21-07:22 UTC) and
+restarted with `up -d --no-deps`: backend started 07:22:25, image built
+07:21:47; frontend started 07:22:24, image built 07:22:04. The `IMPRESSUM_*`
+variables were present. Before building, the objects `/api/suggest` reads
+were checked read-only on the VM: `lemma_dominant_pos` (87,760 rows),
+`lab_noun_genders` (7,194), `lemma_frequency` (87,760),
+`word_dominant_lemma` (112,316), function `normalize_de`, and the trigram
+indexes `idx_words_normalized_trgm` and `idx_words_folded_trgm` on `words`.
+
+**Checked.** `npm test` (182), typecheck, frontend lint and build,
+`npm run test:db -w backend` (51, against the dev database). Live: `/` and
+`/wort/Frage` 200; `/api/suggest?q=Entsch` 200 with six rows (one per
+lemma) and `Cache-Control: public, max-age=3600` through Caddy;
+`/api/suggest?q=E` 200 `[]`; `/api/suggest` without `q` 400;
+`/api/collocations/Entscheidung` 200 and contains `treffen`;
+`/api/collocations/zzzqqq` 404; `/api/check?q=Sport%20machen` 200; the
+served bundle `index-JZkQEpIa.js` contains `api/suggest` and `combobox`;
+no errors in the backend log. Latency of `/api/suggest` measured on the VM
+through Caddy (1 GB, 1 CPU): 54-81 ms for `Ent`, `Entsch`, `Fra`, `Sport`,
+`Verantw`; the very first request after the restart took 749 ms (cold).
+Smoke traffic: 3 lookups (`Entscheidung` twice, `zzzqqq`), 1 check.
