@@ -1,4 +1,4 @@
-import type { CollocationResponse, CollocationSection } from '@collocations/types';
+import type { CollocationSection } from '@collocations/types';
 
 // Word classes (GLOSSARY.md): the one place that knows their order, German
 // label and colours. Decision #63 sets which colours; decision #66 is why
@@ -26,15 +26,9 @@ export function wordClassStyle(wordClass: CollocationSection): WordClassStyle {
 }
 
 /**
- * The word classes whose colours appear on a word page: those of the
- * collocation list, plus noun and verb whenever there are lab pairs, since
- * every lab phrase colours one of each.
+ * Decision #86: a verb-noun group is coloured by its chips, the partners:
+ * verbs when a noun was searched, nouns when a verb was.
  */
-export function legendSections(response: CollocationResponse): Set<CollocationSection> {
-    const sections = new Set<CollocationSection>(response.collocations.map((entry) => entry.section));
-    if (response.verbNounPairs?.pairs.length) {
-        sections.add('noun');
-        sections.add('verb');
-    }
-    return sections;
+export function partnerSection(side: 'noun' | 'verb'): CollocationSection {
+  return side === 'noun' ? 'verb' : 'noun';
 }

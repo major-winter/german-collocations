@@ -28,14 +28,14 @@ export function Home() {
         <div className="py-6 md:py-10 space-y-6">
             <div className="space-y-2 text-center">
                 <WortNetz />
-                <h2 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h2>
+                <h1 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h1>
                 <p className="text-muted-foreground">
                     Suchen Sie ein Wort, und Sie sehen seine Partner mit Beispielsätzen aus echten Texten.
                     So sieht das aus:
                 </p>
             </div>
             {/* A static sample of the real result, so the page shows what a lookup gives. */}
-            <div className="rounded-2xl border p-4 shadow-xs [&_section]:mb-0 [&_section>div]:py-0">
+            <div className="[&_section]:mb-0">
                 <VerbNounPairs data={HOME_SAMPLE} />
             </div>
             <ul className="flex flex-wrap justify-center gap-2 list-none" aria-label="Zum Beispiel">

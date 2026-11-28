@@ -91,3 +91,9 @@ export function isThinPage(response: CollocationResponse): boolean {
     const n = resultCount(response);
     return n > 0 && n < THIN_PAGE_MAX;
 }
+
+/** The groups of partners a word page shows: verb-noun groups plus word-class sections. */
+export function groupCount(response: CollocationResponse): number {
+    const sections = new Set(response.collocations.map((entry) => entry.section));
+    return groupPairs(response.verbNounPairs?.pairs ?? []).length + sections.size;
+}

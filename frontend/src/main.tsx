@@ -20,7 +20,7 @@ createRoot(container).render(
           <Route path="/wort" element={<Navigate to="/" replace />} />
           <Route path="/impressum" element={<Impressum />} />
           <Route path="/datenschutz" element={<Datenschutz />} />
-          <Route path="/wort/:word" element={<Word key={location.pathname} />} />
+          <Route path="/wort/:word" element={<Word />} />
         </Routes>
       </Layout>
     </BrowserRouter>

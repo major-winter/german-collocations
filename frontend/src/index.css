@@ -23,6 +23,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-field-border: var(--field-border);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -48,6 +49,7 @@
   --color-pos-verb: var(--pos-verb);
   --color-pos-adjective: var(--pos-adjective);
   --color-pos-preposition: var(--pos-preposition);
+  --color-pos-other: var(--pos-other);
 }
 
 :root {
@@ -69,6 +71,8 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.87 0 0); /* B3: was 0.922 (1.26:1), faint on a sunlit phone */
   --input: oklch(0.922 0 0);
+  /* Ankunft: the text field's edge is a UI component, so it needs 3:1 (was --input, 1.26:1). */
+  --field-border: oklch(0.60 0 0);
   /* Darker than shadcn's 0.708 so focus outlines reach 3:1 on white. */
   --ring: oklch(0.45 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
@@ -91,6 +95,14 @@
   --pos-verb: oklch(0.55 0.14 58);
   --pos-adjective: oklch(0.52 0.14 145);
   --pos-preposition: oklch(0.50 0.16 300);
+  --pos-other: oklch(0.50 0 0);
+  /* Decision #86: the tint behind a word-class group. Lightness 0.965 and
+     chroma 0.017 keep every pos colour above 4.5:1 on its own tint. */
+  --tint-noun: oklch(0.965 0.017 250);
+  --tint-verb: oklch(0.965 0.017 65);
+  --tint-adjective: oklch(0.965 0.017 145);
+  --tint-preposition: oklch(0.965 0.017 300);
+  --tint-other: oklch(0.965 0 0);
 }
 
 .dark {
@@ -111,6 +123,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 16%); /* B3: was 10% */
   --input: oklch(1 0 0 / 15%);
+  --field-border: oklch(0.55 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
@@ -129,6 +142,12 @@
   --pos-verb: oklch(0.80 0.15 65);
   --pos-adjective: oklch(0.80 0.15 145);
   --pos-preposition: oklch(0.78 0.16 300);
+  --pos-other: oklch(0.75 0 0);
+  --tint-noun: oklch(0.255 0.03 250);
+  --tint-verb: oklch(0.255 0.03 65);
+  --tint-adjective: oklch(0.255 0.03 145);
+  --tint-preposition: oklch(0.255 0.03 300);
+  --tint-other: oklch(0.255 0 0);
 }
 
 @layer base {
@@ -145,6 +164,91 @@
     outline-offset: 2px;
   }
 }
+
+/* Decision #86: a word-class group is a tinted card with a coloured spine,
+   a tracked heading in the class colour, and chips on the page ground. The
+   open chip takes the class colour; the reading panel sits on a plate of
+   the page ground, so sentences keep their AA contrast. */
+.pos-card {
+  --pos-c: var(--foreground);
+  --pos-tint: var(--secondary);
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: var(--pos-tint);
+  padding: 1rem 1rem 0.625rem 1.25rem;
+}
+.pos-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--pos-c);
+}
+.pos-card[data-pos='noun'] { --pos-c: var(--pos-noun); --pos-tint: var(--tint-noun); }
+.pos-card[data-pos='verb'] { --pos-c: var(--pos-verb); --pos-tint: var(--tint-verb); }
+.pos-card[data-pos='adjective'] { --pos-c: var(--pos-adjective); --pos-tint: var(--tint-adjective); }
+.pos-card[data-pos='preposition'] { --pos-c: var(--pos-preposition); --pos-tint: var(--tint-preposition); }
+.pos-card[data-pos='other'] { --pos-c: var(--pos-other); --pos-tint: var(--tint-other); }
+.pos-card-heading {
+  width: fit-content;
+  margin-bottom: 0.625rem;
+  color: var(--pos-c);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.pos-card button[aria-pressed='false'] {
+  border-color: color-mix(in oklch, var(--pos-c) 28%, var(--border));
+}
+
+/* The sticky header (69 px) plus 11 px: a jump or a focus on a card leaves
+   its top edge clear of the header. */
+.pos-card { scroll-margin-top: 5rem; }
+
+/* Sprungleiste: one row of pills that scrolls sideways; a fade at the right
+   edge shows while more pills wait off screen. The pill is tinted and dotted
+   in its group's class colour, like the card it points to. */
+.jump-strip {
+  scrollbar-width: none;
+}
+.jump-strip::-webkit-scrollbar { display: none; }
+.jump-strip[data-more-right] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.jump-pill {
+  --pos-c: var(--foreground);
+  --pos-tint: var(--secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--pos-c) 30%, var(--background));
+  background: var(--pos-tint);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.jump-pill[data-pos='noun'] { --pos-c: var(--pos-noun); --pos-tint: var(--tint-noun); }
+.jump-pill[data-pos='verb'] { --pos-c: var(--pos-verb); --pos-tint: var(--tint-verb); }
+.jump-pill[data-pos='adjective'] { --pos-c: var(--pos-adjective); --pos-tint: var(--tint-adjective); }
+.jump-pill[data-pos='preposition'] { --pos-c: var(--pos-preposition); --pos-tint: var(--tint-preposition); }
+.jump-pill[data-pos='other'] { --pos-c: var(--pos-other); --pos-tint: var(--tint-other); }
+.jump-pill-dot {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 999px;
+  background: var(--pos-c);
+}
+.jump-pill-count {
+  color: var(--pos-other); /* muted-foreground is 4.26:1 on the tints; this is 5.4:1 */
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.jump-pill:hover { border-color: var(--pos-c); }
 
 /* Decision #82 (B5 of the 2026-11-27 UI review): two type roles.
    Serif = German language content; sans = interface. A heading is never

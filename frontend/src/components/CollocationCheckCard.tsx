@@ -117,14 +117,14 @@ function Verdict({ check }: { check: Parsed }) {
                 )}
             </p>
             {check.suggestions.length > 0 && (
-                <ul className="font-serif text-lg list-none p-0 mb-3 space-y-1.5">
+                <ul className="font-serif text-lg list-none p-0 mb-3">
                     {check.suggestions.map((s) => (
                         <li key={s.phrase}>
                             <span className="text-muted-foreground">→ </span>
                             {/* B3: a suggestion runs its own check, like every other partner is tappable. */}
                             <Link
                                 to={{ search: checkSearch(s.phrase) }}
-                                className="underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground">
+                                className="inline-block py-2 underline decoration-muted-foreground/40 underline-offset-4 hover:decoration-foreground">
                                 <Phrase phrase={s} partner={partner} />
                             </Link>
                         </li>

@@ -28,8 +28,9 @@ export function PartnerChips({ chips, openIndex, onOpen, children }: PartnerChip
                         aria-pressed={openIndex === chipIndex}
                         onClick={() => onOpen(chipIndex)}
                         className={cn(
-                            'group/chip inline-flex min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm transition-colors hover:bg-accent/50',
-                            openIndex === chipIndex && 'border-foreground bg-foreground text-background hover:bg-foreground',
+                            'group/chip inline-flex bg-background min-h-11 md:min-h-8 items-center rounded-full border px-4 md:px-3 py-1 text-sm transition-colors hover:bg-accent/50',
+                            // --pos-c is set by a word-class card (index.css); outside one the open chip stays foreground ink.
+                            openIndex === chipIndex && 'border-[color:var(--pos-c,var(--foreground))] bg-[var(--pos-c,var(--foreground))] text-background hover:bg-[var(--pos-c,var(--foreground))]',
                         )}
                     >
                         {/* One inline wrapper: as direct flex items the parts would lose their spaces ("dieEntscheidung"). */}

@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #86), and add it to the index.
+(next: #90), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -61,7 +61,11 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
 - [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
 - [#84](#84) Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
-- [#85](#85) Word web: the home page draws its name (Rolle and its partners in word-class colours); the not-found page shows a dashed thread to a "?"
+- [#85](#85) `/api/suggest`: lemma suggestions with word class and article, cacheable
+- [#86](#86) Colour fields: each word-class group is a tinted card with a coloured spine; the open chip takes the class colour (supersedes #63's quiet colour)
+- [#87](#87) Jump strip: the colour legend becomes a row of jump pills, one per group (supersedes #63's legend)
+- [#88](#88) Suggestions as you type: the header field is a combobox over `/api/suggest` (supersedes #77's plain field)
+- [#89](#89) Word web: the home page draws its name (Rolle and its partners in word-class colours); the not-found page shows a dashed thread to a "?"
 
 ---
 
@@ -4396,10 +4400,268 @@ restarted with `up -d --no-deps` (container started 03:46:52, image built
 (backend not restarted). The rendered panel was not inspected in a browser.
 Smoke traffic: 3 lookups (`Entscheidung` twice, `zzzqqq`), 1 check.
 
-## 85. Word web: a drawn "Wortnetz" on the home page, a dashed thread when nothing is found
+### Follow-up: deployed to production (2026-11-28)
 
-**Date.** 2026-11-28. Branch `frontend-feature-word-web`. Proposal "Netz"
-(#3) of the 2026-11-28 attractiveness round; the user approved it.
+Merge `840193e` of `frontend-bug-duplicate-keys` (distinct React keys for
+the word page's two result blocks, no decision of its own) and
+`tooling-feature-ui-implementer-agent` (`.claude/agents/*` only). Only
+`frontend/` changes behaviour: no backend change, no migration, no data
+load. Server checkout moved from `79d1c46` to `840193e`; only `frontend`
+was built (04:26 UTC) and restarted with `up -d --no-deps` (container
+started 04:26:28, image built 04:26:26). The `IMPRESSUM_*` variables were
+present.
+
+**Checked.** `npm test` (152), typecheck, frontend lint and build. Live: `/`
+200 and `/wort/Frage` 200; `/api/collocations/Entscheidung` 200 and
+contains `treffen`; `/api/collocations/zzzqqq` 404;
+`/api/check?q=Sport%20machen` 200; the served JS bundle contains the new
+key suffix `:pairs`; the backend log of the last 5 minutes has no errors
+(backend not restarted). Smoke traffic: 2 lookups (`Entscheidung`,
+`zzzqqq`), 1 check; `/wort/Frage` is the SPA shell, no API call.
+
+## 86. Colour fields: word-class groups are tinted cards (supersedes #63's quiet colour)
+
+**Date.** 2026-11-28. Branch `frontend-feature-colour-fields`. Proposal
+"Farbfelder" (#5) of the 2026-11-28 attractiveness round; the user approved it.
+(Numbered #86 while the word web was still called #85; the word web is now
+#89.)
+
+**Problem.** #63 kept colour out of the page chrome: group headings were
+grey, chips neutral, colour only on the two words of a pair. The word page
+read as one white sheet; the four word classes the legend names could not be
+scanned before reading.
+
+**Decision.**
+- A group (every partner group on a word page, and the home sample) is a
+  `.pos-card`: a tinted surface, a 5 px spine in the class colour, and a
+  heading in the class colour (13 px bold, slightly tracked). The heading is
+  not set in capitals: capitals would erase the noun capitalisation the
+  learner reads (*Frage + Verb*, *Substantiv + treffen*).
+- The class of a card is the class of its chips: verbs when a noun was
+  searched, nouns when a verb was (`partnerSection` in `lib/wordClass.ts`);
+  a plain partner group takes its own section.
+- Chips stay on the page ground, with a border mixed from the class colour;
+  the open chip is filled with the class colour (`--pos-c`), text in the page
+  ground. Outside a card (`--pos-c` unset) it stays foreground ink. The dimmed
+  article on an open chip is gone: 70 % ink on the class colour was 3.3:1.
+- The reading panel (#84) keeps its noun-blue bar and gets a plate of the
+  page ground (`bg-background`), so sentences read on white or near-black, not
+  on the tint.
+- Tokens in `index.css`: `--tint-{noun,verb,adjective,preposition,other}` and
+  `--pos-other`, light and dark. Tint = L 0.965 / C 0.017 (light), L 0.255 /
+  C 0.03 (dark), at the class hue.
+
+**Contrast (WCAG 2.1, computed from the tokens).** Class colour on its tint
+(heading text, spine): light noun 5.37, verb 4.57, adjective 4.71,
+preposition 5.82, other 5.42; dark 8.19, 8.22, 8.82, 7.38, 7.09. Sentence
+words on the plate: light 5.07 to 6.46, dark 9.19 to 11.17. Open chip
+(page-ground text on the class colour): light 5.07 to 6.46, dark 9.19 to
+11.17. *Verben* in light mode is the closest to the limit (4.57); `--pos-other`
+exists because `--muted-foreground` on the grey tint was 4.28.
+
+**Supersedes.** #63's neutral group headings and neutral open chip. #63's other
+rules stand: colour on the words of a pair, AA word colours. The home sample
+loses its own border (the card is the sample).
+
+**Cost.** No dependency, no font; CSS about +1.5 kB. Pages grow 10 to 18 %
+at 360 px (*Frage* 2,099 to 2,353 px), from card padding.
+
+## 87. Jump strip: the colour legend becomes navigation (supersedes #63's legend)
+
+**Date.** 2026-11-28. Branch `frontend-feature-jump-strip`, cut from
+`frontend-feature-arrival` with `frontend-feature-colour-fields` (#86)
+merged in. Proposal "Sprungleiste" (#2) of the 2026-11-28 site-wide round;
+the user approved it.
+
+**Problem.** #63's legend (a dot and a name per word class) told the learner
+which colour meant what. Since #86 every group card names and colours
+itself, so the legend explained what the page already shows, used 52 px at
+the top, and did nothing. *Frage* at 360 px is 2,365 px tall, six cards; a
+learner who wants the adjectives scrolled 3.7 screens for them.
+
+**Decision.**
+- `PosLegend` is replaced by `JumpStrip`: one `nav` ("Springen zu") with one
+  pill per group card the page renders, built from the response by
+  `jumpGroups` in `lib/jumpGroups.ts` (verb-noun groups first, then word-class
+  sections, so noun and verb pages order themselves). A pill is a dot, a short
+  name (*Verben*, *mit Präposition*, *als Subjekt*, *Adjektive*, ...) and the
+  group's chip count, tinted and dotted in the card's class colour. The
+  colour key survives where #86 put it: on the card.
+- One row, scrolling sideways, 44 px high; a fade at the right edge shows
+  only while pills wait off screen. A wrapped strip was tried and rejected:
+  three rows, first chip pushed down by about 120 px. Hidden when the page
+  has fewer than two groups.
+- Pills are `button`s, not hash links: the router owns the URL. A click
+  calls `scrollIntoView` (smooth only without `prefers-reduced-motion`) and
+  focuses the group's heading (`tabindex="-1"`), so a screen reader reads
+  where it landed and Tab continues into the group's chips. Cards carry
+  `scroll-margin-top: 5rem` for the sticky header.
+- `legendSections` and its tests are removed with the component.
+
+**Alternatives.** A wrapped strip (above). A sticky strip: it would cost
+44 px of every screen at 360 px; not proposed. Hash anchors (`#group-obj`):
+the router would treat them as navigation.
+
+**Cost.** No dependency, no font, no request; CSS about +1 kB.
+
+**Checked.** Measured in headless Chrome at 360 and 1280 px, both themes:
+no horizontal overflow; first chip at y 297 on `/wort/Frage` at 360 px (289
+before); pill text 15 to 18:1, count 5.4:1 light and 7:1 dark (the muted grey
+of the mockup was 4.26:1 on the tint, so the count uses `--pos-other`);
+a jump leaves the card 80 px from the top, 11 px under the header.
+
+---
+
+<a id="85"></a>
+## 85. `/api/suggest`: lemma suggestions with word class and article, cacheable
+
+**Date.** 2026-11-28. Branch `backend-feature-search-suggestions`; design
+`docs/superpowers/specs/2026-11-28-search-suggestions-design.md`. Backend
+half of change #3 "Vorschläge" (as-you-type suggestions in the header
+field); the combobox is a separate frontend branch.
+
+**Problem.** `/api/search` returns fuzzy surface words: for "Entsch" five
+of six rows were forms of *entscheiden*, with no word class and no
+article. Suggestions must show lemmas (chips show lemmas, #45), once each.
+
+**Decision.** A new endpoint, `GET /api/suggest?q=<prefix>`; `/api/search`
+is untouched (its one consumer, the not-found page in `Word.tsx`, wants
+surface words and scores). Response, at most 6, best first:
+`[{ "lemma": "Entscheidung", "wordClass": "noun", "article": "die" }]`;
+`wordClass` is `noun | verb | adjective | adverb | name | other`, `article`
+is `der | die | das | null`. A prefix under 2 characters returns `[]`; a
+missing `q` is a 400. 200 responses carry `Cache-Control: public,
+max-age=3600` (corpus changes only with a reload, #37).
+
+**Data (no migration).** Word class: `lemma_dominant_pos.pos`, with #79's
+rule (ADJ+ADV share) so an uninflected adjective tagged ADV is an
+adjective; PROPN is `name`. Article: `lab_noun_genders` only (7,194
+nouns, #69), `null` for every other noun, never guessed. Lemmas without a
+`lemma_dominant_pos` row, or whose text is not a `words.word`, are not
+suggested (the word page could not open them). Lemmas with a lowercase
+letter directly before a capital ("wichtigDie", tagger glue) are dropped.
+
+**Query.** The 300 most frequent words matching `word_normalized LIKE
+prefix%` (the trigram GIN serves it; the btree does not, collation
+en_US), mapped to dominant lemmas. Ranking: lemma itself starts with the
+prefix, then lemmas reached by an inflected form only; names last;
+`lemma_frequency` descending. LIKE wildcards in the input are escaped.
+Rejected: grouping all matching words by lemma (260-410 ms for "ve",
+"ge", "a": parallel seq scans of `word_dominant_lemma`/`lemma_frequency`).
+
+**Timing (EXPLAIN ANALYZE, dev database).** first draft: "entsch" 15 ms, "fra" 11,
+"treff" 5, "de" 20, "ge" 38, "ve" 47; final, through the
+adapter, over 24 prefixes, 4-54 ms against 11-110 ms for `/api/search`
+on the same prefixes. HTTP with the Express app: 14-23 ms.
+
+**Spot-check (24 prefixes, before = `/api/search` first 6 words, after =
+`/api/suggest`).**
+- Entsch: *entschied, entschieden, entscheiden, entscheidet, Entscheid,
+  ...* -> *die Entscheidung, entscheiden, entscheidend, entschlossen,
+  entschuldigen, der Entscheid*.
+- Fra: *Frau, Frage, Frauen, Fragen, Frank, fragt* -> *die Frau, die
+  Frage, fragen, der Franken, französisch, die Fraktion* (names gone from
+  the top).
+- treff: *Treffen, Treffer, Treff, treffe, ...* -> *treffen [verb], das
+  Treffen, der Treffer, der Treffpunkt, treffend, Treff*.
+- Kri: *der Krieg, die Kritik, kritisieren, kritisch, die Krise, der
+  Kritiker*; Rol: *die Rolle, rollen, Rollstuhl, der Roller, ...*; wicht:
+  *wichtig, das Wichtigste, die Wichtigkeit, Wichtig, wichtigere,
+  wichtiger*; Ver/ve: *vergangen, verlieren, verletzen, versuchen, der
+  Verein, verschieden* (before: *Verein, Vertreter, verlor, verletzt...*).
+- Fraue: *Frauenfußball, Frauen-EM, ... der Frauenanteil*; Größe via
+  "Grö": *die Größe, größtenteils, größer, ...*; "gross": *groß, gross,
+  der Großteil, ...*; Ärz: *die Ärztin, ärztlich, ...* (umlaut and case
+  fold through `normalize_de`).
+- Also checked: Sport, mach, Ents, aufm, Hau, Aufg, zusa, bez, schr, de,
+  ge, Entscheidung. After the #79 rule *gemeinsam*, *genau*, *machbar* are
+  adjectives (first draft: adverbs).
+
+**Known noise.** Tagger errors in the lemma data still show: *wichtigere
+[noun]*, *Wichtig [noun]*, *aufgrund [other]*; some nouns have no article
+because the lab has no gender for them (*Rollstuhl*, *Machthaber*).
+Proper names are demoted, not removed. Not fixed here: both are data
+quality, not query.
+
+**Consumers checked.** `grep` of `frontend/src` and `backend/src` for
+`api/search`, `fetchSearch`, `SearchWords`, `WordIndex`, `WordSuggestion`:
+only `frontend/src/api/search.ts` -> `routes/Word.tsx` (not-found
+suggestions) use `/api/search`; check (`/api/check`) does not call it.
+
+**Checked.** `npm test` (159), `npm run typecheck`, `npm run test:db -w
+backend` (51, 10 new, against `collocations_test`), live `curl -i` of the
+Express app on the dev database (header, 400, `[]` for one letter).
+
+**For the frontend.** Type `LemmaSuggestion` in `@collocations/types`.
+Open `/wort/<lemma>`. Print the article muted before the lemma.
+
+<a id="88"></a>
+## 88. Suggestions as you type: the header field is a combobox over `/api/suggest` (supersedes #77's plain field)
+
+**Date.** 2026-11-28. Branch `frontend-feature-suggest-as-you-type`, cut
+from `frontend-feature-jump-strip` with `main` merged in (the backend half,
+#85). Proposal "Vorschläge" (#3) of the 2026-11-28 site-wide round; the
+user approved it. #77 kept the one field a plain input; it stays one field,
+and stays plain for anyone who just presses Enter.
+
+**Problem.** A misspelt or inflected word costs a full not-found page.
+Typing *Entsch* and tapping a row saves a navigation, a failed lookup and a
+"Meinten Sie". #85 returns up to six lemmas, deduplicated, with word class
+and article, so the list can be short and honest.
+
+**Decision.**
+- `SearchBox` is an ARIA combobox (list autocomplete): `role="combobox"`,
+  `aria-expanded`, `aria-controls` (only while the list exists),
+  `aria-activedescendant`; a `listbox` of `option` rows; a polite
+  `role="status"` says "6 Vorschläge. Mit den Pfeiltasten wählen." or "Keine
+  Vorschläge". Arrow Down/Up walk the rows and pass through "none" at both
+  ends; Enter on an active row opens `/wort/<lemma>`; Enter with no active
+  row submits the typed text exactly as before (phrases go to the check,
+  #70/#77); Escape closes; Tab and blur close.
+- **No row is active by default** (the mockup preselected the first). A
+  preselected row would turn Enter on a typo into the first suggestion.
+- A row is: the article muted (only when the server has one, never guessed),
+  the lemma with the typed prefix in bold, and on the right a dot and the
+  singular class name (*Substantiv*, *Verb*, *Adjektiv*, *Adverb*, *Name*).
+  Dots come from `wordClassStyle`; adverbs, names and others have none. The
+  label means colour is never the only signal. Article and label use
+  `--pos-other` (muted grey is 4.35:1 on the active row's tint).
+- The list is 48 px rows, full width of the header on phones (12 px margins),
+  the width of the field from `sm` up, and capped to what `visualViewport`
+  leaves above an on-screen keyboard (it scrolls inside; the phrase hint
+  below the rows stays). The active row has a 2 px ring as well as a tint.
+- **Hand-rolled, not base-ui's `Combobox`/`Autocomplete`** (both exist in
+  `@base-ui/react` 1.7.0). They are built for choosing a value; this field
+  must keep free text and a form submit as the default, and a full-width
+  phone popup, a visualViewport cap and "no row active" would each need
+  overriding. About 90 lines of component plus a tested `lib/suggest.ts`
+  cost 1.4 kB gzip; no dependency.
+- The network is quiet: no request under two characters or for a phrase
+  (two or more words); 140 ms debounce; the previous request is aborted by
+  the next key and its late answer dropped; the browser caches the answer
+  for an hour (#85). Any failure, including a server error, shows no list
+  and says nothing: the field works as it did.
+- No list on arrival or after navigation: only typing opens it.
+- Not-found and `/api/search` are unchanged; this completes words, it does
+  not repair typos.
+
+**Cost.** JS 302.94 kB to 307.06 kB (gzip 97.69 to 99.06), CSS +0.26 kB gzip;
+`--color-pos-other` added to the Tailwind theme. One request of about 400 B
+per pause in typing, to our own API only (#72).
+
+**Checked.** Headless Chrome at 360 and 1280 px, light and dark: no
+horizontal overflow, rows 48 px, text 4.74:1 to 19.8:1 light and 6.9:1 to
+17.2:1 dark, label and article 5.5:1 light / 6.8:1 dark on the active row,
+active ring 6.8:1 and 5.9:1. Keyboard flow driven with real key events
+(Down + Enter, Enter without a row, phrase Enter, Escape, Tab, click, Enter
+during the debounce). Not verified: a real screen reader, a real phone
+keyboard.
+
+<a id="89"></a>
+## 89. Word web: a drawn "Wortnetz" on the home page, a dashed thread when nothing is found
+
+**Date.** 2026-11-28. Branch `frontend-feature-word-web` (numbered #85 on the
+branch, renumbered when `main` took #85-#88). Proposal "Netz" (#3) of the 2026-11-28 attractiveness round; the user approved it.
 
 **Problem.** The app is called Wortnetz, but nothing on the page showed a
 web of words. The home page opened with a heading, and the not-found page
