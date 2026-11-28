@@ -4394,3 +4394,22 @@ restarted with `up -d --no-deps` (container started 03:46:52, image built
 `type-reading-phrase`; the backend log of the last 5 minutes has no errors
 (backend not restarted). The rendered panel was not inspected in a browser.
 Smoke traffic: 3 lookups (`Entscheidung` twice, `zzzqqq`), 1 check.
+
+### Follow-up: deployed to production (2026-11-28)
+
+Merge `840193e` of `frontend-bug-duplicate-keys` (distinct React keys for
+the word page's two result blocks, no decision of its own) and
+`tooling-feature-ui-implementer-agent` (`.claude/agents/*` only). Only
+`frontend/` changes behaviour: no backend change, no migration, no data
+load. Server checkout moved from `79d1c46` to `840193e`; only `frontend`
+was built (04:26 UTC) and restarted with `up -d --no-deps` (container
+started 04:26:28, image built 04:26:26). The `IMPRESSUM_*` variables were
+present.
+
+**Checked.** `npm test` (152), typecheck, frontend lint and build. Live: `/`
+200 and `/wort/Frage` 200; `/api/collocations/Entscheidung` 200 and
+contains `treffen`; `/api/collocations/zzzqqq` 404;
+`/api/check?q=Sport%20machen` 200; the served JS bundle contains the new
+key suffix `:pairs`; the backend log of the last 5 minutes has no errors
+(backend not restarted). Smoke traffic: 2 lookups (`Entscheidung`,
+`zzzqqq`), 1 check; `/wort/Frage` is the SPA shell, no API call.
