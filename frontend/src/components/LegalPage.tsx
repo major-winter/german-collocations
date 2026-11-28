@@ -10,7 +10,7 @@ export function LegalPage({ title, children }: { title: string; children: ReactN
 
     return (
         <article className="py-8 space-y-5 text-sm leading-relaxed [&_h3]:font-serif [&_h3]:text-lg [&_h3]:font-semibold [&_h3]:mt-6 [&_h3]:mb-1.5 [&_a]:underline">
-            <h2 className="font-serif text-3xl font-semibold">{title}</h2>
+            <h1 className="font-serif text-3xl font-semibold">{title}</h1>
             {OPERATOR.placeholder && (
                 <p className="rounded-md border border-dashed px-3 py-2 text-muted-foreground">
                     Entwicklungsansicht: Die Angaben in eckigen Klammern werden beim Produktions-Build aus

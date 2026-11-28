@@ -13,9 +13,10 @@ function Logomark() {
             <span className="flex items-center justify-center w-7 h-7 rounded-md bg-foreground text-background text-xs font-semibold">
                 WN
             </span>
-            <h1 className="sr-only sm:not-sr-only font-serif text-xl font-semibold text-foreground">
+            {/* A plain name, not a heading: the page's h1 is its own title (Ankunft). */}
+            <span className="sr-only sm:not-sr-only font-serif text-xl font-semibold text-foreground">
                 Wortnetz
-            </h1>
+            </span>
         </Link>
     );
 }
@@ -49,9 +50,9 @@ export function Layout({ children }: LayoutProps) {
                     Daten: Leipzig Corpora Collection · sortiert nach Kollokationsstärke
                 </p>
                 <p className="text-xs text-muted-foreground">
-                    <Link to="/impressum" className="inline-block py-2 px-1.5 hover:underline">Impressum</Link>
+                    <Link to="/impressum" className="inline-block py-3.5 px-1.5 hover:underline">Impressum</Link>
                     {' · '}
-                    <Link to="/datenschutz" className="inline-block py-2 px-1.5 hover:underline">Datenschutz</Link>
+                    <Link to="/datenschutz" className="inline-block py-3.5 px-1.5 hover:underline">Datenschutz</Link>
                 </p>
             </footer>
         </div>

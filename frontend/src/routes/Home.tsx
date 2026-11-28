@@ -26,7 +26,7 @@ export function Home() {
     return (
         <div className="py-10 space-y-6">
             <div className="space-y-2 text-center">
-                <h2 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h2>
+                <h1 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h1>
                 <p className="text-muted-foreground">
                     Suchen Sie ein Wort, und Sie sehen seine Partner mit Beispielsätzen aus echten Texten.
                     So sieht das aus:

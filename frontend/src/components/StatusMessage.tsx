@@ -8,16 +8,22 @@ import { cn } from '@/lib/utils';
 
 interface StatusMessageProps {
     title?: ReactNode;
+    titleId?: string;
     children?: ReactNode;
     action?: ReactNode;
     role?: 'status' | 'alert';
     className?: string;
 }
 
-export function StatusMessage({ title, children, action, role, className }: StatusMessageProps) {
+export function StatusMessage({ title, titleId, children, action, role, className }: StatusMessageProps) {
     return (
         <div role={role} className={cn('mt-8 space-y-3', className)}>
-            {title && <h2 className="text-lg font-semibold break-words">{title}</h2>}
+            {/* The page's h1 when a lookup has nothing else to show; Word moves focus here (Ankunft). */}
+            {title && (
+                <h1 id={titleId} tabIndex={titleId ? -1 : undefined} className="text-lg font-semibold break-words outline-none">
+                    {title}
+                </h1>
+            )}
             {children && <div className="text-sm text-muted-foreground leading-snug">{children}</div>}
             {action}
         </div>
