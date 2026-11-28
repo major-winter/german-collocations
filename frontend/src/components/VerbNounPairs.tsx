@@ -5,6 +5,7 @@ import { highlightCollocates } from '@/lib/highlight.tsx';
 import { groupPairs, headingParts, initialOpen, openAfterClick } from '@/lib/verbNounGroups.ts';
 import { wordClassStyle } from '@/lib/wordClass.ts';
 import { PartnerChips } from './PartnerChips.tsx';
+import { ReadingPanel } from './ReadingPanel.tsx';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
 
 interface VerbNounPairsProps {
@@ -42,22 +43,22 @@ function OpenPair({ pair, side, lemma, colors }: {
     const partnerWord = side === 'noun' ? lastWord(pair.partner) : pair.phraseNoun;
 
     return (
-        <div className="rounded-lg py-1.5 space-y-1">
-            <p className="type-phrase">
+        <ReadingPanel>
+            <p className="type-reading-phrase">
                 {highlightCollocates(pair.phrase, searchedWord, partnerWord, colors.partner, colors.searched)}
             </p>
             {pair.examples.map((example, exampleIndex) => (
-                <p key={exampleIndex} className="text-base text-muted-foreground italic border-l-2 pl-3">
+                <p key={exampleIndex} className="type-example">
                     {highlightCollocates(
                         example.sentence,
                         example.searchWord,
                         example.collocateWord,
-                        colors.partner,
+                        cn(colors.partner, 'font-semibold'),
                         colors.searched,
                     )}
                 </p>
             ))}
-        </div>
+        </ReadingPanel>
     );
 }
 

@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #84), and add it to the index.
+(next: #85), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -60,6 +60,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#81](#81) The check's verdict is a label, its suggestions are links, chip borders are stronger (B3 of the 2026-11-27 UI review)
 - [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
 - [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
+- [#84](#84) Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
 
 ---
 
@@ -4335,3 +4336,43 @@ checkout moved from `b8b6ad3` to `857bc5b`; only `frontend` was built
 bundle contains "Noch keine Beispielsätze"; the served CSS still contains
 `type-heading`; the backend log of the last 5 minutes has no errors.
 Smoke traffic: 1 lookup (`Entscheidung`), no checks.
+
+---
+
+<a id="84"></a>
+## 84. Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
+
+**Date.** 2026-11-28. Branch `frontend-feature-reading-panel`. Variant B of
+the "Lesepanel" prototype in the 2026-11-28 UI audit; the user approved it.
+
+**Problem.** #63 set example sentences quiet: grey, italic, a 2 px grey
+rule. That was right for a page full of open sentences, but since #60/#83
+only one chip per group is open, and that open chip is the point of the
+page. Grey italic made the sentence the hardest thing to read on the
+screen, and italic serif Latin text with bold words in it is the worst
+case for a learner reading German.
+
+**Decision.** The open chip's content is a *reading panel*
+(`components/ReadingPanel.tsx`):
+- A 4 px `border-pos-noun` bar on the left, around the phrase and all its
+  sentences (not one rule per sentence).
+- The phrase is `type-reading-phrase` (serif `2xl`); each sentence is
+  `type-example` (serif `lg`, `leading-relaxed`, `text-foreground`,
+  upright). Both are utilities in `index.css`, in #82's serif role.
+- The partner word in a sentence is semibold as well as coloured, like the
+  searched word, so the pair stays findable at the larger size.
+- The bar is noun blue on every page, also on a verb page, so it reads as
+  "the open entry" and not as a word class. Contrast: light 5.9:1 on white,
+  dark 10.3:1 on the dark ground (WCAG 1.4.11 needs 3:1).
+
+**Supersedes.** #63's "grey italic" for example sentences only. #63's
+other rules stand: neutral chips, colour only on the two words of the
+pair, AA word colours, grey group headings.
+
+**Cost.** An open pair is taller: *Fragen beantworten* at 360 px grew the
+page from 2,032 to 2,099 px. No font change, no new dependency; CSS 37.9 kB
+(7.3 kB gzip).
+
+**Checked.** `npm test` (148), typecheck, frontend lint and build. Headless
+Chrome at 360 and 1280 px, light and dark: *Frage*, *treffen*, and an
+opened adjective chip (*wichtig*); no sideways scroll.

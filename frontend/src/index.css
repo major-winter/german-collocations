@@ -152,6 +152,14 @@
 @utility type-phrase {
   @apply font-serif text-xl;
 }
+/* Decision #84: the reading panel. A sentence is upright serif ink (#82's
+   serif role); the open phrase above it is a size larger than a lemma. */
+@utility type-reading-phrase {
+  @apply font-serif text-2xl leading-tight;
+}
+@utility type-example {
+  @apply font-serif text-lg leading-relaxed text-foreground;
+}
 @utility type-lemma {
   @apply font-serif text-lg;
 }

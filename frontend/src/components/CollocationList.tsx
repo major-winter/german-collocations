@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { PartnerChips } from './PartnerChips.tsx';
+import { ReadingPanel } from './ReadingPanel.tsx';
 import { initialOpenGroups, openGroupChip } from '@/lib/partnerChips.ts';
 import { StatusMessage } from './StatusMessage.tsx';
 import { highlightCollocates } from '@/lib/highlight.tsx';
@@ -20,22 +21,22 @@ function OpenEntry({ word, entry, section }: { word: string; entry: CollocationE
     if (entry.examples.length === 0) {
         // No example sentence: the bare pair, so the chip still opens to something.
         return (
-            <div className="py-1.5 space-y-1">
-                <p className="type-phrase">
+            <ReadingPanel>
+                <p className="type-reading-phrase">
                     <span className="font-semibold">{word}</span> <span className={partnerColor}>{entry.word}</span>
                 </p>
                 <p className="text-sm text-muted-foreground">Noch keine Beispielsätze.</p>
-            </div>
+            </ReadingPanel>
         );
     }
     return (
-        <div className="py-1.5 space-y-1">
+        <ReadingPanel>
             {entry.examples.map((example, i) => (
-                <p key={i} className="text-base text-muted-foreground italic border-l-2 pl-3">
-                    {highlightCollocates(example.sentence, example.searchWord, example.collocateWord, partnerColor)}
+                <p key={i} className="type-example">
+                    {highlightCollocates(example.sentence, example.searchWord, example.collocateWord, `${partnerColor} font-semibold`)}
                 </p>
             ))}
-        </div>
+        </ReadingPanel>
     );
 }
 
