@@ -23,6 +23,7 @@
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
+  --color-field-border: var(--field-border);
   --color-ring: var(--ring);
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
@@ -69,6 +70,8 @@
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.87 0 0); /* B3: was 0.922 (1.26:1), faint on a sunlit phone */
   --input: oklch(0.922 0 0);
+  /* Ankunft: the text field's edge is a UI component, so it needs 3:1 (was --input, 1.26:1). */
+  --field-border: oklch(0.60 0 0);
   /* Darker than shadcn's 0.708 so focus outlines reach 3:1 on white. */
   --ring: oklch(0.45 0 0);
   --chart-1: oklch(0.646 0.222 41.116);
@@ -111,6 +114,7 @@
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 16%); /* B3: was 10% */
   --input: oklch(1 0 0 / 15%);
+  --field-border: oklch(0.55 0 0);
   --ring: oklch(0.708 0 0);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
