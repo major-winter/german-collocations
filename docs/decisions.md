@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #85), and add it to the index.
+(next: #86), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -61,6 +61,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
 - [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
 - [#84](#84) Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
+- [#85](#85) Word web: the home page draws its name (Rolle and its partners in word-class colours); the not-found page shows a dashed thread to a "?"
 
 ---
 
@@ -4394,3 +4395,30 @@ restarted with `up -d --no-deps` (container started 03:46:52, image built
 `type-reading-phrase`; the backend log of the last 5 minutes has no errors
 (backend not restarted). The rendered panel was not inspected in a browser.
 Smoke traffic: 3 lookups (`Entscheidung` twice, `zzzqqq`), 1 check.
+
+## 85. Word web: a drawn "Wortnetz" on the home page, a dashed thread when nothing is found
+
+**Date.** 2026-11-28. Branch `frontend-feature-word-web`. Proposal "Netz"
+(#3) of the 2026-11-28 attractiveness round; the user approved it.
+
+**Problem.** The app is called Wortnetz, but nothing on the page showed a
+web of words. The home page opened with a heading, and the not-found page
+with a bare heading.
+
+**Decision.**
+- Home: a small inline SVG above the heading (`components/WortNetz.tsx`):
+  *Rolle* in the middle in noun blue, five partners as pills in their
+  word-class colours (#63's pos tokens, so both themes stay AA). The
+  partners are the sample card's own words, static in the component; no API
+  call. The lines draw in once (stroke-dashoffset, 1.1 s) and the pills fade
+  in; under `prefers-reduced-motion: reduce` it is simply there. The SVG is
+  one `role="img"` with a text alternative, nothing in it is focusable.
+- Not found: the searched word as a pill, a dashed thread and a dashed "?"
+  circle, above the heading (`LoseFaden`, plain HTML/CSS, `aria-hidden`,
+  because the heading already says the word; long words are truncated).
+- At 360 px the web is 17.5 rem wide (about 128 px tall) and the home page's
+  top padding drops from 40 to 24 px, so the sample card moves down by about
+  76 px, not the mock's 110, and still starts at about 405 px.
+
+**Supersedes.** Nothing. No dependency, no font, no data change; about 2 KB
+of markup and 1 KB of CSS.
