@@ -166,3 +166,46 @@
 @utility type-heading {
   @apply text-base font-medium text-foreground;
 }
+
+/* Decision #85: the home page word web (components/WortNetz.tsx). Colours
+   are the pos tokens; the lines draw in once, unless motion is reduced. */
+.wortnetz text {
+  font-size: 14px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.wortnetz rect {
+  fill: var(--background);
+  stroke-width: 1.5;
+}
+.wortnetz .wn-hub text {
+  font-size: 22px;
+  font-weight: 700;
+}
+.wortnetz .wn-line {
+  fill: none;
+  stroke-width: 1.4;
+  opacity: 0.55;
+}
+.wortnetz .wn-v { stroke: var(--pos-verb); }
+.wortnetz .wn-a { stroke: var(--pos-adjective); }
+.wortnetz .wn-p { stroke: var(--pos-preposition); }
+.wortnetz .wn-n { stroke: var(--pos-noun); }
+.wortnetz .wn-node text, .wortnetz .wn-hub text { stroke: none; }
+.wortnetz .wn-v text { fill: var(--pos-verb); }
+.wortnetz .wn-a text { fill: var(--pos-adjective); }
+.wortnetz .wn-p text { fill: var(--pos-preposition); }
+.wortnetz .wn-n text { fill: var(--pos-noun); }
+@media (prefers-reduced-motion: no-preference) {
+  .wortnetz .wn-line {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation: wn-draw 1.1s 0.1s ease-out forwards;
+  }
+  .wortnetz .wn-node {
+    opacity: 0;
+    animation: wn-fade 0.4s ease-out forwards;
+  }
+}
+@keyframes wn-draw { to { stroke-dashoffset: 0; } }
+@keyframes wn-fade { to { opacity: 1; } }

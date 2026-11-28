@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { HOME_SAMPLE } from '@/lib/homeSample.ts';
 import { wordClassStyle } from '@/lib/wordClass.ts';
 import { VerbNounPairs } from '@/components/VerbNounPairs.tsx';
+import { WortNetz } from '@/components/WortNetz.tsx';
 
 // Words with plenty of verb-noun pairs, checked against the live data.
 // The dot in front of each says which word class it is, in the legend's colours.
@@ -24,8 +25,9 @@ export function Home() {
     }, []);
 
     return (
-        <div className="py-10 space-y-6">
+        <div className="py-6 md:py-10 space-y-6">
             <div className="space-y-2 text-center">
+                <WortNetz />
                 <h2 className="font-serif text-3xl font-semibold">Welche Wörter passen zusammen?</h2>
                 <p className="text-muted-foreground">
                     Suchen Sie ein Wort, und Sie sehen seine Partner mit Beispielsätzen aus echten Texten.
