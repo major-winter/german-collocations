@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #88), and add it to the index.
+(next: #89), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -64,6 +64,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#85](#85) `/api/suggest`: lemma suggestions with word class and article, cacheable
 - [#86](#86) Colour fields: each word-class group is a tinted card with a coloured spine; the open chip takes the class colour (supersedes #63's quiet colour)
 - [#87](#87) Jump strip: the colour legend becomes a row of jump pills, one per group (supersedes #63's legend)
+- [#88](#88) Suggestions as you type: the header field is a combobox over `/api/suggest` (supersedes #77's plain field)
 
 ---
 
@@ -4592,3 +4593,65 @@ Express app on the dev database (header, 400, `[]` for one letter).
 
 **For the frontend.** Type `LemmaSuggestion` in `@collocations/types`.
 Open `/wort/<lemma>`. Print the article muted before the lemma.
+
+<a id="88"></a>
+## 88. Suggestions as you type: the header field is a combobox over `/api/suggest` (supersedes #77's plain field)
+
+**Date.** 2026-11-28. Branch `frontend-feature-suggest-as-you-type`, cut
+from `frontend-feature-jump-strip` with `main` merged in (the backend half,
+#85). Proposal "Vorschläge" (#3) of the 2026-11-28 site-wide round; the
+user approved it. #77 kept the one field a plain input; it stays one field,
+and stays plain for anyone who just presses Enter.
+
+**Problem.** A misspelt or inflected word costs a full not-found page.
+Typing *Entsch* and tapping a row saves a navigation, a failed lookup and a
+"Meinten Sie". #85 returns up to six lemmas, deduplicated, with word class
+and article, so the list can be short and honest.
+
+**Decision.**
+- `SearchBox` is an ARIA combobox (list autocomplete): `role="combobox"`,
+  `aria-expanded`, `aria-controls` (only while the list exists),
+  `aria-activedescendant`; a `listbox` of `option` rows; a polite
+  `role="status"` says "6 Vorschläge. Mit den Pfeiltasten wählen." or "Keine
+  Vorschläge". Arrow Down/Up walk the rows and pass through "none" at both
+  ends; Enter on an active row opens `/wort/<lemma>`; Enter with no active
+  row submits the typed text exactly as before (phrases go to the check,
+  #70/#77); Escape closes; Tab and blur close.
+- **No row is active by default** (the mockup preselected the first). A
+  preselected row would turn Enter on a typo into the first suggestion.
+- A row is: the article muted (only when the server has one, never guessed),
+  the lemma with the typed prefix in bold, and on the right a dot and the
+  singular class name (*Substantiv*, *Verb*, *Adjektiv*, *Adverb*, *Name*).
+  Dots come from `wordClassStyle`; adverbs, names and others have none. The
+  label means colour is never the only signal. Article and label use
+  `--pos-other` (muted grey is 4.35:1 on the active row's tint).
+- The list is 48 px rows, full width of the header on phones (12 px margins),
+  the width of the field from `sm` up, and capped to what `visualViewport`
+  leaves above an on-screen keyboard (it scrolls inside; the phrase hint
+  below the rows stays). The active row has a 2 px ring as well as a tint.
+- **Hand-rolled, not base-ui's `Combobox`/`Autocomplete`** (both exist in
+  `@base-ui/react` 1.7.0). They are built for choosing a value; this field
+  must keep free text and a form submit as the default, and a full-width
+  phone popup, a visualViewport cap and "no row active" would each need
+  overriding. About 90 lines of component plus a tested `lib/suggest.ts`
+  cost 1.4 kB gzip; no dependency.
+- The network is quiet: no request under two characters or for a phrase
+  (two or more words); 140 ms debounce; the previous request is aborted by
+  the next key and its late answer dropped; the browser caches the answer
+  for an hour (#85). Any failure, including a server error, shows no list
+  and says nothing: the field works as it did.
+- No list on arrival or after navigation: only typing opens it.
+- Not-found and `/api/search` are unchanged; this completes words, it does
+  not repair typos.
+
+**Cost.** JS 302.94 kB to 307.06 kB (gzip 97.69 to 99.06), CSS +0.26 kB gzip;
+`--color-pos-other` added to the Tailwind theme. One request of about 400 B
+per pause in typing, to our own API only (#72).
+
+**Checked.** Headless Chrome at 360 and 1280 px, light and dark: no
+horizontal overflow, rows 48 px, text 4.74:1 to 19.8:1 light and 6.9:1 to
+17.2:1 dark, label and article 5.5:1 light / 6.8:1 dark on the active row,
+active ring 6.8:1 and 5.9:1. Keyboard flow driven with real key events
+(Down + Enter, Enter without a row, phrase Enter, Escape, Tab, click, Enter
+during the debounce). Not verified: a real screen reader, a real phone
+keyboard.

@@ -49,6 +49,7 @@
   --color-pos-verb: var(--pos-verb);
   --color-pos-adjective: var(--pos-adjective);
   --color-pos-preposition: var(--pos-preposition);
+  --color-pos-other: var(--pos-other);
 }
 
 :root {
