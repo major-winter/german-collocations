@@ -8,6 +8,8 @@ import { CheckCollocationService } from "./application/CheckCollocationService.t
 import { CountingCheckCollocation, CountingLookupCollocations } from "./application/CountingUseCases.ts";
 import { LookupCollocationsService } from "./application/LookupCollocationsService.ts";
 import { SearchWordsService } from "./application/SearchWordsService.ts";
+import { SuggestLemmasService } from "./application/SuggestLemmasService.ts";
+import { PgLemmaIndex } from "./adapters/postgres/PgLemmaIndex.ts";
 
 // Composition root: the only file that knows which adapter plugs into
 // which port.
@@ -24,6 +26,7 @@ const app = createHttpApp({
     usage,
   ),
   searchWords: new SearchWordsService(new PgWordIndex(pool)),
+  suggestLemmas: new SuggestLemmasService(new PgLemmaIndex(pool)),
   checkCollocation: new CountingCheckCollocation(
     new CheckCollocationService(new PgCollocationCheckStore(pool)),
     usage,

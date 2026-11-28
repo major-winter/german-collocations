@@ -55,6 +55,14 @@ export interface CollocationResponse {
 
 export type WordSuggestion = { word: string; frequency: number; score: number };
 
+// Decision #85: GET /api/suggest?q=<prefix>, at most 6 lemmas, best first.
+export type WordClass = 'noun' | 'verb' | 'adjective' | 'adverb' | 'name' | 'other';
+export interface LemmaSuggestion {
+  lemma: string;                         // dictionary form; /wort/<lemma> opens it
+  wordClass: WordClass;
+  article: 'der' | 'die' | 'das' | null; // nouns the lab knows (#69); null otherwise, never guessed
+}
+
 
 // Decisions #70, #74: "Passt das zusammen?" - one checked phrase.
 export interface CheckPhrase {

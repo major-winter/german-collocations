@@ -61,6 +61,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
 - [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
 - [#84](#84) Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
+- [#85](#85) `/api/suggest`: lemma suggestions with word class and article, cacheable
 - [#86](#86) Colour fields: each word-class group is a tinted card with a coloured spine; the open chip takes the class colour (supersedes #63's quiet colour)
 - [#87](#87) Jump strip: the colour legend becomes a row of jump pills, one per group (supersedes #63's legend)
 
@@ -4507,3 +4508,87 @@ before); pill text 15 to 18:1, count 5.4:1 light and 7:1 dark (the muted grey
 of the mockup was 4.26:1 on the tint, so the count uses `--pos-other`);
 a jump leaves the card 80 px from the top, 11 px under the header.
 
+---
+
+<a id="85"></a>
+## 85. `/api/suggest`: lemma suggestions with word class and article, cacheable
+
+**Date.** 2026-11-28. Branch `backend-feature-search-suggestions`; design
+`docs/superpowers/specs/2026-11-28-search-suggestions-design.md`. Backend
+half of change #3 "Vorschläge" (as-you-type suggestions in the header
+field); the combobox is a separate frontend branch.
+
+**Problem.** `/api/search` returns fuzzy surface words: for "Entsch" five
+of six rows were forms of *entscheiden*, with no word class and no
+article. Suggestions must show lemmas (chips show lemmas, #45), once each.
+
+**Decision.** A new endpoint, `GET /api/suggest?q=<prefix>`; `/api/search`
+is untouched (its one consumer, the not-found page in `Word.tsx`, wants
+surface words and scores). Response, at most 6, best first:
+`[{ "lemma": "Entscheidung", "wordClass": "noun", "article": "die" }]`;
+`wordClass` is `noun | verb | adjective | adverb | name | other`, `article`
+is `der | die | das | null`. A prefix under 2 characters returns `[]`; a
+missing `q` is a 400. 200 responses carry `Cache-Control: public,
+max-age=3600` (corpus changes only with a reload, #37).
+
+**Data (no migration).** Word class: `lemma_dominant_pos.pos`, with #79's
+rule (ADJ+ADV share) so an uninflected adjective tagged ADV is an
+adjective; PROPN is `name`. Article: `lab_noun_genders` only (7,194
+nouns, #69), `null` for every other noun, never guessed. Lemmas without a
+`lemma_dominant_pos` row, or whose text is not a `words.word`, are not
+suggested (the word page could not open them). Lemmas with a lowercase
+letter directly before a capital ("wichtigDie", tagger glue) are dropped.
+
+**Query.** The 300 most frequent words matching `word_normalized LIKE
+prefix%` (the trigram GIN serves it; the btree does not, collation
+en_US), mapped to dominant lemmas. Ranking: lemma itself starts with the
+prefix, then lemmas reached by an inflected form only; names last;
+`lemma_frequency` descending. LIKE wildcards in the input are escaped.
+Rejected: grouping all matching words by lemma (260-410 ms for "ve",
+"ge", "a": parallel seq scans of `word_dominant_lemma`/`lemma_frequency`).
+
+**Timing (EXPLAIN ANALYZE, dev database).** first draft: "entsch" 15 ms, "fra" 11,
+"treff" 5, "de" 20, "ge" 38, "ve" 47; final, through the
+adapter, over 24 prefixes, 4-54 ms against 11-110 ms for `/api/search`
+on the same prefixes. HTTP with the Express app: 14-23 ms.
+
+**Spot-check (24 prefixes, before = `/api/search` first 6 words, after =
+`/api/suggest`).**
+- Entsch: *entschied, entschieden, entscheiden, entscheidet, Entscheid,
+  ...* -> *die Entscheidung, entscheiden, entscheidend, entschlossen,
+  entschuldigen, der Entscheid*.
+- Fra: *Frau, Frage, Frauen, Fragen, Frank, fragt* -> *die Frau, die
+  Frage, fragen, der Franken, französisch, die Fraktion* (names gone from
+  the top).
+- treff: *Treffen, Treffer, Treff, treffe, ...* -> *treffen [verb], das
+  Treffen, der Treffer, der Treffpunkt, treffend, Treff*.
+- Kri: *der Krieg, die Kritik, kritisieren, kritisch, die Krise, der
+  Kritiker*; Rol: *die Rolle, rollen, Rollstuhl, der Roller, ...*; wicht:
+  *wichtig, das Wichtigste, die Wichtigkeit, Wichtig, wichtigere,
+  wichtiger*; Ver/ve: *vergangen, verlieren, verletzen, versuchen, der
+  Verein, verschieden* (before: *Verein, Vertreter, verlor, verletzt...*).
+- Fraue: *Frauenfußball, Frauen-EM, ... der Frauenanteil*; Größe via
+  "Grö": *die Größe, größtenteils, größer, ...*; "gross": *groß, gross,
+  der Großteil, ...*; Ärz: *die Ärztin, ärztlich, ...* (umlaut and case
+  fold through `normalize_de`).
+- Also checked: Sport, mach, Ents, aufm, Hau, Aufg, zusa, bez, schr, de,
+  ge, Entscheidung. After the #79 rule *gemeinsam*, *genau*, *machbar* are
+  adjectives (first draft: adverbs).
+
+**Known noise.** Tagger errors in the lemma data still show: *wichtigere
+[noun]*, *Wichtig [noun]*, *aufgrund [other]*; some nouns have no article
+because the lab has no gender for them (*Rollstuhl*, *Machthaber*).
+Proper names are demoted, not removed. Not fixed here: both are data
+quality, not query.
+
+**Consumers checked.** `grep` of `frontend/src` and `backend/src` for
+`api/search`, `fetchSearch`, `SearchWords`, `WordIndex`, `WordSuggestion`:
+only `frontend/src/api/search.ts` -> `routes/Word.tsx` (not-found
+suggestions) use `/api/search`; check (`/api/check`) does not call it.
+
+**Checked.** `npm test` (159), `npm run typecheck`, `npm run test:db -w
+backend` (51, 10 new, against `collocations_test`), live `curl -i` of the
+Express app on the dev database (header, 400, `[]` for one letter).
+
+**For the frontend.** Type `LemmaSuggestion` in `@collocations/types`.
+Open `/wort/<lemma>`. Print the article muted before the lemma.
