@@ -72,8 +72,8 @@ export function CollocationList({ word, entries, showEmptyMessage, openFirst }: 
                         const group = groups.get(section)!;
                         const openIndex = openChip[section] ?? null;
                         return (
-                            <div key={section} className="py-3">
-                                <h3 className="type-heading mb-2">{wordClassStyle(section).label}</h3>
+                            <div key={section} data-pos={section} className="pos-card">
+                                <h3 className="pos-card-heading">{wordClassStyle(section).label}</h3>
                                 <PartnerChips
                                     chips={group.map((entry, i) => ({ key: `${entry.word}-${i}`, label: entry.word }))}
                                     openIndex={openIndex}

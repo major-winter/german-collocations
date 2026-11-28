@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils';
 import { chipParts } from '@/lib/chipParts.ts';
 import { highlightCollocates } from '@/lib/highlight.tsx';
 import { groupPairs, headingParts, initialOpen, openAfterClick } from '@/lib/verbNounGroups.ts';
-import { wordClassStyle } from '@/lib/wordClass.ts';
+import { partnerSection, wordClassStyle } from '@/lib/wordClass.ts';
 import { PartnerChips } from './PartnerChips.tsx';
 import { ReadingPanel } from './ReadingPanel.tsx';
 import type { VerbNounPair, VerbNounPairs as VerbNounPairsData, VerbNounRelation } from '@collocations/types';
@@ -86,12 +86,10 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
             {groups.map(({ relation, pairs }) => {
                 const openIndex = openChip[relation];
                 return (
-                    <div key={relation} className="py-3">
-                        <h3 className="type-heading mb-2">
+                    <div key={relation} data-pos={partnerSection(data.side)} className="pos-card">
+                        <h3 className="pos-card-heading">
                             {headings[relation].map((part) => (
-                                <span key={part.text} className={cn(part.noun && cn('font-semibold', wordClassStyle('noun').text))}>
-                                    {part.text}
-                                </span>
+                                <span key={part.text}>{part.text}</span>
                             ))}
                         </h3>
                         <PartnerChips
@@ -100,7 +98,7 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
                                 label: chipParts(pair.chip, pair.chipArticle).map((part, partIndex) => (
                                     <span
                                         key={partIndex}
-                                        className={cn(part.muted && (openIndex === chipIndex ? 'opacity-70' : 'text-muted-foreground'))}
+                                        className={cn(part.muted && openIndex !== chipIndex && 'text-muted-foreground')}
                                     >
                                         {part.text}
                                     </span>

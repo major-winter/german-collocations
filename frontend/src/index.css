@@ -94,6 +94,14 @@
   --pos-verb: oklch(0.55 0.14 58);
   --pos-adjective: oklch(0.52 0.14 145);
   --pos-preposition: oklch(0.50 0.16 300);
+  --pos-other: oklch(0.50 0 0);
+  /* Decision #86: the tint behind a word-class group. Lightness 0.965 and
+     chroma 0.017 keep every pos colour above 4.5:1 on its own tint. */
+  --tint-noun: oklch(0.965 0.017 250);
+  --tint-verb: oklch(0.965 0.017 65);
+  --tint-adjective: oklch(0.965 0.017 145);
+  --tint-preposition: oklch(0.965 0.017 300);
+  --tint-other: oklch(0.965 0 0);
 }
 
 .dark {
@@ -133,6 +141,12 @@
   --pos-verb: oklch(0.80 0.15 65);
   --pos-adjective: oklch(0.80 0.15 145);
   --pos-preposition: oklch(0.78 0.16 300);
+  --pos-other: oklch(0.75 0 0);
+  --tint-noun: oklch(0.255 0.03 250);
+  --tint-verb: oklch(0.255 0.03 65);
+  --tint-adjective: oklch(0.255 0.03 145);
+  --tint-preposition: oklch(0.255 0.03 300);
+  --tint-other: oklch(0.255 0 0);
 }
 
 @layer base {
@@ -148,6 +162,42 @@
     outline: 2px solid var(--ring);
     outline-offset: 2px;
   }
+}
+
+/* Decision #86: a word-class group is a tinted card with a coloured spine,
+   a tracked heading in the class colour, and chips on the page ground. The
+   open chip takes the class colour; the reading panel sits on a plate of
+   the page ground, so sentences keep their AA contrast. */
+.pos-card {
+  --pos-c: var(--foreground);
+  --pos-tint: var(--secondary);
+  position: relative;
+  overflow: hidden;
+  border-radius: 1.25rem;
+  background: var(--pos-tint);
+  padding: 1rem 1rem 0.625rem 1.25rem;
+}
+.pos-card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 5px;
+  background: var(--pos-c);
+}
+.pos-card[data-pos='noun'] { --pos-c: var(--pos-noun); --pos-tint: var(--tint-noun); }
+.pos-card[data-pos='verb'] { --pos-c: var(--pos-verb); --pos-tint: var(--tint-verb); }
+.pos-card[data-pos='adjective'] { --pos-c: var(--pos-adjective); --pos-tint: var(--tint-adjective); }
+.pos-card[data-pos='preposition'] { --pos-c: var(--pos-preposition); --pos-tint: var(--tint-preposition); }
+.pos-card[data-pos='other'] { --pos-c: var(--pos-other); --pos-tint: var(--tint-other); }
+.pos-card-heading {
+  margin-bottom: 0.625rem;
+  color: var(--pos-c);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.pos-card button[aria-pressed='false'] {
+  border-color: color-mix(in oklch, var(--pos-c) 28%, var(--border));
 }
 
 /* Decision #82 (B5 of the 2026-11-27 UI review): two type roles.
