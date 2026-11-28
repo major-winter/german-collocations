@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationResponse, VerbNounPair, VerbNounRelation } from '@collocations/types';
-import { groupHeadings, groupPairs, hasAnyResults, isThinPage, headingParts, initialOpen, openAfterClick } from './verbNounGroups.ts';
+import { groupCount, groupHeadings, groupPairs, hasAnyResults, isThinPage, headingParts, initialOpen, openAfterClick } from './verbNounGroups.ts';
 
 function pair(relation: VerbNounRelation, partner: string): VerbNounPair {
   return {
@@ -86,4 +86,16 @@ test('isThinPage: some partners, but fewer than THIN_PAGE_MAX (#79 floor)', () =
   assert.equal(isThinPage(page(2, 2)), true);
   assert.equal(isThinPage(page(3, 2)), false);
   assert.equal(isThinPage({ word: 'x', collocations: [entry], verbNounPairs: null }), true);
+});
+
+test('groupCount: verb-noun groups plus word-class sections, as the page shows them', () => {
+  const entry = (section: string) =>
+    ({ word: 'a', section, cooccurrence: 3, significance: 7, examples: [] }) as unknown as CollocationResponse['collocations'][number];
+  const page: CollocationResponse = {
+    word: 'x',
+    collocations: [entry('adjective'), entry('adjective'), entry('other')],
+    verbNounPairs: { side: 'noun', lemma: 'x', article: null, pairs: [pair('obj', 'a'), pair('obj', 'b'), pair('nsubj', 'c')] },
+  };
+  assert.equal(groupCount(page), 4); // obj, nsubj, adjective, other
+  assert.equal(groupCount({ word: 'x', collocations: [], verbNounPairs: null }), 0);
 });
