@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { CollocationEntry, CollocationResponse, CollocationSection } from '@collocations/types';
-import { legendSections, WORD_CLASS_ORDER, wordClassStyle } from './wordClass.ts';
+import { legendSections, partnerSection, WORD_CLASS_ORDER, wordClassStyle } from './wordClass.ts';
 
 function entry(section: CollocationSection): CollocationEntry {
   return { word: 'x', cooccurrence: 1, significance: 1, examples: [], section };
@@ -46,4 +46,9 @@ test('lab pairs put noun and verb in the legend, even when the collocation list 
 test('an empty lab result adds nothing to the legend', () => {
   const response: CollocationResponse = { ...empty, verbNounPairs: { side: 'noun', lemma: 'Kritik', pairs: [] } };
   assert.equal(legendSections(response).size, 0);
+});
+
+test('a verb-noun group takes the colour of its partners: verbs on a noun page, nouns on a verb page', () => {
+  assert.equal(partnerSection('noun'), 'verb');
+  assert.equal(partnerSection('verb'), 'noun');
 });

@@ -38,3 +38,11 @@ export function legendSections(response: CollocationResponse): Set<CollocationSe
     }
     return sections;
 }
+
+/**
+ * Decision #86: a verb-noun group is coloured by its chips, the partners:
+ * verbs when a noun was searched, nouns when a verb was.
+ */
+export function partnerSection(side: 'noun' | 'verb'): CollocationSection {
+  return side === 'noun' ? 'verb' : 'noun';
+}
