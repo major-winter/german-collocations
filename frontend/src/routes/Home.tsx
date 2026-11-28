@@ -33,7 +33,7 @@ export function Home() {
                 </p>
             </div>
             {/* A static sample of the real result, so the page shows what a lookup gives. */}
-            <div className="rounded-2xl border p-4 shadow-xs [&_section]:mb-0 [&_section>div]:py-0">
+            <div className="[&_section]:mb-0">
                 <VerbNounPairs data={HOME_SAMPLE} />
             </div>
             <ul className="flex flex-wrap justify-center gap-2 list-none" aria-label="Zum Beispiel">
