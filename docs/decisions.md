@@ -4376,3 +4376,21 @@ page from 2,032 to 2,099 px. No font change, no new dependency; CSS 37.9 kB
 **Checked.** `npm test` (148), typecheck, frontend lint and build. Headless
 Chrome at 360 and 1280 px, light and dark: *Frage*, *treffen*, and an
 opened adjective chip (*wichtig*); no sideways scroll.
+
+### Follow-up: deployed to production (2026-11-28)
+
+Merge `79d1c46` of `frontend-feature-reading-panel` (this decision) and
+`frontend-feature-home-sample` (home page sample card, merged second so it
+renders in the reading-panel style). Only `frontend/` and docs changed: no
+backend change, no migration, no data load. Server checkout moved from
+`857bc5b` to `79d1c46`; only `frontend` was built (03:46 UTC) and
+restarted with `up -d --no-deps` (container started 03:46:52, image built
+03:46:48). The `IMPRESSUM_*` variables were present.
+
+**Checked.** `/` 200 and `/wort/Frage` 200; `/api/collocations/Entscheidung`
+200 and contains `treffen`; `/api/collocations/zzzqqq` 404;
+`/api/check?q=Sport%20machen` 200; the served JS bundle contains
+`border-pos-noun` and the sample word "Rolle", the served CSS contains
+`type-reading-phrase`; the backend log of the last 5 minutes has no errors
+(backend not restarted). The rendered panel was not inspected in a browser.
+Smoke traffic: 3 lookups (`Entscheidung` twice, `zzzqqq`), 1 check.
