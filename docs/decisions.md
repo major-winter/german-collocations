@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #89), and add it to the index.
+(next: #90), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -65,6 +65,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#86](#86) Colour fields: each word-class group is a tinted card with a coloured spine; the open chip takes the class colour (supersedes #63's quiet colour)
 - [#87](#87) Jump strip: the colour legend becomes a row of jump pills, one per group (supersedes #63's legend)
 - [#88](#88) Suggestions as you type: the header field is a combobox over `/api/suggest` (supersedes #77's plain field)
+- [#89](#89) Word web: the home page draws its name (Rolle and its partners in word-class colours); the not-found page shows a dashed thread to a "?"
 
 ---
 
@@ -4422,8 +4423,8 @@ key suffix `:pairs`; the backend log of the last 5 minutes has no errors
 
 **Date.** 2026-11-28. Branch `frontend-feature-colour-fields`. Proposal
 "Farbfelder" (#5) of the 2026-11-28 attractiveness round; the user approved it.
-(Numbered #86 so it can sit next to #85, the word web, which was built on its
-own branch; renumber on merge if needed.)
+(Numbered #86 while the word web was still called #85; the word web is now
+#89.)
 
 **Problem.** #63 kept colour out of the page chrome: group headings were
 grey, chips neutral, colour only on the two words of a pair. The word page
@@ -4655,3 +4656,31 @@ active ring 6.8:1 and 5.9:1. Keyboard flow driven with real key events
 (Down + Enter, Enter without a row, phrase Enter, Escape, Tab, click, Enter
 during the debounce). Not verified: a real screen reader, a real phone
 keyboard.
+
+<a id="89"></a>
+## 89. Word web: a drawn "Wortnetz" on the home page, a dashed thread when nothing is found
+
+**Date.** 2026-11-28. Branch `frontend-feature-word-web` (numbered #85 on the
+branch, renumbered when `main` took #85-#88). Proposal "Netz" (#3) of the 2026-11-28 attractiveness round; the user approved it.
+
+**Problem.** The app is called Wortnetz, but nothing on the page showed a
+web of words. The home page opened with a heading, and the not-found page
+with a bare heading.
+
+**Decision.**
+- Home: a small inline SVG above the heading (`components/WortNetz.tsx`):
+  *Rolle* in the middle in noun blue, five partners as pills in their
+  word-class colours (#63's pos tokens, so both themes stay AA). The
+  partners are the sample card's own words, static in the component; no API
+  call. The lines draw in once (stroke-dashoffset, 1.1 s) and the pills fade
+  in; under `prefers-reduced-motion: reduce` it is simply there. The SVG is
+  one `role="img"` with a text alternative, nothing in it is focusable.
+- Not found: the searched word as a pill, a dashed thread and a dashed "?"
+  circle, above the heading (`LoseFaden`, plain HTML/CSS, `aria-hidden`,
+  because the heading already says the word; long words are truncated).
+- At 360 px the web is 17.5 rem wide (about 128 px tall) and the home page's
+  top padding drops from 40 to 24 px, so the sample card moves down by about
+  76 px, not the mock's 110, and still starts at about 405 px.
+
+**Supersedes.** Nothing. No dependency, no font, no data change; about 2 KB
+of markup and 1 KB of CSS.

@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CollocationCheckCard } from "../components/CollocationCheckCard.tsx";
 import { CollocationList } from "../components/CollocationList.tsx";
 import { StatusMessage } from "../components/StatusMessage.tsx";
+import { LoseFaden } from "../components/WortNetz.tsx";
 import { JumpStrip } from "../components/JumpStrip.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { groupCount, hasAnyResults, isThinPage } from "../lib/verbNounGroups.ts";
@@ -163,7 +164,9 @@ function WordPage({
 
     if (state.status === "notFound") {
         return (
-            <StatusMessage titleId={HEADING_ID} title={<>Keine Ergebnisse für „{shownWord}“</>}>
+            <div className="mt-8">
+            <LoseFaden word={shownWord} />
+            <StatusMessage className="mt-4" titleId={HEADING_ID} title={<>Keine Ergebnisse für „{shownWord}“</>}>
                 {state.suggestions.length > 0 ? (
                     <div className="space-y-2">
                         <p>Meinten Sie:</p>
@@ -184,6 +187,7 @@ function WordPage({
                     <p>Auch keine ähnlichen Wörter gefunden.</p>
                 )}
             </StatusMessage>
+            </div>
         );
     }
 
