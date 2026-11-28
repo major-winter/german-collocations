@@ -190,6 +190,7 @@
 .pos-card[data-pos='preposition'] { --pos-c: var(--pos-preposition); --pos-tint: var(--tint-preposition); }
 .pos-card[data-pos='other'] { --pos-c: var(--pos-other); --pos-tint: var(--tint-other); }
 .pos-card-heading {
+  width: fit-content;
   margin-bottom: 0.625rem;
   color: var(--pos-c);
   font-size: 0.8125rem;
@@ -199,6 +200,54 @@
 .pos-card button[aria-pressed='false'] {
   border-color: color-mix(in oklch, var(--pos-c) 28%, var(--border));
 }
+
+/* The sticky header (69 px) plus 11 px: a jump or a focus on a card leaves
+   its top edge clear of the header. */
+.pos-card { scroll-margin-top: 5rem; }
+
+/* Sprungleiste: one row of pills that scrolls sideways; a fade at the right
+   edge shows while more pills wait off screen. The pill is tinted and dotted
+   in its group's class colour, like the card it points to. */
+.jump-strip {
+  scrollbar-width: none;
+}
+.jump-strip::-webkit-scrollbar { display: none; }
+.jump-strip[data-more-right] {
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - 28px), transparent);
+}
+.jump-pill {
+  --pos-c: var(--foreground);
+  --pos-tint: var(--secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--pos-c) 30%, var(--background));
+  background: var(--pos-tint);
+  color: var(--foreground);
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+.jump-pill[data-pos='noun'] { --pos-c: var(--pos-noun); --pos-tint: var(--tint-noun); }
+.jump-pill[data-pos='verb'] { --pos-c: var(--pos-verb); --pos-tint: var(--tint-verb); }
+.jump-pill[data-pos='adjective'] { --pos-c: var(--pos-adjective); --pos-tint: var(--tint-adjective); }
+.jump-pill[data-pos='preposition'] { --pos-c: var(--pos-preposition); --pos-tint: var(--tint-preposition); }
+.jump-pill[data-pos='other'] { --pos-c: var(--pos-other); --pos-tint: var(--tint-other); }
+.jump-pill-dot {
+  width: 0.5625rem;
+  height: 0.5625rem;
+  border-radius: 999px;
+  background: var(--pos-c);
+}
+.jump-pill-count {
+  color: var(--pos-other); /* muted-foreground is 4.26:1 on the tints; this is 5.4:1 */
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+.jump-pill:hover { border-color: var(--pos-c); }
 
 /* Decision #82 (B5 of the 2026-11-27 UI review): two type roles.
    Serif = German language content; sans = interface. A heading is never

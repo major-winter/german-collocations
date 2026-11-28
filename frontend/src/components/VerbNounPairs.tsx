@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { cn } from '@/lib/utils';
 import { chipParts } from '@/lib/chipParts.ts';
 import { highlightCollocates } from '@/lib/highlight.tsx';
+import { headingId, verbNounGroupId } from '@/lib/jumpGroups.ts';
 import { groupPairs, headingParts, initialOpen, openAfterClick } from '@/lib/verbNounGroups.ts';
 import { partnerSection, wordClassStyle } from '@/lib/wordClass.ts';
 import { PartnerChips } from './PartnerChips.tsx';
@@ -86,8 +87,8 @@ export function VerbNounPairs({ data }: VerbNounPairsProps) {
             {groups.map(({ relation, pairs }) => {
                 const openIndex = openChip[relation];
                 return (
-                    <div key={relation} data-pos={partnerSection(data.side)} className="pos-card">
-                        <h3 className="pos-card-heading">
+                    <div key={relation} id={verbNounGroupId(relation)} data-pos={partnerSection(data.side)} className="pos-card">
+                        <h3 id={headingId(verbNounGroupId(relation))} tabIndex={-1} className="pos-card-heading">
                             {headings[relation].map((part) => (
                                 <span key={part.text}>{part.text}</span>
                             ))}

@@ -4,6 +4,7 @@ import { ReadingPanel } from './ReadingPanel.tsx';
 import { initialOpenGroups, openGroupChip } from '@/lib/partnerChips.ts';
 import { StatusMessage } from './StatusMessage.tsx';
 import { highlightCollocates } from '@/lib/highlight.tsx';
+import { headingId, sectionGroupId } from '@/lib/jumpGroups.ts';
 import { WORD_CLASS_ORDER, wordClassStyle } from '@/lib/wordClass.ts';
 import type { CollocationEntry, CollocationSection } from '@collocations/types';
 
@@ -72,8 +73,8 @@ export function CollocationList({ word, entries, showEmptyMessage, openFirst }: 
                         const group = groups.get(section)!;
                         const openIndex = openChip[section] ?? null;
                         return (
-                            <div key={section} data-pos={section} className="pos-card">
-                                <h3 className="pos-card-heading">{wordClassStyle(section).label}</h3>
+                            <div key={section} id={sectionGroupId(section)} data-pos={section} className="pos-card">
+                                <h3 id={headingId(sectionGroupId(section))} tabIndex={-1} className="pos-card-heading">{wordClassStyle(section).label}</h3>
                                 <PartnerChips
                                     chips={group.map((entry, i) => ({ key: `${entry.word}-${i}`, label: entry.word }))}
                                     openIndex={openIndex}

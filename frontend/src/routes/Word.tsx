@@ -7,13 +7,13 @@ import { Button } from "@/components/ui/button";
 import { CollocationCheckCard } from "../components/CollocationCheckCard.tsx";
 import { CollocationList } from "../components/CollocationList.tsx";
 import { StatusMessage } from "../components/StatusMessage.tsx";
-import { PosLegend } from "../components/PosLegend.tsx";
+import { JumpStrip } from "../components/JumpStrip.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { groupCount, hasAnyResults, isThinPage } from "../lib/verbNounGroups.ts";
 import { arrivalAnnouncement, movesFocusOnArrival } from "../lib/arrival.ts";
 import { cn } from "@/lib/utils";
 import { resultKeys } from "../lib/resultKeys.ts";
-import { legendSections } from "../lib/wordClass.ts";
+import { jumpGroups } from "../lib/jumpGroups.ts";
 import { checkHintExample } from "../lib/collocationCheck.ts";
 
 import { API_BASE_URL } from "../config.ts";
@@ -207,7 +207,7 @@ function WordPage({
                     </span>
                 )}
             </div>
-            <PosLegend sections={legendSections(state.data)} />
+            <JumpStrip groups={jumpGroups(state.data)} />
             {/* Decisions #70, #74, #76: "Passt das zusammen?" on noun pages, for verbs, adjectives and prepositional verbs. */}
             {state.data.verbNounPairs?.side === "noun" && (
                 <CollocationCheckCard

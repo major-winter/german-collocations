@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #87), and add it to the index.
+(next: #88), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -62,6 +62,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
 - [#84](#84) Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
 - [#86](#86) Colour fields: each word-class group is a tinted card with a coloured spine; the open chip takes the class colour (supersedes #63's quiet colour)
+- [#87](#87) Jump strip: the colour legend becomes a row of jump pills, one per group (supersedes #63's legend)
 
 ---
 
@@ -4461,3 +4462,48 @@ loses its own border (the card is the sample).
 
 **Cost.** No dependency, no font; CSS about +1.5 kB. Pages grow 10 to 18 %
 at 360 px (*Frage* 2,099 to 2,353 px), from card padding.
+
+## 87. Jump strip: the colour legend becomes navigation (supersedes #63's legend)
+
+**Date.** 2026-11-28. Branch `frontend-feature-jump-strip`, cut from
+`frontend-feature-arrival` with `frontend-feature-colour-fields` (#86)
+merged in. Proposal "Sprungleiste" (#2) of the 2026-11-28 site-wide round;
+the user approved it.
+
+**Problem.** #63's legend (a dot and a name per word class) told the learner
+which colour meant what. Since #86 every group card names and colours
+itself, so the legend explained what the page already shows, used 52 px at
+the top, and did nothing. *Frage* at 360 px is 2,365 px tall, six cards; a
+learner who wants the adjectives scrolled 3.7 screens for them.
+
+**Decision.**
+- `PosLegend` is replaced by `JumpStrip`: one `nav` ("Springen zu") with one
+  pill per group card the page renders, built from the response by
+  `jumpGroups` in `lib/jumpGroups.ts` (verb-noun groups first, then word-class
+  sections, so noun and verb pages order themselves). A pill is a dot, a short
+  name (*Verben*, *mit Präposition*, *als Subjekt*, *Adjektive*, ...) and the
+  group's chip count, tinted and dotted in the card's class colour. The
+  colour key survives where #86 put it: on the card.
+- One row, scrolling sideways, 44 px high; a fade at the right edge shows
+  only while pills wait off screen. A wrapped strip was tried and rejected:
+  three rows, first chip pushed down by about 120 px. Hidden when the page
+  has fewer than two groups.
+- Pills are `button`s, not hash links: the router owns the URL. A click
+  calls `scrollIntoView` (smooth only without `prefers-reduced-motion`) and
+  focuses the group's heading (`tabindex="-1"`), so a screen reader reads
+  where it landed and Tab continues into the group's chips. Cards carry
+  `scroll-margin-top: 5rem` for the sticky header.
+- `legendSections` and its tests are removed with the component.
+
+**Alternatives.** A wrapped strip (above). A sticky strip: it would cost
+44 px of every screen at 360 px; not proposed. Hash anchors (`#group-obj`):
+the router would treat them as navigation.
+
+**Cost.** No dependency, no font, no request; CSS about +1 kB.
+
+**Checked.** Measured in headless Chrome at 360 and 1280 px, both themes:
+no horizontal overflow; first chip at y 297 on `/wort/Frage` at 360 px (289
+before); pill text 15 to 18:1, count 5.4:1 light and 7:1 dark (the muted grey
+of the mockup was 4.26:1 on the tint, so the count uses `--pos-other`);
+a jump leaves the card 80 px from the top, 11 px under the header.
+
