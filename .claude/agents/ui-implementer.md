@@ -61,11 +61,29 @@ PNGs with Read, and treat the chosen variant as the spec.
 
 ## How you check your work
 
-You don't judge UI from code alone. Use the dev stack
-(`docker-compose up -d --build`, with `colima start` first if Docker is
-down; always `--build`) and render with headless Chrome. Plain
-`--window-size` can't go below about 500 px wide, so for 360 px use the
-DevTools protocol with device-metrics and colour-scheme emulation.
+You don't judge UI from code alone, and **starting the dev stack is
+your job**: never assume it is running, and never skip screenshots
+because it was down.
+
+1. Check `curl -s -o /dev/null -w '%{http_code}' http://localhost:5173`.
+   If it isn't 200, run `colima start` if Docker is down, then
+   `docker-compose up -d --build` from the repo root (always `--build`:
+   a stale image silently serves old code, see `CLAUDE.md`). Wait until
+   `:5173` answers 200 and the backend at `:3000` responds before you
+   take any screenshot.
+2. The frontend is bind-mounted, so source edits hot-reload; rebuild
+   (`--build`) after changing dependencies or the Dockerfile. If the
+   page looks stale, check the container's start time before debugging
+   your code.
+3. Leave the stack running when you finish, and never remove its
+   volumes (`down -v`): the dev database holds loaded corpus data.
+4. If the stack won't start, report the exact error and stop. Don't
+   fall back to a host `npx vite` run or to code-only judgement
+   without saying so.
+
+Render with headless Chrome. Plain `--window-size` can't go below about
+500 px wide, so for 360 px use the DevTools protocol with
+device-metrics and colour-scheme emulation.
 
 - **Viewports:** 360 px and 1280 px, each in light and dark.
 - **Pages:** every page the change touches, plus `/`, `/wort/Frage` and
