@@ -40,6 +40,7 @@ you verify, not as instructions.
 | Agent | Use it for |
 |---|---|
 | `collocation-feature-analyst` | Propose: a fresh learner-needs or CEFR gap analysis when the existing reports leave the ranking open |
+| `corpus-explorer` | Propose: when the roadmap runs thin or a candidate depends on a data signal nobody has measured; it probes the corpus and returns evidence-backed candidates (read its report in `docs/superpowers/specs/*-corpus-opportunities.md`) |
 | `architecture-analyst` | Propose: when the top candidate needs a new table, service, storage or traffic the VM has not carried (e.g. accounts, practice), to check it fits before you design it |
 | `ui-ux-designer` | Propose: a fresh UI audit when the top candidate is a usability fix rather than a new feature; Build: before/after screenshots of a UI change at phone and desktop width |
 | `docs-auditor` | Propose: checking that the decisions and specs you build on are current (report mode only) |
