@@ -3,7 +3,7 @@
 Every non-trivial choice, with its reasoning, numbered in the order it was
 made. Never silently reversed: a change of mind is a new entry that names
 the one it supersedes. Add a new decision at the end with the next number
-(next: #85), and add it to the index.
+(next: #87), and add it to the index.
 
 Decisions #1-32 predate this file and are not in this repository.
 
@@ -61,6 +61,7 @@ Decisions #1-32 predate this file and are not in this repository.
 - [#82](#82) Two type roles: serif for German content, sans for interface; headings in the foreground colour, no indent (B5 of the 2026-11-27 UI review)
 - [#83](#83) Every partner group is a chip row with one open entry, like the verb pairs (B2 of the 2026-11-27 UI review)
 - [#84](#84) Reading panel: opened example sentences are upright serif ink behind a noun-blue bar (supersedes #63 for example sentences)
+- [#86](#86) Colour fields: each word-class group is a tinted card with a coloured spine; the open chip takes the class colour (supersedes #63's quiet colour)
 
 ---
 
@@ -4394,3 +4395,50 @@ restarted with `up -d --no-deps` (container started 03:46:52, image built
 `type-reading-phrase`; the backend log of the last 5 minutes has no errors
 (backend not restarted). The rendered panel was not inspected in a browser.
 Smoke traffic: 3 lookups (`Entscheidung` twice, `zzzqqq`), 1 check.
+
+## 86. Colour fields: word-class groups are tinted cards (supersedes #63's quiet colour)
+
+**Date.** 2026-11-28. Branch `frontend-feature-colour-fields`. Proposal
+"Farbfelder" (#5) of the 2026-11-28 attractiveness round; the user approved it.
+(Numbered #86 so it can sit next to #85, the word web, which was built on its
+own branch; renumber on merge if needed.)
+
+**Problem.** #63 kept colour out of the page chrome: group headings were
+grey, chips neutral, colour only on the two words of a pair. The word page
+read as one white sheet; the four word classes the legend names could not be
+scanned before reading.
+
+**Decision.**
+- A group (every partner group on a word page, and the home sample) is a
+  `.pos-card`: a tinted surface, a 5 px spine in the class colour, and a
+  heading in the class colour (13 px bold, slightly tracked). The heading is
+  not set in capitals: capitals would erase the noun capitalisation the
+  learner reads (*Frage + Verb*, *Substantiv + treffen*).
+- The class of a card is the class of its chips: verbs when a noun was
+  searched, nouns when a verb was (`partnerSection` in `lib/wordClass.ts`);
+  a plain partner group takes its own section.
+- Chips stay on the page ground, with a border mixed from the class colour;
+  the open chip is filled with the class colour (`--pos-c`), text in the page
+  ground. Outside a card (`--pos-c` unset) it stays foreground ink. The dimmed
+  article on an open chip is gone: 70 % ink on the class colour was 3.3:1.
+- The reading panel (#84) keeps its noun-blue bar and gets a plate of the
+  page ground (`bg-background`), so sentences read on white or near-black, not
+  on the tint.
+- Tokens in `index.css`: `--tint-{noun,verb,adjective,preposition,other}` and
+  `--pos-other`, light and dark. Tint = L 0.965 / C 0.017 (light), L 0.255 /
+  C 0.03 (dark), at the class hue.
+
+**Contrast (WCAG 2.1, computed from the tokens).** Class colour on its tint
+(heading text, spine): light noun 5.37, verb 4.57, adjective 4.71,
+preposition 5.82, other 5.42; dark 8.19, 8.22, 8.82, 7.38, 7.09. Sentence
+words on the plate: light 5.07 to 6.46, dark 9.19 to 11.17. Open chip
+(page-ground text on the class colour): light 5.07 to 6.46, dark 9.19 to
+11.17. *Verben* in light mode is the closest to the limit (4.57); `--pos-other`
+exists because `--muted-foreground` on the grey tint was 4.28.
+
+**Supersedes.** #63's neutral group headings and neutral open chip. #63's other
+rules stand: colour on the words of a pair, AA word colours. The home sample
+loses its own border (the card is the sample).
+
+**Cost.** No dependency, no font; CSS about +1.5 kB. Pages grow 10 to 18 %
+at 360 px (*Frage* 2,099 to 2,353 px), from card padding.
