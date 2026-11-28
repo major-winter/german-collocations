@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { CollocationCheckCard } from "../components/CollocationCheckCard.tsx";
 import { CollocationList } from "../components/CollocationList.tsx";
 import { StatusMessage } from "../components/StatusMessage.tsx";
+import { LoseFaden } from "../components/WortNetz.tsx";
 import { PosLegend } from "../components/PosLegend.tsx";
 import { VerbNounPairs } from "../components/VerbNounPairs.tsx";
 import { hasAnyResults, isThinPage } from "../lib/verbNounGroups.ts";
@@ -102,7 +103,9 @@ export function Word() {
 
     if (state.status === "notFound") {
         return (
-            <StatusMessage title={<>Keine Ergebnisse für „{word}“</>}>
+            <div className="mt-8">
+            <LoseFaden word={word ?? ""} />
+            <StatusMessage className="mt-4" title={<>Keine Ergebnisse für „{word}“</>}>
                 {state.suggestions.length > 0 ? (
                     <div className="space-y-2">
                         <p>Meinten Sie:</p>
@@ -123,6 +126,7 @@ export function Word() {
                     <p>Auch keine ähnlichen Wörter gefunden.</p>
                 )}
             </StatusMessage>
+            </div>
         );
     }
 
