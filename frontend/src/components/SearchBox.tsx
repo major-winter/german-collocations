@@ -1,11 +1,14 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent, type KeyboardEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router';
 import type { CollocationCheck } from '@collocations/types';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { LoaderCircle, Search } from 'lucide-react';
 import { isPhraseQuery, searchRoute, showsSearchHint } from '@/lib/collocationCheck.ts';
+import { createSuggester, moveActive, suggestionAnnouncement, type SuggestionRow } from '@/lib/suggest.ts';
+import { cn } from '@/lib/utils';
 import { fetchCheck } from '../api/check.ts';
+import { fetchSuggest } from '../api/suggest.ts';
 import { API_BASE_URL } from '../config.ts';
 import { UnparsedCheckHint } from './UnparsedCheckHint.tsx';
 
@@ -15,6 +18,8 @@ interface SearchBoxProps {
 }
 
 const HINT_ID = 'search-check-hint';
+const LIST_ID = 'search-suggestions';
+const MIN_LIST_HEIGHT = 144; // three rows, even when the keyboard leaves little room
 
 export function SearchBox({ initialValue }: SearchBoxProps) {
     const [value, setValue] = useState(initialValue);
@@ -33,8 +38,82 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
     const showHint = showsSearchHint(hintFor, value, searchParams.get('pruefen'));
     const navigate = useNavigate();
 
+    // Decision #88: suggestions as you type. The field stays one plain field:
+    // `active` -1 means "no row chosen", and Enter then submits the typed text.
+    const [rows, setRows] = useState<SuggestionRow[]>([]);
+    const [open, setOpen] = useState(false); // the learner has typed and not dismissed the list
+    const [active, setActive] = useState(-1);
+    const [announcement, setAnnouncement] = useState('');
+    const [maxHeight, setMaxHeight] = useState<number | undefined>(undefined);
+    const [suggester] = useState(() =>
+        createSuggester({
+            load: (q, signal) => fetchSuggest(API_BASE_URL, q, signal),
+            onRows: (found, query) => {
+                setRows(found);
+                setActive(-1);
+                setAnnouncement(query ? suggestionAnnouncement(found.length) : '');
+            },
+        }),
+    );
+    const listShown = open && rows.length > 0;
+    useEffect(() => () => suggester.cancel(), [suggester]);
+
+    // Keep the list inside what the on-screen keyboard leaves visible.
+    useEffect(() => {
+        if (!listShown) return;
+        const vv = window.visualViewport;
+        function fit() {
+            const top = document.getElementById(LIST_ID)?.parentElement?.getBoundingClientRect().top;
+            if (top === undefined) return;
+            const bottom = vv ? vv.offsetTop + vv.height : window.innerHeight;
+            setMaxHeight(Math.max(MIN_LIST_HEIGHT, Math.floor(bottom - top - 8)));
+        }
+        fit();
+        vv?.addEventListener('resize', fit);
+        vv?.addEventListener('scroll', fit);
+        return () => {
+            vv?.removeEventListener('resize', fit);
+            vv?.removeEventListener('scroll', fit);
+        };
+    }, [listShown]);
+
+    useEffect(() => {
+        if (active >= 0) document.getElementById(rows[active]?.id)?.scrollIntoView({ block: 'nearest' });
+    }, [active, rows]);
+
+    function closeList() {
+        suggester.cancel();
+        setOpen(false);
+        setActive(-1);
+        setAnnouncement('');
+    }
+
+    function choose(row: SuggestionRow) {
+        closeList();
+        setHintFor(null);
+        setValue(row.lemma);
+        navigate(row.to);
+    }
+
+    function handleKeyDown(e: KeyboardEvent<HTMLInputElement>) {
+        if (e.nativeEvent.isComposing) return;
+        if ((e.key === 'ArrowDown' || e.key === 'ArrowUp') && rows.length > 0) {
+            e.preventDefault(); // no caret jump to the ends of the text
+            if (!listShown) setAnnouncement(suggestionAnnouncement(rows.length));
+            setOpen(true);
+            setActive(moveActive(listShown ? active : -1, e.key, rows.length));
+        } else if (e.key === 'Enter' && listShown && active >= 0) {
+            e.preventDefault(); // a chosen row wins; otherwise the form submits the text as before
+            choose(rows[active]);
+        } else if (e.key === 'Escape' && listShown) {
+            e.preventDefault();
+            closeList();
+        }
+    }
+
     async function handleSubmit(e: FormEvent<HTMLFormElement>) {
         e.preventDefault();
+        closeList();
         const trimmed = value.trim();
         if (!trimmed || checking) return;
         // Decision #70: a phrase like "eine Entscheidung machen" opens its noun
@@ -58,12 +137,23 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
     }
 
     return (
-        <div>
+        <div className="sm:relative">
             <form onSubmit={handleSubmit} role="search" aria-busy={checking} className="relative">
                 <Input
                     type="text"
                     value={value}
-                    onChange={(e) => setValue(e.target.value)}
+                    onChange={(e) => {
+                        setValue(e.target.value);
+                        setOpen(true);
+                        suggester.input(e.target.value);
+                    }}
+                    onKeyDown={handleKeyDown}
+                    onBlur={closeList}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={listShown}
+                    aria-controls={listShown ? LIST_ID : undefined}
+                    aria-activedescendant={listShown && active >= 0 ? rows[active]?.id : undefined}
                     placeholder="Wort oder Verbindung"
                     aria-label="Wort suchen oder Verbindung prüfen"
                     aria-describedby={showHint ? HINT_ID : undefined}
@@ -81,6 +171,52 @@ export function SearchBox({ initialValue }: SearchBoxProps) {
                     {checking ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
                 </Button>
             </form>
+            {listShown && (
+                <div
+                    className="absolute z-50 inset-x-3 top-full mt-1 sm:inset-x-0 sm:mt-1.5 flex flex-col rounded-xl border bg-popover text-popover-foreground shadow-lg p-1.5"
+                    style={{ maxHeight }}
+                    // Keep focus in the field when a row is pressed, or blur would close the list first.
+                    onMouseDown={(e) => e.preventDefault()}
+                >
+                    <ul
+                        id={LIST_ID}
+                        role="listbox"
+                        aria-label="Vorschläge"
+                        className="min-h-0 overflow-y-auto"
+                    >
+                        {rows.map((row, i) => (
+                            <li
+                                key={row.id}
+                                id={row.id}
+                                role="option"
+                                aria-selected={i === active}
+                                onClick={() => choose(row)}
+                                className={cn(
+                                    'flex min-h-12 cursor-pointer items-center gap-2 rounded-lg px-3 text-base hover:bg-muted',
+                                    i === active && 'bg-muted outline-2 -outline-offset-2 outline-ring',
+                                )}
+                            >
+                                <span className="min-w-0 truncate">
+                                    {row.article && <span className="text-pos-other">{row.article} </span>}
+                                    <b className="font-semibold">{row.head}</b>
+                                    {row.tail}
+                                </span>
+                                {row.classLabel && (
+                                    <span className="ml-auto flex shrink-0 items-center gap-1.5 text-xs text-pos-other">
+                                        {row.dot && <span aria-hidden="true" className={cn('size-2 rounded-full', row.dot)} />}
+                                        {row.classLabel}
+                                    </span>
+                                )}
+                            </li>
+                        ))}
+                    </ul>
+                    {/* Not in the listbox (its children are options). Spoken once by the placeholder, so hidden here. */}
+                    <p aria-hidden="true" className="mt-1 shrink-0 border-t px-3 pb-1 pt-2 text-xs text-muted-foreground">
+                        Oder eine ganze Verbindung eingeben, z. B. „eine Entscheidung treffen“
+                    </p>
+                </div>
+            )}
+            <div role="status" className="sr-only">{announcement}</div>
             {/* Always in the DOM, so screen readers announce the hint when it appears. */}
             <div aria-live="polite">
                 {showHint && (
