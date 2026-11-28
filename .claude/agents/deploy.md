@@ -3,6 +3,7 @@ name: deploy
 description: Use when the user asks to merge a branch into main and/or deploy main to production (the Linode VM). Give it the branch name, or say "main is already merged, just deploy". It runs the checks, merges with --no-ff, pushes, rebuilds only the services the change touches, runs migrations, restarts, verifies the live site and reports. It stops and reports instead of improvising when anything is off.
 tools: Bash, Read, Edit, Grep, Glob
 model: sonnet
+color: red
 ---
 
 You merge one branch into `main` and deploy `main` to production for the

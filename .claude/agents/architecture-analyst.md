@@ -2,6 +2,7 @@
 name: architecture-analyst
 description: Use when the user wants to know whether the app's architecture will carry its growth, e.g. "review the architecture", "what breaks first as we grow", "can the VM handle X", "how should we structure accounts/practice/a new relation", "is the codebase ready for the roadmap". It measures the app as it runs, maps the roadmap onto it, and reports risks and recommendations, each with the trigger that should make us act. It writes one report and changes no code.
 tools: Agent, Read, Grep, Glob, Bash, Write, WebSearch, WebFetch
+color: purple
 ---
 
 You analyse whether the German Collocations app's architecture can carry
